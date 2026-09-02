@@ -1,0 +1,76 @@
+# [R01] Runtime font-generation architecture
+
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** pending
+> **Blocked by:** R04, R11 · **Blocks:** R05, R12
+
+## Objective
+
+Meet an explicit end-to-end latency and resource budget without compressing an entire WOFF2 face synchronously for every response token.
+
+## Background
+
+`packages/core/src/engine.ts:175-182` creates a full-font permutation, rebuilds `cmap`, and invokes WOFF2 WASM on each unique token/face cache miss. `packages/core/src/cli.ts:239-259` benchmarks only text encoding. Review measurements placed the hot path between 681 and 2,075 ms for representative 182–877 KB faces.
+
+## Goals
+
+- Keep response mappings fresh and non-reusable at the documented scope.
+- Bound latency, CPU, memory, and concurrent generation.
+- Preserve byte-identical non-`cmap` tables and the final face model from R04.
+- Make performance mode and any security downgrade explicit in configuration and payload metadata.
+
+## Non-goals
+
+- Preventing recovery from a downloaded font.
+- Glyph slicing, watermarking, geometry perturbation, or requester fingerprinting.
+- Hiding infrastructure latency with misleading benchmark output.
+
+## Requirements
+
+1. The selected architecture MUST be recorded by an ADR comparing at least: one-use pre-generation pools, worker-thread/native compression, prepared coverage subsets, and a time-window rotation mode.
+2. The ordinary request handler MUST NOT perform unbounded synchronous WOFF2 compression on the event loop.
+3. Identical concurrent `(token, face)` requests MUST share one in-flight job.
+4. Generation queues MUST have concurrency, timeout, cancellation, and overload policies that fail closed.
+5. Memory caches MUST be bounded by bytes and expiry, not only entry count.
+6. Benchmarks MUST include token validation, permutation, cmap patching, compression or pool acquisition, and response construction.
+7. Reference gates MUST cover 100 KB and 1 MB normalized faces on Node 22 and 24, with cold and warm p50/p95/p99 results.
+8. The implementation MUST expose counters/timings without content, seed, token, or mapping telemetry.
+
+## Design
+
+The implementation phase begins with an ADR and microbenchmarks rather than immediately optimizing the existing loop. Preferred direction:
+
+1. R04 produces bounded prepared faces and coverage-specific artifacts.
+2. A `FontVariantProvider` abstraction owns acquisition of a one-use generated variant.
+3. The default provider maintains a low-watermark pool produced off the request event loop. A consumed variant is never reassigned to another protected response.
+4. The encrypted token identifies the prepared variant and authorized face rather than forcing stateless recomputation.
+5. Deployments that cannot maintain a pool may opt into a documented window-rotation provider; the type and docs must state that it is not per-response.
+6. The current stateless compressor remains test-only until it meets the same gates.
+
+The final choice may differ if benchmarks disprove the pool approach, but it must satisfy the requirements above and preserve the claim boundary.
+
+## Scope
+
+- `packages/core/src/engine.ts`
+- `packages/core/src/font-pipeline.ts`
+- new `packages/core/src/variant-provider.ts` and worker/pool modules
+- `packages/core/src/types.ts`
+- `packages/core/src/cli.ts`
+- performance fixtures and CI benchmark jobs
+
+## Testing strategy
+
+- Unit tests for pool uniqueness, cancellation, overload, expiry, and byte-bounded eviction.
+- Concurrency tests proving one generation for duplicate requests and distinct variants for distinct responses.
+- End-to-end benchmark suites with real 100 KB and 1 MB prepared faces.
+- Event-loop delay assertions under parallel font requests.
+- Failure tests proving overload never falls back to plaintext or a previously consumed mapping.
+
+## Risks
+
+- A pool creates state and changes the current stateless deployment story.
+- Serverless cold starts may require a weaker explicit mode or an external pool.
+- Subsetting must retain glyph closure for GSUB/GPOS and complex shaping.
+
+## Exit criteria
+
+The chosen provider meets approved cold/warm p95 targets on Node 22/24, has bounded queue and memory behavior, performs no duplicate concurrent work, and preserves one-use mapping semantics in its default mode.
