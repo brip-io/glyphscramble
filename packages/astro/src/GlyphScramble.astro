@@ -1,0 +1,14 @@
+---
+import type { GlyphPayload } from "@brip/glyphscramble";
+const { payload } = Astro.props as { payload: GlyphPayload };
+---
+
+<style is:inline nonce={payload.cspNonce} set:html={payload.css}></style>
+<span hidden aria-hidden="true" data-glyphscramble-payload data-family={payload.family}>{payload.encodedText}</span>
+<script is:inline>
+  for (const node of document.querySelectorAll("[data-glyphscramble-payload]")) {
+    const family = node.getAttribute("data-family");
+    node.style.fontFamily = `"${family}"`;
+    document.fonts.load(`1em "${family}"`, node.textContent.slice(0, 32)).then(() => { node.hidden = false; });
+  }
+</script>

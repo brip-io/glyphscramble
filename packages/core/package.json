@@ -1,0 +1,43 @@
+{
+  "name": "@brip/glyphscramble",
+  "version": "0.1.0-beta.0",
+  "description": "Core engine and CLI for per-response glyph scrambling.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "glyphscramble": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@unicode/unicode-17.0.0": "^1.6.17",
+    "parse5": "^8.0.0",
+    "woff2-encoder": "^2.0.0"
+  }
+}

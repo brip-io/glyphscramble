@@ -1,0 +1,35 @@
+{
+  "name": "@brip/glyphscramble-vite",
+  "version": "0.1.0-beta.0",
+  "description": "Vite SSR primitives and explicitly per-build static GlyphScramble plugin.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:^"
+  },
+  "peerDependencies": {
+    "vite": ">=7 <9"
+  }
+}

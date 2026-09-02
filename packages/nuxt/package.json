@@ -1,0 +1,41 @@
+{
+  "name": "@brip/glyphscramble-nuxt",
+  "version": "0.1.0-beta.0",
+  "description": "Nuxt/Nitro request integration for GlyphScramble.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./module": {
+      "types": "./dist/module.d.ts",
+      "import": "./dist/module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:^",
+    "@brip/glyphscramble-vue": "workspace:^"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4 <5",
+    "vue": ">=3.5 <4"
+  }
+}
