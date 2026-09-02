@@ -1,4 +1,6 @@
 import type { GlyphConfig } from "./types.js";
+import spdxParse from "spdx-expression-parse";
+import { parseCoverage } from "./coverage.js";
 
 const HTTPS = /^https:\/\//i;
 
@@ -36,6 +38,24 @@ export function validateGlyphConfig(config: GlyphConfig): void {
         `Font ${id} requires an SPDX expression and license file.`,
       );
     }
+    try {
+      spdxParse(font.license.spdx);
+    } catch {
+      throw new Error(`Font ${id} has an invalid SPDX license expression.`);
+    }
+    if (font.coverage) parseCoverage(font.coverage);
+    const faces = Object.entries(font.faces ?? {});
+    for (const [faceId, selector] of faces) {
+      if (!/^[a-z][a-z0-9_-]*$/i.test(faceId))
+        throw new Error(`Invalid face id ${faceId} for font ${id}.`);
+      if (selector.coverage) parseCoverage(selector.coverage);
+    }
+    if (font.defaultFace && !font.faces?.[font.defaultFace])
+      throw new Error(
+        `Font ${id} defaultFace ${font.defaultFace} is not present in faces.`,
+      );
+    if (faces.length > 1 && !font.defaultFace)
+      throw new Error(`Font ${id} with multiple faces requires defaultFace.`);
     if (font.source.kind !== "file" && !HTTPS.test(font.source.url)) {
       throw new Error(`Remote font ${id} must use HTTPS.`);
     }
