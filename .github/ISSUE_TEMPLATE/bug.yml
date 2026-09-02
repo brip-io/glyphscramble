@@ -1,0 +1,19 @@
+name: Bug report
+description: Report a reproducible GlyphScramble defect
+body:
+  - type: checkboxes
+    attributes:
+      label: Threat-model check
+      options:
+        - label: I understand that headless browsers, OCR, and font analysis are documented recovery paths.
+          required: true
+  - type: input
+    attributes:
+      label: Package and version
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+    validations:
+      required: true

@@ -1,0 +1,38 @@
+{
+  "name": "@brip/glyphscramble-vue",
+  "version": "0.1.0-beta.0",
+  "description": "Vue component for GlyphScramble payloads.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:^"
+  },
+  "peerDependencies": {
+    "vue": ">=3.5 <4"
+  },
+  "devDependencies": {
+    "vue": "^3.5.21"
+  }
+}

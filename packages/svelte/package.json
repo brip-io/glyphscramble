@@ -1,0 +1,37 @@
+{
+  "name": "@brip/glyphscramble-svelte",
+  "version": "0.1.0-beta.0",
+  "description": "Svelte component and action for GlyphScramble payloads.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./GlyphScramble.svelte": "./src/GlyphScramble.svelte"
+  },
+  "files": [
+    "dist",
+    "src/GlyphScramble.svelte"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": ">=5 <6"
+  }
+}
