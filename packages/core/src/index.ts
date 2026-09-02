@@ -2,6 +2,9 @@ export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
 export { createGlyphEngine, protectedResponseHeaders } from "./engine.js";
 export {
   inspectFont,
+  loadPreparedFont,
+  loadPreparedFonts,
+  parseCssFontFaces,
   prepareGlyphFonts,
   summarizeCoverage,
 } from "./font-pipeline.js";
@@ -19,13 +22,17 @@ export {
 export type {
   DoctorFinding,
   FontConfig,
+  FontAxisMetadata,
+  FontFaceDescriptors,
   FontFaceMetadata,
+  FontFaceSelector,
   FontLicense,
   FontSource,
   GlyphConfig,
   GlyphEngine,
   GlyphLockfile,
   GlyphPayload,
+  PreparedFontFamilyMetadata,
   ResponseContext,
   ScrambleOptions,
 } from "./types.js";

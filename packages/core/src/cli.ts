@@ -239,8 +239,10 @@ async function doctor(root: string): Promise<DoctorFinding[]> {
 async function benchmark(configPath: string): Promise<void> {
   const config = await loadConfig(configPath);
   const lock = await prepareGlyphFonts(config);
-  const face = Object.values(lock.fonts)[0];
-  if (!face) throw new Error("No font configured.");
+  const family = Object.values(lock.fonts)[0];
+  if (!family) throw new Error("No font configured.");
+  const face = family.faces[family.defaultFace];
+  if (!face) throw new Error("Configured default font face was not prepared.");
   const seed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   const permutation = createPermutation(face.codepoints, seed, "benchmark");
   const candidates = face.codepoints.filter((cp) => permutation.encode.has(cp));

@@ -50,6 +50,11 @@ export default defineGlyphConfig({
         url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700",
       },
       license: { spdx: "OFL-1.1", file: "./licenses/OFL.txt" },
+      faces: {
+        regular: { family: "Inter", weight: 400, coverage: ["U+0000-00FF"] },
+        bold: { family: "Inter", weight: 700, coverage: ["U+0000-00FF"] },
+      },
+      defaultFace: "regular",
     },
   },
   rotation: {
@@ -63,7 +68,11 @@ export default defineGlyphConfig({
 });
 ```
 
-The license declaration is an acknowledgement, not legal advice. Original and generated fonts retain their own license and notices; GlyphScramble does not relicense them.
+CSS sources that contain more than one `@font-face` require explicit named selectors, so a remote stylesheet cannot silently change which weight, style, stretch, or Unicode subset is used. Select a non-default face with `{ font: "body", face: "bold" }`.
+
+Coverage limits the codepoints eligible for permutation and can satisfy the normalized-size guard, but it does not physically subset outline tables in this release. Use an already-subset source when artifact size matters. Preparation records raw and normalized hashes, copies the exact notice bytes into `.glyphscramble/licenses`, and publishes all faces plus the lockfile transactionally.
+
+The license declaration is an acknowledgement, not legal advice. SPDX syntax is validated, but GlyphScramble does not decide whether modification or redistribution is permitted. Original and generated fonts retain their own license and notices; GlyphScramble does not relicense them.
 
 ## Static websites
 
@@ -80,7 +89,7 @@ npx glyphscramble prepare
 npx glyphscramble static --input dist --output dist-protected
 ```
 
-The command copies the build, rewrites marked text nodes, and emits `/_glyphscramble/static.css`, `static.js`, and matching WOFF2 files. A new random mapping is generated on every build. Passing `--seed` makes builds reproducible but also makes mappings reproducible; keep that option for deterministic CI only.
+The command copies the build, rewrites marked text nodes, and emits `/_glyphscramble/static.css`, `static.js`, matching WOFF2 files, and the configured font notices. A new random mapping is generated on every build. Passing `--seed` makes builds reproducible but also makes mappings reproducible; keep that option for deterministic CI only.
 
 Static mode has excellent CDN behavior but weaker resistance: every visitor and every page in that build shares a downloadable mapping. It must never be described as per-response rotation.
 

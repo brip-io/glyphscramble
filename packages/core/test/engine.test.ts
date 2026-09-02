@@ -55,6 +55,7 @@ describe("request engine", () => {
     expect(one.encodedText).not.toBe("Secret Value");
     expect(one.encodedText).not.toBe(two.encodedText);
     expect(one.fontToken).not.toBe(two.fontToken);
+    expect(one.face).toBe("default");
     expect(JSON.stringify(one)).not.toContain("Secret Value");
     const response = await engine.fontResponse(
       new Request(`https://example.test${one.fontUrl}`),
@@ -94,5 +95,72 @@ describe("request engine", () => {
     expect(html).not.toContain("Secret Value");
     expect(html).toContain("Indexable copy");
     expect(html).toContain("/_glyphscramble/static.css");
+    expect(
+      await readFile(
+        join(cwd, "protected/_glyphscramble/licenses/body.LICENSE.txt"),
+        "utf8",
+      ),
+    ).toBe("fixture license");
+  });
+
+  it("selects named faces and reproduces their CSS descriptors", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-faces-"));
+    await mkdir(join(cwd, "licenses"));
+    await writeFile(join(cwd, "licenses/OFL.txt"), "fixture license");
+    const config = defineGlyphConfig({
+      fonts: {
+        body: {
+          source: {
+            kind: "google-css",
+            url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700",
+          },
+          license: { spdx: "OFL-1.1", file: "./licenses/OFL.txt" },
+          faces: {
+            regular: { family: "Inter", weight: 400 },
+            bold: { family: "Inter", weight: 700 },
+          },
+          defaultFace: "regular",
+        },
+      },
+      rotation: {
+        scope: "response",
+        secretEnv: "GLYPHSCRAMBLE_SECRET",
+        tokenTtlSeconds: 600,
+      },
+      routePrefix: "/_glyphscramble",
+      unsupported: "error",
+      accessibilityRiskAcknowledged: true,
+    });
+    const css = `
+      @font-face { font-family: Inter; font-weight: 400; font-style: normal; src: url(https://fonts.gstatic.test/regular.woff2); }
+      @font-face { font-family: Inter; font-weight: 700; font-style: italic; src: url(https://fonts.gstatic.test/bold.woff2); }
+    `;
+    const fetcher = (async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      return url.startsWith("https://fonts.googleapis.com/")
+        ? new Response(css)
+        : new Response(syntheticFont());
+    }) as typeof fetch;
+    await prepareGlyphFonts(config, { cwd, fetcher });
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const engine = await createGlyphEngine(config, { cwd });
+    const context = engine.beginResponse();
+    const regular = context.scramble("Secret", { font: "body" });
+    const bold = context.scramble("Secret", { font: "body", face: "bold" });
+    expect(regular.face).toBe("regular");
+    expect(regular.css).toContain("font-weight:400");
+    expect(bold.face).toBe("bold");
+    expect(bold.css).toContain("font-weight:700");
+    expect(bold.css).toContain("font-style:italic");
+    expect(bold.fontUrl).not.toBe(regular.fontUrl);
+    expect(
+      await engine.fontResponse(
+        new Request(`https://example.test${bold.fontUrl}`),
+      ),
+    ).toMatchObject({ status: 200 });
+    expect(() =>
+      context.scramble("Secret", { font: "body", face: "missing" }),
+    ).toThrow(/Unknown GlyphScramble face/);
   });
 });
