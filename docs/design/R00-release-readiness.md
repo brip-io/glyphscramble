@@ -126,7 +126,7 @@ Normalize safe defaults, enforce one cross-framework usability rubric, make init
 
 Retain generation-time mappings on variants, replace per-swap HMAC with an unbiased keystream, and make request encoding proportional to protected text rather than font repertoire.
 
-#### R17 · Runtime capacity, lifecycle, and observability · **M**
+#### R17 · Runtime capacity, lifecycle, and observability · **M** · **Implemented in [PR #47](https://github.com/brip-io/glyphscramble/pull/47)**
 
 Add bounded async acquisition, scalable expiry, persistent workers, graceful drain, diagnostics, stable benchmark methodology, and an evidence-based WOFF 1.0 spike.
 
