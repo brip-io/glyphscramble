@@ -1,6 +1,6 @@
 # [R06] Client payload and font-load lifecycle
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#7](https://github.com/brip-io/glyphscramble/issues/7)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In review in [PR #25](https://github.com/brip-io/glyphscramble/pull/25) · **GitHub issue:** [#7](https://github.com/brip-io/glyphscramble/issues/7)
 > **Blocked by:** R04, R05 · **Blocks:** R03, R07-R10, R12
 
 ## Objective
@@ -67,3 +67,17 @@ Replace `payload.css` with a versioned payload containing `face: { family, weigh
 ## Exit criteria
 
 All adapters consume one validated data-only payload and shared lifecycle; repeated updates and navigation reveal only after the exact face loads and leave no stale rules, timers, or accessible encoded text.
+
+## Implementation evidence
+
+[PR #25](https://github.com/brip-io/glyphscramble/pull/25) introduces the
+data-only v2 payload, bounded runtime validation, root-relative token/face-bound
+font URLs, exact `FontFace` registration and verification, reference-counted
+cleanup, abortable update/destroy handles, nonce-scoped CSP rules, and shared
+React, Vue, Svelte, and Astro adapters.
+
+Unit coverage exercises malformed and oversized payloads, descriptor and
+coverage invariants, deduplication, timeout, exact-face failure, rapid updates,
+teardown, and CSP helpers. Playwright runs duplicate mounts, strict CSP, stale
+navigation-style updates, font failure, and accessibility-state assertions in
+Chromium, Firefox, and WebKit CI projects.
