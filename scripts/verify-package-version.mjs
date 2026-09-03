@@ -33,6 +33,10 @@ try {
   const generated = await import(
     `${pathToFileURL(join(packedRoot, "dist/generated/version.js")).href}?verify=${Date.now()}`
   );
+  const browserRuntime = await readFile(
+    join(packedRoot, "dist/browser.js"),
+    "utf8",
+  );
   const { stdout: cliOutput } = await execute(
     process.execPath,
     [join(core, "dist/cli.js"), "--version"],
@@ -46,6 +50,10 @@ try {
   if (cliOutput.trim() !== manifest.version)
     throw new Error(
       `CLI version ${cliOutput.trim()} does not match manifest ${manifest.version}.`,
+    );
+  if (/\b(?:import|export)\s[^;]*?\sfrom\s+["']\.\//u.test(browserRuntime))
+    throw new Error(
+      "Packed browser runtime contains a relative module dependency instead of one self-contained artifact.",
     );
   process.stdout.write(
     `Verified packed GlyphScramble version ${manifest.version}.\n`,
