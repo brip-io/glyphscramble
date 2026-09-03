@@ -56,6 +56,23 @@ export interface GlyphConfig {
     /** Explicit opt-out for controlled build networks; false by default. */
     allowPrivateHosts?: boolean;
   };
+  /** Runtime limits for one-use response font variants. */
+  runtime?: {
+    /** The beta runtime never silently downgrades to a reusable mapping. */
+    variantMode?: "response-pool";
+    /** Variants synchronously available before a protected response begins. */
+    poolLowWatermark?: number;
+    /** Maximum ready variants retained ahead of demand. */
+    poolHighWatermark?: number;
+    /** Maximum font-generation jobs running at once. */
+    generationConcurrency?: number;
+    /** Maximum jobs waiting behind active generators. */
+    generationQueueLimit?: number;
+    /** Per-face generation deadline. */
+    generationTimeoutMs?: number;
+    /** Combined byte ceiling for ready and issued WOFF2 variants. */
+    cacheMaxBytes?: number;
+  };
 }
 
 declare const glyphPayloadBrand: unique symbol;
@@ -71,6 +88,11 @@ export interface GlyphPayload {
   readonly fontUrl: string;
   readonly coverage: readonly string[];
   readonly css: string;
+  readonly rotation: {
+    readonly scope: "response";
+    readonly variantMode: "response-pool";
+    readonly reusableAcrossResponses: false;
+  };
   readonly cspNonce?: string;
 }
 
@@ -84,6 +106,34 @@ export interface ScrambleOptions {
 export interface ResponseContext {
   readonly token: string;
   scramble(text: string, options: ScrambleOptions): GlyphPayload;
+}
+
+export interface GlyphEngineMetrics {
+  readonly variantMode: "response-pool";
+  readonly leasesIssued: number;
+  readonly poolExhaustions: number;
+  readonly fontHits: number;
+  readonly fontMisses: number;
+  readonly generations: number;
+  readonly generationFailures: number;
+  readonly generationTimeouts: number;
+  readonly generationCancellations: number;
+  readonly generationOverloads: number;
+  readonly expiredVariants: number;
+  readonly capacityDrops: number;
+  readonly readyVariants: number;
+  readonly activeVariants: number;
+  readonly cacheBytes: number;
+  readonly queueDepth: number;
+  readonly activeGenerators: number;
+  readonly generationMilliseconds: {
+    readonly count: number;
+    readonly total: number;
+    readonly max: number;
+    readonly p50: number;
+    readonly p95: number;
+    readonly p99: number;
+  };
 }
 
 export interface FontAxisMetadata {
@@ -155,6 +205,7 @@ export interface GlyphLockfile {
 export interface GlyphEngine {
   beginResponse(): ResponseContext;
   fontResponse(request: Request): Promise<Response>;
+  metrics(): GlyphEngineMetrics;
   close(): Promise<void>;
 }
 

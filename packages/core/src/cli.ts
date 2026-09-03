@@ -6,8 +6,9 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { buildStaticSite } from "./static-site.js";
+import { createGlyphEngine } from "./engine.js";
 import { inspectFont, prepareGlyphFonts } from "./font-pipeline.js";
-import { createPermutation, encodeText } from "./unicode.js";
+import { createPermutation } from "./unicode.js";
 import type { DoctorFinding, GlyphConfig } from "./types.js";
 
 const HELP = `GlyphScramble by BRIP
@@ -61,6 +62,15 @@ export default defineGlyphConfig({
     scope: "response",
     secretEnv: "GLYPHSCRAMBLE_SECRET",
     tokenTtlSeconds: 600,
+  },
+  runtime: {
+    variantMode: "response-pool",
+    poolLowWatermark: 2,
+    poolHighWatermark: 4,
+    generationConcurrency: 2,
+    generationQueueLimit: 64,
+    generationTimeoutMs: 10_000,
+    cacheMaxBytes: 64 * 1024 * 1024,
   },
   routePrefix: "/_glyphscramble",
   unsupported: "error",
@@ -251,26 +261,111 @@ async function benchmark(configPath: string): Promise<void> {
   const sample = Array.from({ length: 10_000 }, (_, index) =>
     String.fromCodePoint(candidates[index % candidates.length]!),
   ).join("");
-  const timings: number[] = [];
-  for (let index = 0; index < 30; index++) {
-    const start = performance.now();
-    encodeText(sample, permutation);
-    timings.push(performance.now() - start);
-  }
-  timings.sort((a, b) => a - b);
-  const p95 = timings[Math.floor(timings.length * 0.95)]!;
-  process.stdout.write(
-    JSON.stringify(
-      {
-        scalars: 10_000,
-        p95Milliseconds: Number(p95.toFixed(3)),
-        targetMilliseconds: 5,
-        pass: p95 < 5,
-      },
-      null,
-      2,
-    ) + "\n",
+  const iterations = 20;
+  const normalizedBytes = Object.values(lock.fonts).reduce(
+    (familyTotal, item) =>
+      familyTotal +
+      Object.values(item.faces).reduce(
+        (faceTotal, itemFace) => faceTotal + itemFace.bytes,
+        0,
+      ),
+    0,
   );
+  const benchmarkConfig: GlyphConfig = {
+    ...config,
+    runtime: {
+      ...config.runtime,
+      variantMode: "response-pool",
+      poolLowWatermark: iterations,
+      poolHighWatermark: iterations,
+      cacheMaxBytes: Math.max(
+        config.runtime?.cacheMaxBytes ?? 0,
+        normalizedBytes * iterations * 2,
+      ),
+    },
+  };
+  const secretName = config.rotation.secretEnv;
+  const oldSecret = process.env[secretName];
+  if (!oldSecret)
+    process.env[secretName] =
+      "local glyphscramble benchmark secret, never used in production";
+  const encoding: number[] = [];
+  const acquisition: number[] = [];
+  const response: number[] = [];
+  let engine: Awaited<ReturnType<typeof createGlyphEngine>> | undefined;
+  const coldStarted = performance.now();
+  try {
+    engine = await createGlyphEngine(benchmarkConfig);
+    const coldPoolMilliseconds = performance.now() - coldStarted;
+    for (let index = 0; index < iterations; index++) {
+      const acquisitionStarted = performance.now();
+      const context = engine.beginResponse();
+      const encodingStarted = performance.now();
+      const protectedPayload = context.scramble(sample, {
+        font: family.id,
+        face: face.id,
+      });
+      encoding.push(performance.now() - encodingStarted);
+      acquisition.push(performance.now() - acquisitionStarted);
+      const responseStarted = performance.now();
+      const fontResponse = await engine.fontResponse(
+        new Request(`https://benchmark.invalid${protectedPayload.fontUrl}`),
+      );
+      response.push(performance.now() - responseStarted);
+      if (!fontResponse.ok)
+        throw new Error(
+          `Benchmark font response failed: ${fontResponse.status}`,
+        );
+      await fontResponse.arrayBuffer();
+    }
+    const metrics = engine.metrics();
+    const encodingStats = timingStats(encoding);
+    const acquisitionStats = timingStats(acquisition);
+    const responseStats = timingStats(response);
+    process.stdout.write(
+      JSON.stringify(
+        {
+          node: process.version,
+          mode: "response-pool",
+          iterations,
+          scalarsPerResponse: 10_000,
+          normalizedBytes,
+          coldPoolMilliseconds: Number(coldPoolMilliseconds.toFixed(3)),
+          backgroundGenerationMilliseconds: metrics.generationMilliseconds,
+          responseAcquisitionMilliseconds: acquisitionStats,
+          preparedFontResponseMilliseconds: responseStats,
+          gates: {
+            encodingP95Under5ms: encodingStats.p95 < 5,
+            preparedFontResponseP95Under5ms: responseStats.p95 < 5,
+            noPoolExhaustion: metrics.poolExhaustions === 0,
+            noGenerationFailure: metrics.generationFailures === 0,
+          },
+          encodingMilliseconds: encodingStats,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+  } finally {
+    if (engine) await engine.close();
+    if (oldSecret === undefined) delete process.env[secretName];
+    else process.env[secretName] = oldSecret;
+  }
+}
+
+function timingStats(values: readonly number[]): {
+  p50: number;
+  p95: number;
+  p99: number;
+} {
+  const sorted = [...values].sort((left, right) => left - right);
+  const at = (quantile: number) =>
+    Number(
+      sorted[
+        Math.min(sorted.length - 1, Math.ceil(sorted.length * quantile) - 1)
+      ]!.toFixed(3),
+    );
+  return { p50: at(0.5), p95: at(0.95), p99: at(0.99) };
 }
 
 async function main(): Promise<void> {

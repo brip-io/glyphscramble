@@ -48,7 +48,7 @@ Do not put plaintext into JSON-LD, `aria-label`, hidden DOM nodes, comments, hyd
 
 ## Caching
 
-Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. The matching font is private and immutable for the token lifetime. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
+Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. The matching font is private and immutable for the remaining token lifetime. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
 
 Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Cache its content-addressed font and CSS for a long time and rotate by rebuilding. Do not mix static pages from one build with assets from another.
 
@@ -60,4 +60,4 @@ This means the protected block is not WCAG-conformant. Limit it to opted-in, non
 
 ## Failure behavior
 
-Protected elements stay hidden until `document.fonts` confirms the generated face. A timeout or CSP/CORS/font error produces a visible generic error, never plaintext. Monitor failures in your own application without sending content or mapping data to BRIP.
+Protected elements stay hidden until `document.fonts` confirms the generated face. A timeout, CSP/CORS/font error, process restart, wrong-instance route, or exhausted variant pool produces a visible generic error, never plaintext. Monitor the engine's content-free counters and timings in your own application without sending content or mapping data to BRIP.

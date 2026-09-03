@@ -24,4 +24,19 @@ describe("response tokens", () => {
     expect(() => readToken(tampered, secret)).toThrow(/Invalid|tampered/);
     expect(() => issueToken("weak", 60)).toThrow(/at least 32/);
   });
+
+  it("binds a response-pool token to its prepared variant and faces", () => {
+    const issued = issueToken(secret, 60, 1_000_000, {
+      seed: "prepared-seed",
+      variant: "prepared-variant",
+      variantMode: "response-pool",
+      faces: ["body@regular", "body@bold"],
+    });
+    expect(readToken(issued.token, secret, 1_000_000)).toMatchObject({
+      seed: "prepared-seed",
+      variant: "prepared-variant",
+      variantMode: "response-pool",
+      faces: ["body@regular", "body@bold"],
+    });
+  });
 });

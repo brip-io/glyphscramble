@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Move response-specific WOFF2 generation into a bounded one-use worker pool so protected requests perform only token validation and lookup, while overload, expiry, restart, and capacity failures remain closed and observable without content telemetry.
 - Prepare explicit named font faces from structured CSS, enforce Unicode coverage, preserve license notices, and carry verified descriptors and source identities through dynamic and static delivery.
 - Bound remote font ingestion and harden SFNT, WOFF, WOFF2, and `cmap` validation; pin reproducible Unicode 17 classification so malformed or oversized build inputs fail closed.
 

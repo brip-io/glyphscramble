@@ -1,6 +1,22 @@
 export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
 export { createGlyphEngine, protectedResponseHeaders } from "./engine.js";
 export {
+  DEFAULT_VARIANT_RUNTIME,
+  ResponsePoolVariantProvider,
+  VariantCancelledError,
+  VariantOverloadError,
+  VariantTimeoutError,
+  VariantUnavailableError,
+  variantRuntimeOptions,
+} from "./variant-provider.js";
+export type {
+  FontVariantLease,
+  FontVariantProvider,
+  VariantFace,
+  VariantGenerator,
+  VariantProviderOptions,
+} from "./variant-provider.js";
+export {
   inspectFont,
   loadPreparedFont,
   loadPreparedFonts,
@@ -44,6 +60,7 @@ export type {
   FontSource,
   GlyphConfig,
   GlyphEngine,
+  GlyphEngineMetrics,
   GlyphLockfile,
   GlyphPayload,
   PreparedFontFamilyMetadata,
