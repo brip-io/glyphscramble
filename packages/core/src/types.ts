@@ -77,7 +77,7 @@ export interface GlyphConfig {
     generationQueueLimit?: number;
     /** Per-face generation deadline. */
     generationTimeoutMs?: number;
-    /** Combined byte ceiling for ready and issued WOFF2 variants. */
+    /** Combined byte ceiling for ready and issued WOFF2 variants and mappings. */
     cacheMaxBytes?: number;
   };
   /** Build-time delivery policy for the reusable static mapping fallback. */

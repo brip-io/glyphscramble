@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createCipheriv, createHmac } from "node:crypto";
 import {
   unicodePropertyKeys,
   unicodePropertyRanges,
@@ -6,6 +6,12 @@ import {
 } from "./generated/unicode17.js";
 
 export const UNICODE_VERSION = "17.0.0" as const;
+export const PERMUTATION_ALGORITHM =
+  "glyphscramble-aes-256-ctr-rejection-v2" as const;
+
+const UINT32_RANGE = 0x1_0000_0000;
+const KEYSTREAM_BLOCK_BYTES = 256;
+const ZERO_KEYSTREAM_BLOCK = Buffer.alloc(KEYSTREAM_BLOCK_BYTES);
 
 /** Characters whose independent substitution can alter segmentation, ordering, or shaping. */
 export function isStructuralCodePoint(cp: number): boolean {
@@ -43,22 +49,125 @@ export function propertySignature(cp: number): string | null {
   return null;
 }
 
-function randomIndex(
+/** Converts uniform 32-bit words to a bounded value without modulo bias. */
+export function unbiasedIndex(nextUint32: () => number, size: number): number {
+  if (!Number.isSafeInteger(size) || size < 1 || size > UINT32_RANGE)
+    throw new Error(
+      "Permutation bound must be an integer from 1 through 2^32.",
+    );
+  const limit = Math.floor(UINT32_RANGE / size) * size;
+  let value: number;
+  do {
+    value = nextUint32();
+    if (!Number.isInteger(value) || value < 0 || value >= UINT32_RANGE)
+      throw new Error(
+        "Permutation keystream must return unsigned 32-bit words.",
+      );
+  } while (value >= limit);
+  return value % size;
+}
+
+function keystream(
   seed: string,
-  group: string,
-  position: number,
-  size: number,
-): number {
-  const digest = createHmac("sha256", Buffer.from(seed, "base64url"))
-    .update(group)
-    .update(":" + position)
-    .digest();
-  return digest.readUInt32BE(0) % size;
+  namespace: string,
+  signature: string,
+): () => number {
+  const seedBytes = Buffer.from(seed, "base64url");
+  const derive = (purpose: string): Buffer => {
+    const hmac = createHmac("sha256", seedBytes);
+    for (const value of [
+      purpose,
+      PERMUTATION_ALGORITHM,
+      UNICODE_VERSION,
+      namespace,
+      signature,
+    ]) {
+      const bytes = Buffer.from(value);
+      const length = Buffer.allocUnsafe(4);
+      length.writeUInt32BE(bytes.length);
+      hmac.update(length).update(bytes);
+    }
+    return hmac.digest();
+  };
+  const key = derive("glyphscramble:permutation:key");
+  const counter = derive("glyphscramble:permutation:counter").subarray(0, 16);
+  const cipher = createCipheriv("aes-256-ctr", key, counter);
+  let bytes = Buffer.alloc(0);
+  let offset = 0;
+  return () => {
+    if (offset === bytes.length) {
+      bytes = cipher.update(ZERO_KEYSTREAM_BLOCK);
+      offset = 0;
+    }
+    const value = bytes.readUInt32BE(offset);
+    offset += 4;
+    return value;
+  };
 }
 
 export interface Permutation {
   encode: ReadonlyMap<number, number>;
   decode: ReadonlyMap<number, number>;
+}
+
+/** Compact immutable lookup retained with a generated response font. */
+export interface CodePointMapping {
+  readonly size: number;
+  readonly byteLength: number;
+  get(codepoint: number): number | undefined;
+}
+
+class CompactCodePointMapping implements CodePointMapping {
+  readonly #keys: Uint32Array;
+  readonly #target: Uint32Array;
+  readonly #size: number;
+  readonly #mask: number;
+
+  constructor(entries: readonly (readonly [number, number])[]) {
+    let capacity = 2;
+    while (capacity * 0.7 < entries.length) capacity *= 2;
+    this.#keys = new Uint32Array(capacity);
+    this.#target = new Uint32Array(capacity);
+    this.#size = entries.length;
+    this.#mask = capacity - 1;
+    for (const [source, target] of entries) {
+      let slot = this.#slot(source);
+      while (this.#keys[slot] !== 0) slot = (slot + 1) & this.#mask;
+      this.#keys[slot] = source + 1;
+      this.#target[slot] = target;
+    }
+    Object.freeze(this);
+  }
+
+  get size(): number {
+    return this.#size;
+  }
+
+  get byteLength(): number {
+    return this.#keys.byteLength + this.#target.byteLength;
+  }
+
+  get(codepoint: number): number | undefined {
+    if (!Number.isInteger(codepoint) || codepoint < 0 || codepoint > 0x10ffff)
+      return undefined;
+    const key = codepoint + 1;
+    let slot = this.#slot(codepoint);
+    while (this.#keys[slot] !== 0) {
+      if (this.#keys[slot] === key) return this.#target[slot];
+      slot = (slot + 1) & this.#mask;
+    }
+    return undefined;
+  }
+
+  #slot(codepoint: number): number {
+    return (Math.imul(codepoint, 0x9e37_79b1) >>> 0) & this.#mask;
+  }
+}
+
+export function compactEncodeMapping(
+  mapping: ReadonlyMap<number, number>,
+): CodePointMapping {
+  return new CompactCodePointMapping([...mapping]);
 }
 
 export interface PermutationPlan {
@@ -99,13 +208,9 @@ export function createPermutationFromPlan(
   for (const { signature, values } of plan.groups) {
     if (values.length < 2) continue;
     const shuffled = [...values];
+    const nextUint32 = keystream(seed, namespace, signature);
     for (let index = shuffled.length - 1; index > 0; index--) {
-      const other = randomIndex(
-        seed,
-        `${namespace}:${signature}`,
-        index,
-        index + 1,
-      );
+      const other = unbiasedIndex(nextUint32, index + 1);
       [shuffled[index], shuffled[other]] = [shuffled[other]!, shuffled[index]!];
     }
     // Deterministically eliminate fixed points without changing the property pool.
@@ -136,30 +241,45 @@ export function createPermutation(
   );
 }
 
-export function encodeText(text: string, permutation: Permutation): string {
+export function encodeText(
+  text: string,
+  permutation: Permutation | CodePointMapping,
+): string {
   if (text !== text.normalize("NFC")) {
     throw new Error("Protected text must be NFC-normalized before scrambling.");
   }
   let encoded = "";
+  const resolved = new Map<number, string>();
   for (const value of text) {
     const cp = value.codePointAt(0)!;
+    const cached = resolved.get(cp);
+    if (cached !== undefined) {
+      encoded += cached;
+      continue;
+    }
     const signature = propertySignature(cp);
     if (!signature) {
       if (isStructuralCodePoint(cp)) {
         encoded += value;
+        resolved.set(cp, value);
         continue;
       }
       throw new Error(
         `No Unicode-safe mapping for U+${cp.toString(16).toUpperCase().padStart(4, "0")}.`,
       );
     }
-    const mapped = permutation.encode.get(cp);
+    const mapped =
+      "encode" in permutation
+        ? permutation.encode.get(cp)
+        : permutation.get(cp);
     if (mapped === undefined) {
       throw new Error(
         `No Unicode-safe mapping for U+${cp.toString(16).toUpperCase().padStart(4, "0")}.`,
       );
     }
-    encoded += String.fromCodePoint(mapped);
+    const replacement = String.fromCodePoint(mapped);
+    resolved.set(cp, replacement);
+    encoded += replacement;
   }
   return encoded;
 }

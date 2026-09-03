@@ -8,12 +8,15 @@ import {
   unicodeStructuralRanges,
 } from "../src/generated/unicode17.js";
 import {
+  compactEncodeMapping,
   createPermutation,
   createPermutationFromPlan,
   createPermutationPlan,
   encodeText,
   isStructuralCodePoint,
+  PERMUTATION_ALGORITHM,
   propertySignature,
+  unbiasedIndex,
 } from "../src/unicode.js";
 
 describe("Unicode-safe permutation", () => {
@@ -49,6 +52,63 @@ describe("Unicode-safe permutation", () => {
       "body",
     );
     expect(planned).toEqual(direct);
+  });
+
+  it("pins the versioned deterministic permutation vector", () => {
+    const permutation = createPermutation(
+      [..."ABCDEFGH"].map((value) => value.codePointAt(0)!),
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "vector",
+    );
+    expect(PERMUTATION_ALGORITHM).toBe(
+      "glyphscramble-aes-256-ctr-rejection-v2",
+    );
+    expect([...permutation.encode]).toEqual([
+      [0x41, 0x46],
+      [0x42, 0x41],
+      [0x43, 0x48],
+      [0x44, 0x43],
+      [0x45, 0x47],
+      [0x46, 0x45],
+      [0x47, 0x42],
+      [0x48, 0x44],
+    ]);
+  });
+
+  it("uses rejection sampling instead of modulo reduction", () => {
+    const words = [0xffff_ffff, 5];
+    expect(unbiasedIndex(() => words.shift()!, 3)).toBe(2);
+    expect(words).toEqual([]);
+    expect(() => unbiasedIndex(() => 0, 0)).toThrow(/bound/);
+  });
+
+  it("compacts encode mappings into explicitly accounted typed storage", () => {
+    const permutation = createPermutation(
+      covered,
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "compact",
+    );
+    const compact = compactEncodeMapping(permutation.encode);
+    expect(compact.size).toBe(permutation.encode.size);
+    expect(compact.byteLength).toBeGreaterThanOrEqual(compact.size * 8);
+    expect(compact.byteLength).toBeLessThan(compact.size * 24);
+    for (const [original, encoded] of permutation.encode)
+      expect(compact.get(original)).toBe(encoded);
+    expect(compact.get(0x10ffff)).toBeUndefined();
+  });
+
+  it("resolves repeated scalars once per encoding call", () => {
+    let lookups = 0;
+    const mapping = {
+      size: 1,
+      byteLength: 8,
+      get(codepoint: number) {
+        lookups++;
+        return codepoint === 0x41 ? 0x42 : undefined;
+      },
+    };
+    expect(encodeText("AAAA", mapping)).toBe("BBBB");
+    expect(lookups).toBe(1);
   });
 
   it("leaves segmentation and bidi controls unchanged", () => {

@@ -27,7 +27,7 @@ import type {
   GlyphConfig,
 } from "./types.js";
 
-const STATIC_ALGORITHM = "glyphscramble-static-v2" as const;
+const STATIC_ALGORITHM = "glyphscramble-static-v3" as const;
 const DEFAULT_FONT_LOAD_TIMEOUT_MS = 8_000;
 const MAX_FONT_LOAD_TIMEOUT_MS = 60_000;
 const FAILURE_TEXT = "This protected content could not be displayed.";

@@ -79,7 +79,7 @@ build manifest.
 
 ## Caching
 
-Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. `ResponseContext.used` remains false until `scramble()` succeeds, so post-render middleware preserves an unprotected response's original cache policy. The matching font is private and immutable only for its remaining token lifetime; `max-age` shrinks on every request. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
+Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. `ResponseContext.used` remains false until `scramble()` succeeds, so post-render middleware preserves an unprotected response's original cache policy. The matching font is private and immutable only for its remaining token lifetime; `max-age` shrinks on every request. Its bytes and compact encode mapping stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size plus mapping storage, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
 
 ## Runtime secrets and rotation
 
