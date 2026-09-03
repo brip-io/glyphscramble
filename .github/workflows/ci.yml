@@ -60,15 +60,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect runtime benchmark inputs
+        id: benchmark-inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE_SHA"...HEAD -- \
+            packages/core \
+            scripts/benchmark-runtime.mjs \
+            package.json \
+            pnpm-lock.yaml \
+            pnpm-workspace.yaml \
+            tsconfig.base.json; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v4
+        if: steps.benchmark-inputs.outputs.run == 'true'
         with:
           version: 11.19.0
       - uses: actions/setup-node@v4
+        if: steps.benchmark-inputs.outputs.run == 'true'
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm benchmark:runtime
+      - if: steps.benchmark-inputs.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.benchmark-inputs.outputs.run == 'true'
+        run: pnpm benchmark:runtime
 
   dco:
     if: github.event_name == 'pull_request'

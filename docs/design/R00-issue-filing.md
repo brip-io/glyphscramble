@@ -22,6 +22,11 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 | R13 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
 | R14 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
 | R15 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
+| R16 | [#33](https://github.com/brip-io/glyphscramble/issues/33) |
+| R17 | [#34](https://github.com/brip-io/glyphscramble/issues/34) |
+| R18 | [#35](https://github.com/brip-io/glyphscramble/issues/35) |
+| R19 | [#36](https://github.com/brip-io/glyphscramble/issues/36) |
+| R20 | [#37](https://github.com/brip-io/glyphscramble/issues/37) |
 
 ## Repository metadata
 

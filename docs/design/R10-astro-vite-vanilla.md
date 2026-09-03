@@ -35,6 +35,8 @@ The Astro component is excluded from Astro typechecking and embeds one unhandled
 7. Static output MUST consume R02/R03 and always emit a per-build downgrade notice.
 8. Generic Fetch and Node examples MUST show request-context ownership, font routing, selective cache headers, streaming limits, and shutdown.
 9. Real Astro and Vite fixtures MUST build and run in CI.
+10. Astro's lazy `ReadableStream` rendering MUST be tested explicitly. The adapter MUST either buffer with a documented ceiling/cost or require route-scoped protection so `private, no-store` is committed before protected bytes.
+11. Astro and vanilla surfaces MUST expose the shared R18 timeout and localized generic-error options.
 
 ## Design
 
@@ -54,6 +56,7 @@ The Vite plugin captures `outDir`, `base`, and build mode during `configResolved
 ## Testing strategy
 
 - `astro check`, Astro SSR/static builds, and navigation/failure E2E.
+- An Astro component that scrambles only when its response stream is pulled, proving the final cache/header contract.
 - Vite resolved base/outDir matrix and repeated-build safety.
 - Hydrated island refusal fixtures.
 - Plaintext scans across HTML, assets, and client chunks.
