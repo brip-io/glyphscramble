@@ -1,6 +1,6 @@
 # [R10] Astro 7, Vite, and vanilla integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#11](https://github.com/brip-io/glyphscramble/issues/11)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#11](https://github.com/brip-io/glyphscramble/issues/11)
 > **Blocked by:** R02, R03, R05, R06 · **Blocks:** R12
 
 ## Objective
@@ -43,6 +43,33 @@ The Astro component is excluded from Astro typechecking and embeds one unhandled
 Astro publishes middleware typed with the official API and a component that invokes a small shared R06 module once per node with teardown. Static mode operates after Astro build only on R02-approved non-hydrated markers.
 
 The Vite plugin captures `outDir`, `base`, and build mode during `configResolved`; it either stages Vite output into a separate protected directory or performs R02's atomic publish flow. The initializer patches a simple `vite.config` only when syntax is safely recognized, otherwise prints an exact manual snippet and exits nonzero/incomplete.
+
+### Streaming and publication decisions
+
+Astro defaults to bounded buffering because `next()` returning a `Response`
+does not prove that lazy component or endpoint rendering has completed. The
+adapter consumes at most 2 MiB before inspecting `ResponseContext.used`; an
+overflow fails before any body escapes. Publishers that need streaming opt into
+an explicit route predicate. Unmatched routes receive no response context,
+while matched routes commit protected headers before `next()`.
+
+The Astro component is a versioned custom element. Native connect/disconnect
+callbacks own one shared R06 mount handle per block, including timeout,
+localized generic error, and teardown. The package itself runs `astro check`.
+
+Vite's config hook redirects its normal fresh output to a private staging tree.
+`configResolved` supplies the project root, base, SSR flag, and final paths;
+`writeBundle` proves output was emitted; `closeBundle` invokes the transactional
+R02/R03 compiler and removes staging after success. SSR and non-root-relative
+bases without an explicit override fail with repair guidance. The initializer
+modifies only a narrow, conventional object-form config and otherwise performs
+no writes.
+
+The Node/Fetch example renders fully before committing headers, serves the
+runtime and font from the same origin, preserves ordinary cache headers,
+demonstrates response rotation, and closes both HTTP server and engine on
+termination. Its comment makes the streaming boundary explicit rather than
+presenting buffering as a universal server adapter.
 
 ## Scope
 

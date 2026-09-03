@@ -10,3 +10,11 @@ packages/demo/.next/
 packages/demo/.output/
 examples/next/.glyphscramble/
 examples/next/.next/
+packages/astro/.astro/
+examples/astro/.astro/
+examples/astro/.glyphscramble/
+examples/astro/dist-static/
+examples/astro/dist-static-input/
+examples/vite-static/.glyphscramble/
+examples/vite-static/dist-site/
+examples/node-fetch/.glyphscramble/

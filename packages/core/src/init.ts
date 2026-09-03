@@ -7,12 +7,15 @@ export type GlyphFramework = "next" | "nuxt" | "sveltekit" | "astro" | "vite";
 interface IntegrationArtifact {
   readonly path: string;
   readonly content: string;
+  /** Exact source that may be replaced after every collision is validated. */
+  readonly replace?: string;
 }
 
 export interface InitResult {
   readonly framework: GlyphFramework;
   readonly packageName: string;
   readonly created: readonly string[];
+  readonly modified: readonly string[];
   readonly existing: readonly string[];
   readonly notes: readonly string[];
 }
@@ -122,14 +125,79 @@ export const HEAD = glyphs.fontRoute;
   };
 }
 
-function integrationTemplates(
+function manualViteInstructions(path: string): string {
+  return `${path} is not a simple object-form Vite config that GlyphScramble can patch safely. Add these imports and plugin entry manually, then rerun init:\n\nimport glyphConfig from "./glyphscramble.config.ts";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n\nexport default defineConfig({\n  plugins: [glyphscrambleStatic(glyphConfig)],\n});\n\nNo files were changed.`;
+}
+
+function patchSimpleViteConfig(source: string, path: string): string {
+  if (
+    source.includes('from "@brip/glyphscramble-vite"') &&
+    source.includes("glyphscrambleStatic(glyphConfig)")
+  )
+    return source;
+  if (source.includes("glyphscramble"))
+    throw new Error(manualViteInstructions(path));
+  const match =
+    /^(?<imports>(?:import[^\n]*\n)+)(?<prefix>\s*export default defineConfig\(\{\s*\n)(?<body>[\s\S]*)(?<suffix>\n\}\);?\s*)$/.exec(
+      source,
+    );
+  if (!match?.groups) throw new Error(manualViteInstructions(path));
+  const importsSource = match.groups.imports!;
+  const prefix = match.groups.prefix!;
+  const bodySource = match.groups.body!;
+  const suffix = match.groups.suffix!;
+  const pluginLines = [...bodySource.matchAll(/^ {2}plugins\s*:\s*\[/gm)];
+  if (pluginLines.length > 1) throw new Error(manualViteInstructions(path));
+  const imports = `${importsSource}import glyphConfig from "./glyphscramble.config.ts";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n`;
+  const body =
+    pluginLines.length === 1
+      ? bodySource.replace(
+          /^( {2}plugins\s*:\s*\[)/m,
+          "$1glyphscrambleStatic(glyphConfig), ",
+        )
+      : `  plugins: [glyphscrambleStatic(glyphConfig)],\n${bodySource}`;
+  return `${imports}${prefix}${body}${suffix}`;
+}
+
+async function viteArtifacts(cwd: string): Promise<IntegrationArtifact[]> {
+  const candidates = [
+    "vite.config.ts",
+    "vite.config.mts",
+    "vite.config.js",
+    "vite.config.mjs",
+  ]
+    .map((name) => join(cwd, name))
+    .filter(existsSync);
+  if (candidates.length > 1)
+    throw new Error(
+      `Multiple Vite config files exist (${candidates.map((path) => displayPath(cwd, path)).join(", ")}). Keep one canonical config, then rerun init. No files were changed.`,
+    );
+  if (candidates.length === 0)
+    return [
+      {
+        path: join(cwd, "vite.config.ts"),
+        content: `import { defineConfig } from "vite";\nimport glyphConfig from "./glyphscramble.config.ts";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n\nexport default defineConfig({\n  plugins: [glyphscrambleStatic(glyphConfig)],\n});\n`,
+      },
+    ];
+  const path = candidates[0]!;
+  const source = await readFile(path, "utf8");
+  return [
+    {
+      path,
+      content: patchSimpleViteConfig(source, displayPath(cwd, path)),
+      replace: source,
+    },
+  ];
+}
+
+async function integrationTemplates(
   framework: GlyphFramework,
   cwd: string,
-): {
+): Promise<{
   artifacts: IntegrationArtifact[];
   packageName: string;
   notes: string[];
-} {
+}> {
   switch (framework) {
     case "next": {
       const next = nextArtifacts(cwd);
@@ -168,24 +236,27 @@ function integrationTemplates(
     case "astro":
       return {
         packageName: "@brip/glyphscramble-astro",
-        notes: [],
+        notes: [
+          "Astro defaults to a bounded response buffer so lazy rendering can set selective cache headers safely; use explicit route-scoped streaming for large responses.",
+        ],
         artifacts: [
           {
             path: join(cwd, "src", "middleware.ts"),
             content: `import config from "../glyphscramble.config";\nimport { createAstroGlyphMiddleware } from "@brip/glyphscramble-astro";\n\nexport const onRequest = await createAstroGlyphMiddleware(config);\n`,
+          },
+          {
+            path: join(cwd, "src", "glyphscramble.d.ts"),
+            content: `import type { ResponseContext } from "@brip/glyphscramble";\n\ndeclare global {\n  namespace App {\n    interface Locals {\n      glyphscramble?: ResponseContext;\n    }\n  }\n}\n\nexport {};\n`,
           },
         ],
       };
     default:
       return {
         packageName: "@brip/glyphscramble-vite",
-        notes: [],
-        artifacts: [
-          {
-            path: join(cwd, "glyphscramble.vite.ts"),
-            content: `import config from "./glyphscramble.config";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n\nexport default glyphscrambleStatic(config);\n`,
-          },
+        notes: [
+          "Vite output is static per-build protection: mappings are shared until the next build and hydrated blocks are rejected.",
         ],
+        artifacts: await viteArtifacts(cwd),
       };
   }
 }
@@ -208,7 +279,7 @@ export async function initProject(
   if (!["next", "nuxt", "sveltekit", "astro", "vite"].includes(detected))
     throw new Error(`Unsupported framework: ${detected}`);
   const framework = detected as GlyphFramework;
-  const integration = integrationTemplates(framework, cwd);
+  const integration = await integrationTemplates(framework, cwd);
   const configPath = join(cwd, "glyphscramble.config.ts");
   const configExists = existsSync(configPath);
 
@@ -218,27 +289,40 @@ export async function initProject(
   for (const artifact of integration.artifacts) {
     if (!existsSync(artifact.path)) continue;
     const current = await readFile(artifact.path, "utf8");
-    if (current !== artifact.content)
+    if (current !== artifact.content && current !== artifact.replace)
       throw new Error(
         `${displayPath(cwd, artifact.path)} already exists and GlyphScramble will not overwrite it. Move its behavior into the generated template manually or remove it, then rerun init. No files were changed.`,
       );
-    existing.push(displayPath(cwd, artifact.path));
+    if (current === artifact.content)
+      existing.push(displayPath(cwd, artifact.path));
   }
 
   const created: string[] = [];
+  const modified: string[] = [];
   const pending = [
     ...(configExists ? [] : [{ path: configPath, content: configTemplate() }]),
-    ...integration.artifacts.filter((artifact) => !existsSync(artifact.path)),
+    ...integration.artifacts.filter(
+      (artifact) =>
+        !existsSync(artifact.path) ||
+        (artifact.replace !== undefined &&
+          artifact.content !== artifact.replace),
+    ),
   ];
   for (const artifact of pending) {
     await mkdir(dirname(artifact.path), { recursive: true });
-    await writeFile(artifact.path, artifact.content, { flag: "wx" });
-    created.push(displayPath(cwd, artifact.path));
+    if (artifact.replace !== undefined && existsSync(artifact.path)) {
+      await writeFile(artifact.path, artifact.content, { flag: "w" });
+      modified.push(displayPath(cwd, artifact.path));
+    } else {
+      await writeFile(artifact.path, artifact.content, { flag: "wx" });
+      created.push(displayPath(cwd, artifact.path));
+    }
   }
   return {
     framework,
     packageName: integration.packageName,
     created,
+    modified,
     existing,
     notes: integration.notes,
   };

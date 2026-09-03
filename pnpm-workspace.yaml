@@ -14,3 +14,6 @@ ignoredBuiltDependencies:
   - esbuild
 
 confirmModulesPurge: false
+
+minimumReleaseAgeExclude:
+  - astro@7.3.1

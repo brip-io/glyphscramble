@@ -180,6 +180,13 @@ CSP, cache-header, accessibility, and atomic-publish guidance.
 
 Static mode has excellent CDN behavior but weaker resistance: every visitor and every page in that build shares a downloadable mapping. It must never be described as per-response rotation.
 
+Vite users can register `glyphscrambleStatic(config)` directly in the normal
+`plugins` array. It derives the final directory and root-relative public base
+from Vite's resolved configuration, stages a fresh unprotected build internally,
+and atomically publishes only the verified protected tree. Astro static users
+run the same compiler after `astro build`. Both modes reject protected hydrated
+islands, state, or client bundles.
+
 ## Tradeoffs
 
 | Concern                | Per-response SSR                                                          | Static per-build                                 | Practical guidance                                                                          |

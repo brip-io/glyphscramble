@@ -23,6 +23,13 @@ async function project(layout: "root" | "src" | "pages" = "root") {
   return cwd;
 }
 
+async function frameworkProject(dependencies: Record<string, string>) {
+  const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-init-"));
+  roots.push(cwd);
+  await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies }));
+  return cwd;
+}
+
 afterEach(async () => {
   await Promise.all(
     roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
@@ -125,6 +132,71 @@ describe("framework initializer", () => {
     );
     await expect(
       readFile(join(cwd, "glyphscramble.config.ts")),
+    ).rejects.toThrow();
+  });
+
+  it("creates typed Astro middleware and locals scaffolding", async () => {
+    const cwd = await frameworkProject({ astro: "7.3.1" });
+    await mkdir(join(cwd, "src"), { recursive: true });
+    const result = await initProject({ cwd });
+    expect(result).toMatchObject({
+      framework: "astro",
+      packageName: "@brip/glyphscramble-astro",
+      created: [
+        "glyphscramble.config.ts",
+        "src/middleware.ts",
+        "src/glyphscramble.d.ts",
+      ],
+      modified: [],
+    });
+    expect(result.notes.join(" ")).toMatch(/bounded response buffer/);
+    expect(
+      await readFile(join(cwd, "src/glyphscramble.d.ts"), "utf8"),
+    ).toContain('import type { ResponseContext } from "@brip/glyphscramble"');
+  });
+
+  it("creates a registered Vite plugin when no config exists", async () => {
+    const cwd = await frameworkProject({ vite: "8.2.2" });
+    const result = await initProject({ cwd });
+    expect(result).toMatchObject({
+      framework: "vite",
+      created: ["glyphscramble.config.ts", "vite.config.ts"],
+      modified: [],
+    });
+    const source = await readFile(join(cwd, "vite.config.ts"), "utf8");
+    expect(source).toContain("plugins: [glyphscrambleStatic(glyphConfig)]");
+    expect(result.notes.join(" ")).toMatch(/per-build protection/);
+  });
+
+  it("patches a simple Vite plugins array once", async () => {
+    const cwd = await frameworkProject({ vite: "8.2.2" });
+    const path = join(cwd, "vite.config.ts");
+    await writeFile(
+      path,
+      'import { defineConfig } from "vite";\nimport example from "./example";\n\nexport default defineConfig({\n  plugins: [example()],\n});\n',
+    );
+    const first = await initProject({ cwd });
+    expect(first.modified).toEqual(["vite.config.ts"]);
+    expect(await readFile(path, "utf8")).toContain(
+      "plugins: [glyphscrambleStatic(glyphConfig), example()]",
+    );
+    const second = await initProject({ cwd });
+    expect(second.modified).toEqual([]);
+    expect(second.existing).toContain("vite.config.ts");
+  });
+
+  it("refuses a dynamic Vite config atomically with manual instructions", async () => {
+    const cwd = await frameworkProject({ vite: "8.2.2" });
+    const path = join(cwd, "vite.config.ts");
+    const source =
+      'import { defineConfig } from "vite";\nexport default defineConfig(() => ({ plugins: [] }));\n';
+    await writeFile(path, source);
+    await expect(initProject({ cwd })).rejects.toThrow(
+      /Add these imports and plugin entry manually.*No files were changed/s,
+    );
+    expect(await readFile(path, "utf8")).toBe(source);
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts"), "utf8"),
     ).rejects.toThrow();
   });
 });

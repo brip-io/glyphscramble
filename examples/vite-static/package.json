@@ -1,0 +1,18 @@
+{
+  "name": "@brip/glyphscramble-example-vite-static",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:glyphs": "node ../../packages/core/dist/cli.js prepare --config glyphscramble.config.ts",
+    "build:fixture": "vite build",
+    "qualify:rebuild": "node verify-rebuild.mjs",
+    "preview": "vite preview --host 127.0.0.1 --port 4174"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:*",
+    "@brip/glyphscramble-vite": "workspace:*",
+    "@fontsource-variable/inter": "5.3.0",
+    "vite": "8.2.2"
+  }
+}

@@ -22,6 +22,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:next": "playwright test --config playwright.next.config.ts",
+    "test:r10": "pnpm build:r10-fixtures && playwright test --config playwright.r10.config.ts",
+    "build:r10-fixtures": "pnpm --filter @brip/glyphscramble build && pnpm --filter @brip/glyphscramble-astro build && pnpm --filter @brip/glyphscramble-vite build && pnpm --dir examples/astro prepare:glyphs && pnpm --dir examples/astro check && pnpm --dir examples/astro build:ssr && pnpm --dir examples/astro build:static && pnpm --dir examples/vite-static prepare:glyphs && pnpm --dir examples/vite-static build:fixture && pnpm --dir examples/vite-static qualify:rebuild && pnpm --dir examples/node-fetch prepare:glyphs",
     "test:watch": "vitest",
     "typecheck": "pnpm -r build && pnpm -r typecheck",
     "changeset": "changeset",

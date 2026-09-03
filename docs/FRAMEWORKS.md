@@ -56,10 +56,91 @@ Install `createGlyphHandle()` as the server handle. It places the response conte
 
 ## Astro 7
 
-SSR mode uses `createAstroGlyphMiddleware()`. The `.astro` component emits encoded text plus a serialized data-only payload and mounts it through the bundled shared runtime. Static mode accepts only marked HTML outside `astro-island` or other hydrated ancestors; protected client islands fail during planning.
+Run `glyphscramble init`, then use the generated middleware and locals type.
+The middleware is typed against Astro's real `MiddlewareHandler` API and owns
+one engine plus one response context per rendered route:
+
+```ts
+import config from "../glyphscramble.config";
+import { createAstroGlyphMiddleware } from "@brip/glyphscramble-astro";
+
+export const onRequest = await createAstroGlyphMiddleware(config);
+```
+
+Astro can defer component and endpoint work until a response stream is pulled.
+The safe default buffers at most 2 MiB, exhausts that lazy stream, then applies
+`private, no-store` only if the context was used. The ceiling is fail-closed
+and explicit:
+
+```ts
+export const onRequest = await createAstroGlyphMiddleware(config, {
+  streaming: { strategy: "buffer", maxBytes: 4 * 1024 * 1024 },
+});
+```
+
+For large streamed responses, opt in by route instead. Only matched routes
+receive a context, and their protected headers are committed before rendering:
+
+```ts
+export const onRequest = await createAstroGlyphMiddleware(config, {
+  streaming: {
+    strategy: "route",
+    protectedRoute: ({ url }) => url.pathname.startsWith("/premium/"),
+  },
+});
+```
+
+Render the branded payload with
+`@brip/glyphscramble-astro/GlyphScramble.astro`. `fontTimeoutMs` and
+`errorText` customize the shared R06 guard. A versioned custom element mounts
+and destroys exactly one lifecycle per block; there is no document-wide scan.
+The package's build runs `astro check`, because ordinary `tsc` ignores `.astro`
+files. See Astro's official [middleware API](https://docs.astro.build/en/reference/modules/astro-middleware/)
+and [typechecking guidance](https://docs.astro.build/en/guides/typescript/).
+
+Astro static output uses the same post-build marker as any other HTML generator.
+It accepts only non-hydrated output; a protected `astro-island`, `client:*`
+boundary, or other known hydration marker fails before publication.
 
 ## Vite and vanilla servers
 
-Vite is not a server boundary. Per-response rotation requires a Node or Fetch server that owns `createGlyphEngine()`. The static command and Vite plugin support non-hydrated HTML blocks only and fail on known React/Vue/Svelte/Astro hydration markers. They do not protect SPA state, component props, client bundles, or hydrated descendants, and always emit a per-build downgrade warning.
+Vite is not a server boundary. Per-response rotation requires a Node or Fetch
+server that owns `createGlyphEngine()`. The generic reference implementation is
+in `examples/node-fetch`: it owns one process-level engine, creates a context
+per complete response, routes font GET/HEAD to that same engine, applies cache
+headers only after rendering, serves the client runtime from the same origin,
+and drains the server and engine on shutdown. A streamed server response must
+declare protection and commit `private, no-store` before its first byte.
 
-Framework initializers generate no more than one config and three integration files. Run `glyphscramble doctor` after client navigation, streaming, or layout changes.
+For non-hydrated static HTML, register the real Vite plugin:
+
+```ts
+import { defineConfig } from "vite";
+import glyphConfig from "./glyphscramble.config.ts";
+import { glyphscrambleStatic } from "@brip/glyphscramble-vite";
+
+export default defineConfig({
+  base: "/docs/",
+  build: { outDir: "dist" },
+  plugins: [glyphscrambleStatic(glyphConfig)],
+});
+```
+
+The plugin reads Vite's resolved root, base, mode, and output contract, writes
+the ordinary build into a fresh internal staging directory, and atomically
+replaces the configured final output only after R02/R03 planning and
+verification succeed. Staging is removed after success and protected output is
+never a future transform input. Every build emits the static per-build
+downgrade warning. Non-root-relative Vite bases require an explicit
+`publicBasePath`. See Vite's official [plugin API](https://vite.dev/guide/api-plugin.html).
+
+`init` creates a complete config when none exists, patches a conventional
+object-form `vite.config` once, and refuses dynamic or ambiguous configurations
+with an exact manual snippet before writing any file. The plugin rejects SSR
+bundles, known React/Vue/Svelte/Astro hydration markers, and protected islands.
+It does not protect SPA state, component props, client bundles, or
+client-fetched APIs.
+
+Framework initializers generate no more than one config and three integration
+files. Run `glyphscramble doctor` after client navigation, streaming, or layout
+changes.
