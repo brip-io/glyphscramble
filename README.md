@@ -97,7 +97,9 @@ See [Font sources and parser limits](docs/FONT-SOURCES.md) for supported contain
 
 ## Static websites
 
-Static mode rotates once per build and works with Astro static output, Vite, or any folder of HTML. Mark only the block to protect:
+Static mode rotates once per build and supports explicitly marked,
+non-hydrated HTML from Astro, Vite, or another static generator. Mark only the
+block to protect:
 
 ```html
 <article data-glyphscramble-font="body">High-value excerpt only.</article>
@@ -110,21 +112,41 @@ npx glyphscramble prepare
 npx glyphscramble static --input dist --output dist-protected
 ```
 
-The command copies the build, rewrites marked text nodes, and emits `/_glyphscramble/static.css`, `static.js`, matching WOFF2 files, and the configured font notices. A new random mapping is generated on every build. Passing `--seed` makes builds reproducible but also makes mappings reproducible; keep that option for deterministic CI only.
+The command scans the untouched source first, stages a fresh sibling tree, and
+publishes only after every marked block and generated font succeeds. An existing
+destination is transactionally replaced by default; pass
+`--existing-output reject` to require an absent destination. The source build is
+never modified or used as the next transform input.
+
+Only descendant text nodes are encoded. Scripts, styles, templates, comments,
+text-bearing attributes, forms, links, interactive elements, and known
+React/Next, Vue/Nuxt, Svelte/SvelteKit, Astro, and generic hydration markers
+fail with a file and DOM path before publication. Same-font nested markers are
+compiled as one outer block and recorded as a warning; conflicting font IDs
+fail. A custom `StaticHydrationDetector` can make a project-specific marker a
+hard boundary.
+
+The output includes `glyphscramble-static-manifest.json` with source HTML
+hashes, transformed paths, selected font IDs, an algorithm version, a one-way
+seed identity, and warnings—never protected text or the seed. It also emits
+`/_glyphscramble/static.css`, `static.js`, matching WOFF2 files, and configured
+font notices. A new random mapping is generated on every build. Passing
+`--seed` makes builds reproducible but also makes mappings reproducible; keep
+that option for deterministic CI only.
 
 Static mode has excellent CDN behavior but weaker resistance: every visitor and every page in that build shares a downloadable mapping. It must never be described as per-response rotation.
 
 ## Tradeoffs
 
-| Concern                | Per-response SSR                                                          | Static per-build                          | Practical guidance                                                                          |
-| ---------------------- | ------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Commodity DOM scraping | Different encoded bytes and token per response                            | One reusable mapping per build            | Prefer SSR for the highest-value blocks                                                     |
-| SEO                    | Protected words are absent from crawler-visible text                      | Same                                      | Keep titles, headings, summaries, structured data, and discovery copy unprotected           |
-| HTML/CDN caching       | Protected documents are `private, no-store`                               | Full static/CDN caching                   | Protect a small dynamic island when the surrounding page should remain cacheable            |
-| Font caching           | Private and immutable for the short token lifetime                        | Long-lived, content-addressed build asset | Budget the extra font request and preload only when justified                               |
-| Accessibility          | Protected block is `aria-hidden`; no plaintext mirror is shipped          | Same                                      | Use only for optional, opted-in, non-essential/noindex content; this is not WCAG-conformant |
-| Flash/failure          | Hidden until `document.fonts` confirms the face; visible error on failure | Same                                      | Do not protect content required to navigate, submit a form, or recover from failure         |
-| Advanced extraction    | Recoverable with browser/OCR/font analysis                                | Easier because mapping is reused          | Treat as cost-raising friction, never confidentiality                                       |
+| Concern                | Per-response SSR                                                          | Static per-build                                                         | Practical guidance                                                                          |
+| ---------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Commodity DOM scraping | Different encoded bytes and token per response                            | One reusable mapping per build                                           | Prefer SSR for the highest-value blocks                                                     |
+| SEO                    | Protected words are absent from crawler-visible text                      | Same                                                                     | Keep titles, headings, summaries, structured data, and discovery copy unprotected           |
+| HTML/CDN caching       | Protected documents are `private, no-store`                               | Full static/CDN caching                                                  | Protect a small dynamic island when the surrounding page should remain cacheable            |
+| Font caching           | Private and immutable for the short token lifetime                        | Build-scoped assets; immutable content addressing is an R03 release gate | Do not mix HTML and font assets from different builds                                       |
+| Accessibility          | Protected block is `aria-hidden`; no plaintext mirror is shipped          | Same                                                                     | Use only for optional, opted-in, non-essential/noindex content; this is not WCAG-conformant |
+| Flash/failure          | Hidden until `document.fonts` confirms the face; visible error on failure | Same                                                                     | Do not protect content required to navigate, submit a form, or recover from failure         |
+| Advanced extraction    | Recoverable with browser/OCR/font analysis                                | Easier because mapping is reused                                         | Treat as cost-raising friction, never confidentiality                                       |
 
 Read [Choosing what to protect](docs/USAGE-GUIDE.md) before integration and [the threat model](docs/SECURITY-MODEL.md) before making any product claim.
 

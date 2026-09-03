@@ -1,3 +1,6 @@
 # 08 · Astro, Vite, and static
 
-Status: beta API implemented. Astro SSR middleware and component share the core engine. The static post-build command copies output, rewrites only marked blocks, and emits content-addressed WOFF2/CSS/loader assets with an explicit per-build downgrade warning. Remaining release gate: real Astro and Vite example builds.
+Status: proof-of-concept adapters implemented. R02 supplies an atomic,
+non-hydrated static compiler with explicit refusal boundaries and a source-hash
+manifest. Content-addressed delivery and accessibility remain R03 gates; real
+Astro/Vite integration and consumer builds remain R10 gates.

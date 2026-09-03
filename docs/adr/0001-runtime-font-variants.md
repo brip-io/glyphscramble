@@ -92,7 +92,11 @@ and WOFF2 generation. It reports p50/p95/p99 instead of a single encoding p95.
 CI uses the pinned OFL Inter variable face at 122,912 normalized bytes and the
 same real face padded with an inert, incompressible table to exercise the 1 MiB
 resource path. Three cold five-variant engine starts measure real WOFF2 worker
-throughput. Fifty response acquisitions and prepared-font lookups then exercise
+throughput. The first batch is labelled process-cold and is governed by the
+whole-pool startup ceiling; the next two are labelled process-warm and are
+governed by the per-generation p95 ceiling. This prevents one-time worker/WASM
+startup from being counted against both gates while keeping every measurement
+visible. Fifty response acquisitions and prepared-font lookups then exercise
 the production pool and engine with prebuilt byte payloads, keeping the 5 ms
 and 10 ms request-path gates meaningful instead of treating the slowest of only
 five shared-runner observations as a percentile. R12 still owns a naturally

@@ -24,7 +24,26 @@ export {
   prepareGlyphFonts,
   summarizeCoverage,
 } from "./font-pipeline.js";
-export { buildStaticSite } from "./static-site.js";
+export { buildStaticSite, STATIC_BUILD_WARNING } from "./static-site.js";
+export type {
+  StaticBuildManifest,
+  StaticManifestHtmlFile,
+  StaticSiteOptions,
+  StaticSiteResult,
+} from "./static-site.js";
+export {
+  DEFAULT_STATIC_HYDRATION_DETECTORS,
+  StaticBuildPlanError,
+  StaticBuildPlanner,
+} from "./static-plan.js";
+export type {
+  StaticBuildPlan,
+  StaticBuildPlannerOptions,
+  StaticElementSnapshot,
+  StaticHydrationDetector,
+  StaticPlannedFile,
+  StaticPlanWarning,
+} from "./static-plan.js";
 export { buildCmap, parseCmap, parseVariationSequences } from "./cmap.js";
 export type { VariationSequenceMap } from "./cmap.js";
 export {
@@ -67,4 +86,3 @@ export type {
   ResponseContext,
   ScrambleOptions,
 } from "./types.js";
-export type { StaticSiteOptions, StaticSiteResult } from "./static-site.js";

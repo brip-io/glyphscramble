@@ -18,10 +18,10 @@ Install `createGlyphHandle()` as the server handle. It places the response conte
 
 ## Astro 7
 
-SSR mode uses `createAstroGlyphMiddleware()`. The `.astro` component emits encoded text, the matching `@font-face`, and a load guard. Static mode uses the post-build marker workflow instead.
+SSR mode uses `createAstroGlyphMiddleware()`. The `.astro` component emits encoded text, the matching `@font-face`, and a load guard. Static mode accepts only marked HTML outside `astro-island` or other hydrated ancestors; protected client islands fail during planning.
 
 ## Vite and vanilla servers
 
-Vite is not a server boundary. Per-response rotation requires a Node or Fetch server that owns `createGlyphEngine()`. Fully static React/Vue/Svelte applications can use `glyphscramble static` or the Vite static plugin, which always emits a downgrade warning because rotation is per build.
+Vite is not a server boundary. Per-response rotation requires a Node or Fetch server that owns `createGlyphEngine()`. The static command and Vite plugin support non-hydrated HTML blocks only and fail on known React/Vue/Svelte/Astro hydration markers. They do not protect SPA state, component props, client bundles, or hydrated descendants, and always emit a per-build downgrade warning.
 
 Framework initializers generate no more than one config and three integration files. Run `glyphscramble doctor` after client navigation, streaming, or layout changes.

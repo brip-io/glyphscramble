@@ -39,7 +39,9 @@ describe("Unicode-safe permutation", () => {
   });
 
   it("leaves segmentation and bidi controls unchanged", () => {
-    for (const cp of [0x0a, 0x200c, 0x200d, 0x202e, 0x2067, 0xfe0f, 0x0301])
+    for (const cp of [
+      0x0a, 0x21, 0x2e, 0x301, 0x200c, 0x200d, 0x202e, 0x2067, 0xfe0f,
+    ])
       expect(isStructuralCodePoint(cp)).toBe(true);
     const permutation = createPermutation(
       covered,
@@ -59,6 +61,9 @@ describe("Unicode-safe permutation", () => {
     );
     expect(() => encodeText("Z", permutation)).toThrow(
       /No Unicode-safe mapping/,
+    );
+    expect(() => encodeText("∑", permutation)).toThrow(
+      /No Unicode-safe mapping for U\+2211/,
     );
   });
 
