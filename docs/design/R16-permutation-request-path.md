@@ -1,6 +1,6 @@
 # [R16] Permutation and request-path efficiency
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#33](https://github.com/brip-io/glyphscramble/issues/33)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Implemented ([PR #44](https://github.com/brip-io/glyphscramble/pull/44), corrected by [PR #45](https://github.com/brip-io/glyphscramble/pull/45)) · **GitHub issue:** [#33](https://github.com/brip-io/glyphscramble/issues/33)
 > **Blocked by:** R01 and R11 · **Blocks:** R12 performance qualification
 
 ## Objective
@@ -72,3 +72,38 @@ The engine encodes text directly through the leased mapping. Tests compare every
 ## Exit criteria
 
 Font generation and text encoding consume the same stored mapping, no repertoire-sized cryptographic loop runs during `scramble()`, all Unicode/cmap invariants pass, retained-map memory is bounded and released, and the large-repertoire request path meets the qualified 5 ms p95 gate on Node 22/24.
+
+## Implementation evidence
+
+- [PR #44](https://github.com/brip-io/glyphscramble/pull/44) versions the
+  permutation as `glyphscramble-aes-256-ctr-rejection-v2`, derives
+  length-delimited domains with HMAC-SHA256, and consumes AES-256-CTR words
+  through unbiased rejection sampling.
+- Prepared faces carry the startup-built `PermutationPlan`. The provider passes
+  one resulting `Permutation` to font generation and retains the exact compact
+  `CodePointMapping`; the engine resolves that mapping through a server-only
+  lease boundary and never reconstructs a repertoire permutation.
+- Variant cache accounting includes retained font and mapping bytes, and expiry
+  or closure releases both. Generation begins outside the acquiring call stack,
+  so refill cost is not misreported as request encoding.
+- The request encoder memoizes scalar classification and lookup per call. The
+  20,142-codepoint benchmark repertoire keeps 10,000-scalar encoding below the
+  5 ms p95 gate on Node 22 and 24 while reporting generation separately.
+- Tests pin the deterministic keystream and rejection path, compare retained
+  Latin and Hebrew mappings with both generator input and patched `cmap`, cover
+  the low-level provider seam, and prove memory release and repeated-scalar
+  lookup behavior.
+- [PR #45](https://github.com/brip-io/glyphscramble/pull/45) corrects the
+  remaining BMP binary inefficiency by representing contiguous format 4 runs as
+  delta or glyph-array segments. Direct round trips cover arbitrary mappings,
+  constant deltas, and the exact 65,535-byte table boundary.
+
+## Review record
+
+R16 closes review findings S6, P1, and P11 from the 2026-09-03 repository
+review. PR #44 removed modulo reduction and request-time repertoire work; the
+post-merge documentation audit found that P11's format 4 assignment remained
+open, so PR #45 corrected it before this design was marked implemented. R16
+also removed request-path work and measurement contamination that contributed
+to P12, while R17 and R12 retain ownership of stable shared-runner capacity and
+final qualification methodology.

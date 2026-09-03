@@ -122,7 +122,7 @@ Normalize safe defaults, enforce one cross-framework usability rubric, make init
 
 **Exit criterion:** an unfamiliar developer reaches a verified protected block through the same short workflow in every qualified framework, while every release channel resolves to one auditable version without duplicate registries or long-lived publish credentials.
 
-#### R16 · Permutation and request-path efficiency · **M**
+#### R16 · Permutation and request-path efficiency · **M** · **Implemented in [PR #44](https://github.com/brip-io/glyphscramble/pull/44), corrected by [PR #45](https://github.com/brip-io/glyphscramble/pull/45)**
 
 Retain generation-time mappings on variants, replace per-swap HMAC with an unbiased keystream, and make request encoding proportional to protected text rather than font repertoire.
 
