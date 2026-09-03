@@ -62,11 +62,29 @@ export default defineGlyphConfig({
     secretEnv: "GLYPHSCRAMBLE_SECRET",
     tokenTtlSeconds: 600,
   },
+  runtime: {
+    variantMode: "response-pool",
+    poolLowWatermark: 2,
+    poolHighWatermark: 4,
+    generationConcurrency: 2,
+    generationQueueLimit: 64,
+    generationTimeoutMs: 10_000,
+    cacheMaxBytes: 64 * 1024 * 1024,
+  },
   routePrefix: "/_glyphscramble",
   unsupported: "error",
   accessibilityRiskAcknowledged: true,
 });
 ```
+
+The production runtime prepares one-use WOFF2 variants in worker threads before
+protected responses need them. The first `scramble()` call (or explicit token
+read) consumes a variant exactly once; an unused response context consumes
+nothing. If demand outruns the bounded pool or active tokens fill the byte budget,
+it throws before plaintext is emitted. A process restart invalidates live font
+tokens, so keep HTML and its font route on the same stateful engine instance and
+size the cache for generated font bytes × responses within the token TTL. There
+is no implicit time-window fallback.
 
 CSS sources that contain more than one `@font-face` require explicit named selectors, so a remote stylesheet cannot silently change which weight, style, stretch, or Unicode subset is used. Select a non-default face with `{ font: "body", face: "bold" }`.
 
@@ -116,7 +134,7 @@ glyphscramble init        framework detection and scaffold
 glyphscramble prepare     resolve, normalize, inspect, and lock fonts
 glyphscramble inspect     report tables, coverage, format, axes, and color data
 glyphscramble doctor      find likely client leakage and essential-content usage
-glyphscramble benchmark   run the 10,000-scalar encoding gate
+glyphscramble benchmark   measure pool startup, generation, encoding, token validation, and font responses
 glyphscramble static      post-process a static build
 ```
 

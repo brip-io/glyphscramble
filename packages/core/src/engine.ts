@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
-import { parseSfnt, remapCmap } from "./sfnt.js";
-import {
-  loadPreparedFonts,
-  toWoff2,
-  type PreparedFont,
-} from "./font-pipeline.js";
+import { loadPreparedFonts, type PreparedFont } from "./font-pipeline.js";
 import { issueToken, readToken } from "./token.js";
 import { createPermutation, encodeText, type Permutation } from "./unicode.js";
 import { validateGlyphConfig } from "./config.js";
+import {
+  ResponsePoolVariantProvider,
+  variantRuntimeOptions,
+  type FontVariantProvider,
+  type VariantFace,
+} from "./variant-provider.js";
 import type {
   GlyphConfig,
   GlyphEngine,
@@ -39,6 +40,10 @@ function secretFor(config: GlyphConfig): string {
   if (!secret)
     throw new Error(
       `Missing ${config.rotation.secretEnv}. GlyphScramble cannot rotate safely without a server secret.`,
+    );
+  if (secret.length < 32)
+    throw new Error(
+      `${config.rotation.secretEnv} must contain at least 32 characters.`,
     );
   return secret;
 }
@@ -78,35 +83,18 @@ function payload(
     fontUrl,
     coverage: font.coverage,
     css,
+    rotation: {
+      scope: "response",
+      variantMode: "response-pool",
+      reusableAcrossResponses: false,
+    },
     ...(options.cspNonce ? { cspNonce: options.cspNonce } : {}),
   } as GlyphPayload;
 }
 
-class MemoryFontCache {
-  readonly #items = new Map<string, Uint8Array>();
-  constructor(private readonly max = 128) {}
-  get(key: string): Uint8Array | undefined {
-    const value = this.#items.get(key);
-    if (value) {
-      this.#items.delete(key);
-      this.#items.set(key, value);
-    }
-    return value;
-  }
-  set(key: string, value: Uint8Array): void {
-    this.#items.delete(key);
-    this.#items.set(key, value);
-    if (this.#items.size > this.max)
-      this.#items.delete(this.#items.keys().next().value!);
-  }
-  clear(): void {
-    this.#items.clear();
-  }
-}
-
 export async function createGlyphEngine(
   config: GlyphConfig,
-  options: { cwd?: string; cacheEntries?: number } = {},
+  options: { cwd?: string; variantProvider?: FontVariantProvider } = {},
 ): Promise<GlyphEngine> {
   validateGlyphConfig(config);
   const secret = secretFor(config);
@@ -132,14 +120,47 @@ export async function createGlyphEngine(
     if (!defaultFace) throw new Error(`Font ${id} has no prepared faces.`);
     families.set(id, { defaultFace, faces: runtimeFaces });
   }
-  const cache = new MemoryFontCache(options.cacheEntries);
+  const variantFaces: VariantFace[] = [...fonts.values()].map((font) => ({
+    id: runtimeId(font),
+    namespace: runtimeNamespace(font),
+    sfnt: font.sfnt,
+    codepoints: font.codepoints,
+  }));
+  const variantProvider =
+    options.variantProvider ??
+    new ResponsePoolVariantProvider(
+      variantFaces,
+      variantRuntimeOptions(config.runtime),
+    );
+  try {
+    await variantProvider.start();
+  } catch (error) {
+    await variantProvider.close();
+    throw error;
+  }
 
   return {
     beginResponse(): ResponseContext {
-      const issued = issueToken(secret, config.rotation.tokenTtlSeconds);
+      let issued: ReturnType<typeof issueToken> | undefined;
+      const ensureIssued = (): ReturnType<typeof issueToken> => {
+        if (issued) return issued;
+        const now = Date.now();
+        const expiresAt =
+          (Math.floor(now / 1000) + config.rotation.tokenTtlSeconds) * 1000;
+        const lease = variantProvider.acquire(expiresAt);
+        issued = issueToken(secret, config.rotation.tokenTtlSeconds, now, {
+          seed: lease.seed,
+          variant: lease.id,
+          variantMode: "response-pool",
+          faces: variantFaces.map((face) => face.id),
+        });
+        return issued;
+      };
       const permutations = new Map<string, Permutation>();
       return {
-        token: issued.token,
+        get token() {
+          return ensureIssued().token;
+        },
         scramble(text: string, scrambleOptions: ScrambleOptions): GlyphPayload {
           const family = families.get(scrambleOptions.font);
           if (!family)
@@ -152,12 +173,13 @@ export async function createGlyphEngine(
             throw new Error(
               `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
             );
+          const responseToken = ensureIssued();
           const namespace = runtimeNamespace(font);
           let permutation = permutations.get(namespace);
           if (!permutation) {
             permutation = createPermutation(
               font.codepoints,
-              issued.seed,
+              responseToken.seed,
               namespace,
             );
             permutations.set(namespace, permutation);
@@ -165,7 +187,7 @@ export async function createGlyphEngine(
           return payload(
             text,
             font,
-            issued.token,
+            responseToken.token,
             permutation,
             config,
             scrambleOptions,
@@ -205,35 +227,46 @@ export async function createGlyphEngine(
           headers: { "cache-control": "private, no-store" },
         });
       }
-      const cacheKey = `${token}:${id}`;
-      let output = cache.get(cacheKey);
-      if (!output) {
-        const permutation = createPermutation(
-          font.codepoints,
-          claims.seed,
-          runtimeNamespace(font),
-        );
-        output = await toWoff2(
-          remapCmap(parseSfnt(font.sfnt), permutation.decode),
-        );
-        cache.set(cacheKey, output);
-      }
+      if (
+        !claims.variant ||
+        claims.variantMode !== "response-pool" ||
+        !claims.faces?.includes(id)
+      )
+        return new Response("Unsupported font token mode", {
+          status: 401,
+          headers: { "cache-control": "private, no-store" },
+        });
+      const output = variantProvider.font(claims.variant, id, claims.seed);
+      if (!output)
+        return new Response("Font variant is no longer available", {
+          status: 410,
+          headers: { "cache-control": "private, no-store" },
+        });
+      const remainingSeconds = Math.max(
+        0,
+        claims.exp - Math.floor(Date.now() / 1000),
+      );
       return new Response(
         request.method === "HEAD" ? null : new Uint8Array(output).buffer,
         {
           headers: {
             "content-type": "font/woff2",
             "content-length": String(output.length),
-            "cache-control": `private, max-age=${config.rotation.tokenTtlSeconds}, immutable`,
+            "cache-control": `private, max-age=${remainingSeconds}, immutable`,
             "x-content-type-options": "nosniff",
             "cross-origin-resource-policy": "same-origin",
+            "x-glyphscramble-variant-mode": "response-pool",
           },
         },
       );
     },
 
+    metrics() {
+      return variantProvider.metrics();
+    },
+
     async close(): Promise<void> {
-      cache.clear();
+      await variantProvider.close();
     },
   };
 }

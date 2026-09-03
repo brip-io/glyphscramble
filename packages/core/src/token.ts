@@ -11,6 +11,16 @@ export interface TokenClaims {
   readonly seed: string;
   readonly iat: number;
   readonly exp: number;
+  readonly variant?: string;
+  readonly variantMode?: "response-pool";
+  readonly faces?: readonly string[];
+}
+
+export interface TokenCoordination {
+  readonly seed?: string;
+  readonly variant?: string;
+  readonly variantMode?: "response-pool";
+  readonly faces?: readonly string[];
 }
 
 function keyFromSecret(secret: string): Buffer {
@@ -25,13 +35,19 @@ export function issueToken(
   secret: string,
   ttlSeconds: number,
   now = Date.now(),
+  coordination: TokenCoordination = {},
 ): TokenClaims & { token: string } {
   const iat = Math.floor(now / 1000);
   const claims: TokenClaims = {
     v: 1,
-    seed: randomBytes(32).toString("base64url"),
+    seed: coordination.seed ?? randomBytes(32).toString("base64url"),
     iat,
     exp: iat + ttlSeconds,
+    ...(coordination.variant ? { variant: coordination.variant } : {}),
+    ...(coordination.variantMode
+      ? { variantMode: coordination.variantMode }
+      : {}),
+    ...(coordination.faces ? { faces: coordination.faces } : {}),
   };
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", keyFromSecret(secret), iv);
@@ -79,7 +95,13 @@ export function readToken(
     if (
       claims.v !== 1 ||
       typeof claims.seed !== "string" ||
-      !Number.isInteger(claims.exp)
+      !Number.isInteger(claims.exp) ||
+      (claims.variant !== undefined && typeof claims.variant !== "string") ||
+      (claims.variantMode !== undefined &&
+        claims.variantMode !== "response-pool") ||
+      (claims.faces !== undefined &&
+        (!Array.isArray(claims.faces) ||
+          claims.faces.some((face) => typeof face !== "string")))
     )
       throw new Error();
     if (claims.exp <= Math.floor(now / 1000))

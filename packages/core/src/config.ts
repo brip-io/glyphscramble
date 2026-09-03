@@ -4,6 +4,7 @@ import { parseCoverage } from "./coverage.js";
 
 const HTTPS = /^https:\/\//i;
 const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
+const MAX_RUNTIME_CACHE_BYTES = 1024 * 1024 * 1024;
 
 export function defineGlyphConfig<const T extends GlyphConfig>(config: T): T {
   validateGlyphConfig(config);
@@ -51,6 +52,39 @@ export function validateGlyphConfig(config: GlyphConfig): void {
     (!Number.isSafeInteger(maxRedirects) || maxRedirects < 0)
   )
     throw new Error("remote.maxRedirects must be a non-negative integer.");
+  const runtimeIntegers = {
+    poolLowWatermark: config.runtime?.poolLowWatermark,
+    poolHighWatermark: config.runtime?.poolHighWatermark,
+    generationConcurrency: config.runtime?.generationConcurrency,
+    generationQueueLimit: config.runtime?.generationQueueLimit,
+    generationTimeoutMs: config.runtime?.generationTimeoutMs,
+    cacheMaxBytes: config.runtime?.cacheMaxBytes,
+  };
+  for (const [name, value] of Object.entries(runtimeIntegers)) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
+      throw new Error(`runtime.${name} must be a positive integer.`);
+  }
+  if (
+    config.runtime?.cacheMaxBytes !== undefined &&
+    config.runtime.cacheMaxBytes > MAX_RUNTIME_CACHE_BYTES
+  )
+    throw new Error(
+      `runtime.cacheMaxBytes must be no greater than ${MAX_RUNTIME_CACHE_BYTES}.`,
+    );
+  if (
+    (config.runtime?.poolLowWatermark ?? 2) >
+    (config.runtime?.poolHighWatermark ?? 4)
+  )
+    throw new Error(
+      "runtime.poolLowWatermark must not exceed runtime.poolHighWatermark.",
+    );
+  if (
+    config.runtime?.variantMode !== undefined &&
+    config.runtime.variantMode !== "response-pool"
+  )
+    throw new Error(
+      "runtime.variantMode must be response-pool; reusable window rotation is not supported.",
+    );
   const entries = Object.entries(config.fonts);
   if (entries.length === 0)
     throw new Error("At least one font must be configured.");

@@ -41,11 +41,27 @@ async function fixture() {
 }
 
 describe("request engine", () => {
+  it("rejects a weak runtime secret before generating variants", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET = "too short";
+    await expect(createGlyphEngine(config, { cwd })).rejects.toThrow(
+      /at least 32/,
+    );
+  });
+
   it("rotates responses and serves a private matching font", async () => {
     const { cwd, config } = await fixture();
     process.env.GLYPHSCRAMBLE_SECRET =
       "test secret with more than thirty two characters";
-    const engine = await createGlyphEngine(config, { cwd });
+    const engine = await createGlyphEngine(
+      {
+        ...config,
+        runtime: { poolLowWatermark: 2, poolHighWatermark: 2 },
+      },
+      { cwd },
+    );
+    engine.beginResponse();
+    expect(engine.metrics().leasesIssued).toBe(0);
     const one = engine
       .beginResponse()
       .scramble("Secret Value", { font: "body" });
@@ -56,14 +72,31 @@ describe("request engine", () => {
     expect(one.encodedText).not.toBe(two.encodedText);
     expect(one.fontToken).not.toBe(two.fontToken);
     expect(one.face).toBe("default");
+    expect(one.rotation).toEqual({
+      scope: "response",
+      variantMode: "response-pool",
+      reusableAcrossResponses: false,
+    });
     expect(JSON.stringify(one)).not.toContain("Secret Value");
-    const response = await engine.fontResponse(
-      new Request(`https://example.test${one.fontUrl}`),
-    );
+    const generationsBeforeRequests = engine.metrics().generations;
+    const [response, duplicate] = await Promise.all([
+      engine.fontResponse(new Request(`https://example.test${one.fontUrl}`)),
+      engine.fontResponse(new Request(`https://example.test${one.fontUrl}`)),
+    ]);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("font/woff2");
     expect(response.headers.get("cache-control")).toMatch(/^private/);
+    expect(response.headers.get("x-glyphscramble-variant-mode")).toBe(
+      "response-pool",
+    );
     expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
+    expect((await duplicate.arrayBuffer()).byteLength).toBeGreaterThan(0);
+    expect(engine.metrics()).toMatchObject({
+      leasesIssued: 2,
+      fontHits: 2,
+    });
+    expect(engine.metrics().generations).toBe(generationsBeforeRequests);
+    await engine.close();
   });
 
   it("rejects tampered font tokens", async () => {
@@ -76,6 +109,27 @@ describe("request engine", () => {
       new Request(`https://example.test${value.fontUrl}x`),
     );
     expect(response.status).toBe(404);
+    await engine.close();
+  });
+
+  it("fails closed when a burst consumes the bounded ready pool", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const engine = await createGlyphEngine(
+      {
+        ...config,
+        runtime: { poolLowWatermark: 1, poolHighWatermark: 1 },
+      },
+      { cwd },
+    );
+    const first = engine.beginResponse().scramble("Secret", { font: "body" });
+    expect(first.encodedText).not.toBe("Secret");
+    expect(() =>
+      engine.beginResponse().scramble("Another secret", { font: "body" }),
+    ).toThrow(/variant is ready/i);
+    expect(engine.metrics().poolExhaustions).toBe(1);
+    await engine.close();
   });
 
   it("post-processes explicitly marked static blocks without plaintext", async () => {
@@ -164,5 +218,6 @@ describe("request engine", () => {
     expect(() =>
       context.scramble("Secret", { font: "body", face: "missing" }),
     ).toThrow(/Unknown GlyphScramble face/);
+    await engine.close();
   });
 });
