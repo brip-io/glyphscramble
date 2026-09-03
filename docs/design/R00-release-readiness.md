@@ -3,7 +3,7 @@
 > **Size:** L · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#1](https://github.com/brip-io/glyphscramble/issues/1)
 > **Owner:** BRIP · **Reviewers:** runtime, framework, accessibility, security, and counsel/IP
 
-> **This is a parent project.** It is delivered through twelve independently mergeable child issues. This document owns architecture, ordering, and release gates; each child owns its implementation and tests.
+> **This is a parent project.** It is delivered through fourteen independently mergeable child issues. This document owns architecture, ordering, and release gates; each child owns its implementation and tests.
 
 ## Objective
 
@@ -32,7 +32,7 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 7. Font notices and license metadata MUST accompany redistributed generated artifacts.
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
-10. Public release remains blocked on counsel/IP approval and all R12 release gates.
+10. Public release remains blocked on R13 documentation, R14 demo evidence, counsel/IP approval, and all R12 release gates.
 
 ## Milestones and issue breakdown
 
@@ -104,6 +104,18 @@ Ship typed Astro middleware/components, a functional Vite integration, explicit 
 
 ### Release D — Evidence and controlled release
 
+#### R13 · Developer documentation website · **M**
+
+Build a static-first, public documentation site with one canonical content registry, qualified quickstarts, search, Markdown/LLM outputs, and mechanical checks for claims, examples, SEO, accessibility, and performance.
+
+**Exit criterion:** a developer can choose a safe content block and delivery mode, complete a qualified integration, and inspect accurate limitations through human- and agent-readable pages whose examples and support claims cannot drift from the packages.
+
+#### R14 · Raw-agent and human-rendering conceptual demo · **M**
+
+Use real generated artifacts to animate the raw-fetch, human-rendering, rotation, static-build, and advanced-recovery paths without implying universal resistance to agents.
+
+**Exit criterion:** the demo proves different encoded responses render identically, distinguishes static per-build reuse, exposes the recoverability boundary, and passes no-motion, no-JS, failure, browser, accessibility, claim, and performance gates.
+
 #### R12 · Cross-browser qualification and release gates · **M**
 
 Exercise the complete real-font, script, browser, leakage, performance, packaging, and release matrix and prevent publication when any required evidence is missing.
@@ -117,9 +129,11 @@ R04 ─▶ R11 ─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
                            ├─▶ R08 ─┤
                            ├─▶ R09 ─┤
                            └─▶ R10 ─┤
-R06 ─┬────────────────▶ adapters ├─▶ R12
-     └─▶ R03 ────────────────▶ R10
+R06 ─┬────────────────▶ adapters ├─▶ R13 ─┐
+     ├─▶ R03 ────────────────▶ R10       ├─▶ R12
+     └────────────────────────▶ R14 ──────┘
 R02 ───▶ R03
+R03/R05 ───────────────────────▶ R14
 ```
 
 Hard orderings:
@@ -129,6 +143,7 @@ Hard orderings:
 - R05 and R06 precede server/UI adapters so every framework shares one lifecycle contract.
 - R02, R04, and R06 precede R03 because static delivery consumes the safe transformer, final face metadata, and shared loader.
 - R02 and R03 precede R10 because Vite/Astro static support must expose only the corrected static compiler.
+- R13 consumes final adapter behavior and R14 consumes the static/request/client contracts; both precede R12 so release qualification tests public claims and evidence rather than inventing them.
 - Every child precedes R12; R12 validates rather than invents missing functionality.
 
 ## Release policy
@@ -154,7 +169,9 @@ Hard orderings:
 | R10 | [Astro 7, Vite, and vanilla integration](R10-astro-vite-vanilla.md)                   |    M |       P1 | [#11](https://github.com/brip-io/glyphscramble/issues/11) |
 | R11 | [Binary and Unicode hardening](R11-binary-unicode-hardening.md)                       |    M |       P1 | [#12](https://github.com/brip-io/glyphscramble/issues/12) |
 | R12 | [Cross-browser qualification and release gates](R12-qualification-release.md)         |    M |       P0 | [#13](https://github.com/brip-io/glyphscramble/issues/13) |
+| R13 | [Developer documentation website](R13-documentation-website.md)                       |    M |       P1 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
+| R14 | [Raw-agent and human-rendering conceptual demo](R14-agent-human-demo.md)              |    M |       P1 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
 
 ## Completion definition
 
-R00 closes only when every child issue is complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.
+R00 closes only when all fourteen child issues are complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.
