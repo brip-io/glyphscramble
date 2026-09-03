@@ -1,6 +1,6 @@
 # [R06] Client payload and font-load lifecycle
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In review in [PR #25](https://github.com/brip-io/glyphscramble/pull/25) · **GitHub issue:** [#7](https://github.com/brip-io/glyphscramble/issues/7)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #25](https://github.com/brip-io/glyphscramble/pull/25) · **GitHub issue:** [#7](https://github.com/brip-io/glyphscramble/issues/7)
 > **Blocked by:** R04, R05 · **Blocks:** R03, R07-R10, R12
 
 ## Objective
