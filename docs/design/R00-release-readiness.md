@@ -38,7 +38,7 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 
 ### Release A — Safe foundations
 
-#### R01 · Runtime font-generation architecture · **M** · **In progress**
+#### R01 · Runtime font-generation architecture · **M** · **Implemented in [PR #19](https://github.com/brip-io/glyphscramble/pull/19)**
 
 Remove whole-font WOFF2 compression from the latency-sensitive request path, introduce bounded/coalesced generation, and enforce end-to-end performance budgets.
 

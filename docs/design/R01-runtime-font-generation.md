@@ -1,6 +1,6 @@
 # [R01] Runtime font-generation architecture
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#2](https://github.com/brip-io/glyphscramble/issues/2)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Implemented in [PR #19](https://github.com/brip-io/glyphscramble/pull/19) · **GitHub issue:** [#2](https://github.com/brip-io/glyphscramble/issues/2)
 > **Blocked by:** R04, R11 · **Blocks:** R05, R12
 
 ## Objective
