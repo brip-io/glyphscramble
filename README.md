@@ -29,7 +29,8 @@ Client components accept only a branded `GlyphPayload`; the public client API ha
 
 ## Install and prepare
 
-Node 22.12 or newer and pnpm are supported. The published packages also run on Node 24.
+Node 22 or 24 is supported by the published packages. Repository development
+with the pinned pnpm 11 release requires Node 22.13 or newer.
 
 ```bash
 pnpm add @brip/glyphscramble @brip/glyphscramble-next @brip/glyphscramble-react

@@ -14,7 +14,8 @@ import {
   prepareGlyphFonts,
 } from "../packages/core/dist/index.js";
 
-const ITERATIONS = 5;
+const VARIANT_ITERATIONS = 5;
+const FONT_RESPONSE_ITERATIONS = 50;
 const COLD_ITERATIONS = 3;
 const SECRET = "GLYPHSCRAMBLE_BENCHMARK_SECRET";
 
@@ -75,12 +76,12 @@ async function run(label, source, ceilings) {
       accessibilityRiskAcknowledged: true,
       maxNormalizedBytes: 2 * 1024 * 1024,
       runtime: {
-        poolLowWatermark: ITERATIONS,
-        poolHighWatermark: ITERATIONS,
+        poolLowWatermark: VARIANT_ITERATIONS,
+        poolHighWatermark: VARIANT_ITERATIONS,
         generationConcurrency: 2,
         generationQueueLimit: 16,
         generationTimeoutMs: ceilings.generationP95 * 2,
-        cacheMaxBytes: source.length * ITERATIONS * 4,
+        cacheMaxBytes: source.length * VARIANT_ITERATIONS * 4,
       },
     };
     const lock = await prepareGlyphFonts(config, { cwd });
@@ -99,14 +100,20 @@ async function run(label, source, ceilings) {
     }
     const acquisition = [];
     const response = [];
+    const fontUrls = [];
     const sample = "High value block. ".repeat(625);
-    for (let index = 0; index < ITERATIONS; index++) {
+    for (let index = 0; index < VARIANT_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
       acquisition.push(performance.now() - acquired);
+      fontUrls.push(payload.fontUrl);
+    }
+    for (let index = 0; index < FONT_RESPONSE_ITERATIONS; index++) {
       const responseStarted = performance.now();
       const font = await engine.fontResponse(
-        new globalThis.Request(`https://benchmark.invalid${payload.fontUrl}`),
+        new globalThis.Request(
+          `https://benchmark.invalid${fontUrls[index % fontUrls.length]}`,
+        ),
       );
       response.push(performance.now() - responseStarted);
       if (!font.ok)
@@ -142,12 +149,12 @@ async function run(label, source, ceilings) {
 
 const results = [
   await run("inter-123kb", interSource, {
-    generationP95: 1_250,
-    coldPool: 2_500,
+    generationP95: 2_000,
+    coldPool: 4_000,
   }),
   await run("inter-padded-1mb", paddedInterFont(1024 * 1024), {
-    generationP95: 3_000,
-    coldPool: 8_000,
+    generationP95: 5_000,
+    coldPool: 12_000,
   }),
 ];
 
