@@ -32,7 +32,8 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 7. Font notices and license metadata MUST accompany redistributed generated artifacts.
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
-10. Public release remains blocked on R13-R20 evidence, counsel/IP approval, and all R12 release gates.
+10. Public release remains blocked on the open R13-R15 and R18-R19 work,
+    counsel/IP approval, and all R12 release gates.
 
 ## Milestones and issue breakdown
 
@@ -138,7 +139,7 @@ Keep authorization stable across faces, deduplicate descriptors/downloads, and m
 
 Make static traversal near-linear, move text failures into contextual planning, and introduce bounded deterministic I/O concurrency.
 
-#### R20 · Core contract and operator hardening · **M**
+#### R20 · Core contract and operator hardening · **M** · **Implemented in [PR #49](https://github.com/brip-io/glyphscramble/pull/49)**
 
 Align client/server bounds, cap timers, improve font/content/remote errors, correct token lifecycle/log guidance, and derive lockfile version from the package.
 

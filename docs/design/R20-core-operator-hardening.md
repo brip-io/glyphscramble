@@ -1,6 +1,6 @@
 # [R20] Core contract and operator hardening
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#37](https://github.com/brip-io/glyphscramble/issues/37)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #49](https://github.com/brip-io/glyphscramble/pull/49) · **GitHub issue:** [#37](https://github.com/brip-io/glyphscramble/issues/37)
 > **Blocked by:** R04-R06 and R11 · **Blocks:** R12 release qualification
 
 ## Objective
@@ -71,6 +71,39 @@ Centralize payload bounds shared by preparation and browser validation. Add expl
 - R04/R11 own font and parser foundations; R05/R06 own token/payload boundaries.
 - R15 owns guided doctor/config ergonomics.
 - R12 qualifies packed version identity and all security/error contracts.
+
+## Implementation notes
+
+[PR #49](https://github.com/brip-io/glyphscramble/pull/49) completed the
+operator boundary as follows:
+
+- one shared limits module now governs server emission, browser consumption,
+  prepared coverage, runtime/remote timer inputs, and lease expiry; the server
+  runs the complete browser payload validator before marking a response used;
+- `GlyphContentError` reports code point, normalization state, family/face, and
+  a repair anchor without source text, while explicit `protect()` and
+  `protectAsync()` boundaries return either a payload or content-free omitted
+  diagnostics in core, React server helpers, and Next;
+- `GlyphFontError` classifies strict parser failures and points operators to
+  documented OTS/fonttools workflows without modifying input; mapped and
+  compatible IPv6 addresses now reuse the IPv4 deny policy, and redirects
+  without `Location` have a distinct bounded error;
+- the public token getter was removed, tamper coverage now changes encrypted
+  token bytes while preserving the valid font path, and the security guide
+  documents path/access-log redaction plus private cache policy;
+- a generated package-version module drives the CLI, user agents, and lockfile.
+  The repository check packs the package and compares its manifest, generated
+  module, and CLI output. The packed browser runtime is additionally asserted
+  to remain one self-contained ESM artifact after a real consumer test exposed
+  an internal-import regression during CI.
+
+The optional policy is deliberately per block rather than configuration-wide,
+so a global setting cannot hide coverage mistakes. The broader `doctor`
+content-fixture scan remains with R15's guided readiness work; R20 supplies the
+typed diagnostics that scan will consume.
+
+CI passed DCO, Node 22.13/24 validation and runtime benchmarks, the packed
+Astro/Vite/Node and Next consumers, and Chromium/Firefox/WebKit runtime tests.
 
 ## Exit criteria
 
