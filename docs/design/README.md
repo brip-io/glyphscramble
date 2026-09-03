@@ -21,10 +21,10 @@ The initial beta scaffold below is a proof of concept, not a qualified public be
 | **R12** | [Cross-browser qualification and release gates](R12-qualification-release.md)         |    M |       P0 | pending      |
 
 ```text
-R04 ─┬─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
-     │                ├─▶ R08 ─┤
-R11 ─┘                ├─▶ R09 ─┤
-                      └─▶ R10 ─┤
+R04 ─▶ R11 ─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
+                           ├─▶ R08 ─┤
+                           ├─▶ R09 ─┤
+                           └─▶ R10 ─┤
 R06 ─┬────────────────▶ adapters ├─▶ R12
      └─▶ R03 ────────────────▶ R10
 R02 ───▶ R03

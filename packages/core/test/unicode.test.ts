@@ -1,4 +1,12 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import {
+  unicodePropertyKeys,
+  unicodePropertyRanges,
+  unicodeSourceDigests,
+  unicodeStructuralRanges,
+} from "../src/generated/unicode17.js";
 import {
   createPermutation,
   encodeText,
@@ -52,5 +60,61 @@ describe("Unicode-safe permutation", () => {
     expect(() => encodeText("Z", permutation)).toThrow(
       /No Unicode-safe mapping/,
     );
+  });
+
+  it("matches the pinned source and generated-file digests", async () => {
+    const manifest = JSON.parse(
+      await readFile(
+        new URL("../../../scripts/unicode-17-sources.json", import.meta.url),
+        "utf8",
+      ),
+    ) as {
+      sources: Record<string, { sha256: string }>;
+      generated: { sha256: string };
+    };
+    expect(unicodeSourceDigests).toEqual(
+      Object.fromEntries(
+        Object.entries(manifest.sources).map(([name, value]) => [
+          name,
+          value.sha256,
+        ]),
+      ),
+    );
+    const generated = await readFile(
+      new URL("../src/generated/unicode17.ts", import.meta.url),
+    );
+    expect(createHash("sha256").update(generated).digest("hex")).toBe(
+      manifest.generated.sha256,
+    );
+  });
+
+  it("exhaustively serves sorted, disjoint generated Unicode tables", () => {
+    let previousEnd = -1;
+    for (const [start, end] of unicodeStructuralRanges) {
+      expect(start).toBeGreaterThan(previousEnd);
+      expect(end).toBeGreaterThanOrEqual(start);
+      for (let codepoint = start; codepoint <= end; codepoint++) {
+        expect(isStructuralCodePoint(codepoint)).toBe(true);
+        expect(propertySignature(codepoint)).toBeNull();
+      }
+      previousEnd = end;
+    }
+
+    previousEnd = -1;
+    for (const [start, end, key] of unicodePropertyRanges) {
+      expect(start).toBeGreaterThan(previousEnd);
+      expect(end).toBeGreaterThanOrEqual(start);
+      expect(unicodePropertyKeys[key]).toBeTypeOf("string");
+      for (let codepoint = start; codepoint <= end; codepoint++) {
+        expect(isStructuralCodePoint(codepoint)).toBe(false);
+        expect(propertySignature(codepoint)).toBe(unicodePropertyKeys[key]);
+      }
+      previousEnd = end;
+    }
+
+    for (const codepoint of [-1, 0x110000, 1.5, Number.NaN]) {
+      expect(isStructuralCodePoint(codepoint)).toBe(false);
+      expect(propertySignature(codepoint)).toBeNull();
+    }
   });
 });

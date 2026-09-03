@@ -16,6 +16,12 @@ Each response uses a CSPRNG seed. The seed is carried in an AES-256-GCM encrypte
 
 The font pipeline preserves outline, variation, color, GSUB, and GPOS bytes and replaces `cmap` plus required `head` checksum state. WOFF2 uses the Google WOFF2 implementation compiled to WASM. TTC collections are rejected in 0.1.
 
-Structural Unicode values stay unchanged. Permutation pools do not cross script, category, case, or BMP/astral width. Qualification uses the pinned Unicode 17 property corpus and official segmentation/bidi fixtures. A missing safe value fails closed rather than returning plaintext.
+Font preparation treats local and remote font bytes as untrusted. Remote fetches are HTTPS-only, validate every redirect, reject credentials and private/reserved destinations by default, pin validated DNS results to the built-in HTTPS connection, stream through a byte ceiling, and enforce both per-hop and total deadlines. MIME type and font magic must agree with the requested resource kind. `remote.allowPrivateHosts` is an explicit escape hatch for controlled build networks; enabling it removes the SSRF destination guard. An injected custom fetch transport owns DNS-to-connection binding and must honor the supplied abort signal and stream cancellation, so callers that supply one must enforce those boundaries themselves.
+
+SFNT, WOFF, WOFF2 declarations, and `cmap` subtables are checked before their collections are expanded. The default parser ceilings are 16 MiB input/output, 8 MiB per table, 128 tables, 64 `cmap` encoding records, 100,000 format-12 groups, and 250,000 decoded mappings. Passing a larger configured normalized-font allowance is an informed opt-in, not evidence that an arbitrary font is safe.
+
+Structural Unicode values stay unchanged. Permutation pools do not cross script, category, case, or BMP/astral width. Runtime classification and its exhaustive invariant use the pinned Unicode 17 property corpus; the manifest records the official segmentation and bidi fixtures that R12 must execute for release qualification. A missing safe value fails closed rather than returning plaintext.
+
+`pnpm qualify:font` runs the pinned OFL Inter variable-font smoke face through the binary round trip and reports HarfBuzz, OTS, and fontTools results as machine-readable JSON. A missing optional system tool is reported as `skipped`, never confused with a pass; the release qualification environment must provide the pinned toolchain.
 
 Before public release, counsel must review the implementation and claims in light of related font-obfuscation filings, including US patent application 2024/0160832. Version 0.1 excludes glyph slicing, multi-font message encoding, identity watermarking, and geometry perturbation.
