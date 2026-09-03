@@ -1,6 +1,7 @@
 import type { GlyphConfig, GlyphConfigInput } from "./types.js";
 import spdxParse from "spdx-expression-parse";
 import { parseCoverage } from "./coverage.js";
+import { assertTimerDelay, MAX_TIMER_DELAY_MS } from "./limits.js";
 
 const HTTPS = /^https:\/\//i;
 const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
@@ -88,11 +89,16 @@ export function validateGlyphConfig(config: GlyphConfig): void {
   for (const [name, value] of Object.entries({
     timeoutMs: config.remote?.timeoutMs,
     totalTimeoutMs: config.remote?.totalTimeoutMs,
-    maxBytes: config.remote?.maxBytes,
   })) {
-    if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
-      throw new Error(`remote.${name} must be a positive integer.`);
+    if (value !== undefined)
+      assertTimerDelay(value, `remote.${name}`, MAX_TIMER_DELAY_MS);
   }
+  const remoteMaxBytes = config.remote?.maxBytes;
+  if (
+    remoteMaxBytes !== undefined &&
+    (!Number.isSafeInteger(remoteMaxBytes) || remoteMaxBytes < 1)
+  )
+    throw new Error("remote.maxBytes must be a positive integer.");
   const maxRedirects = config.remote?.maxRedirects;
   if (
     maxRedirects !== undefined &&
@@ -114,6 +120,14 @@ export function validateGlyphConfig(config: GlyphConfig): void {
   for (const [name, value] of Object.entries(runtimeIntegers)) {
     if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
       throw new Error(`runtime.${name} must be a positive integer.`);
+  }
+  for (const [name, value] of Object.entries({
+    generationTimeoutMs: config.runtime?.generationTimeoutMs,
+    acquisitionTimeoutMs: config.runtime?.acquisitionTimeoutMs,
+    drainTimeoutMs: config.runtime?.drainTimeoutMs,
+  })) {
+    if (value !== undefined)
+      assertTimerDelay(value, `runtime.${name}`, MAX_TIMER_DELAY_MS);
   }
   if (
     config.runtime?.cacheMaxBytes !== undefined &&

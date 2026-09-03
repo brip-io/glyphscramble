@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 import { Agent } from "undici";
 import type { GlyphConfig } from "./types.js";
+import { assertTimerDelay } from "./limits.js";
 
 const DEFAULT_REMOTE_BYTES = 8 * 1024 * 1024;
 const DEFAULT_HOP_TIMEOUT_MS = 10_000;
@@ -50,7 +51,6 @@ for (const [network, prefix] of [
 for (const [network, prefix] of [
   ["::", 128],
   ["::1", 128],
-  ["::ffff:0:0", 96],
   ["64:ff9b::", 96],
   ["64:ff9b:1::", 48],
   ["100::", 64],
@@ -65,12 +65,68 @@ for (const [network, prefix] of [
 ] as const)
   blocked6.addSubnet(network, prefix, "ipv6");
 
+function parseIpv4(value: string): readonly number[] | undefined {
+  const parts = value.split(".");
+  if (parts.length !== 4) return undefined;
+  const octets = parts.map(Number);
+  return octets.every(
+    (part, index) =>
+      Number.isInteger(part) &&
+      part >= 0 &&
+      part <= 255 &&
+      String(part) === parts[index],
+  )
+    ? octets
+    : undefined;
+}
+
+function embeddedIpv4(address: string): string | undefined {
+  let normalized = address.toLowerCase();
+  if (normalized.includes(".")) {
+    const separator = normalized.lastIndexOf(":");
+    const octets = parseIpv4(normalized.slice(separator + 1));
+    if (separator < 0 || !octets) return undefined;
+    normalized = `${normalized.slice(0, separator + 1)}${(
+      octets[0]! * 256 +
+      octets[1]!
+    ).toString(16)}:${(octets[2]! * 256 + octets[3]!).toString(16)}`;
+  }
+  const halves = normalized.split("::");
+  if (halves.length > 2) return undefined;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves[1] ? halves[1].split(":") : [];
+  const compressed = halves.length === 2;
+  const missing = compressed ? 8 - left.length - right.length : 0;
+  const parts =
+    halves.length === 2
+      ? [...left, ...Array.from({ length: missing }, () => "0"), ...right]
+      : left;
+  if (
+    (compressed ? missing < 1 : left.length !== 8) ||
+    parts.length !== 8 ||
+    parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part))
+  )
+    return undefined;
+  const words = parts.map((part) => Number.parseInt(part, 16));
+  const compatible = words.slice(0, 6).every((word) => word === 0);
+  const mapped =
+    words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff;
+  if (!compatible && !mapped) return undefined;
+  return [
+    words[6]! >>> 8,
+    words[6]! & 0xff,
+    words[7]! >>> 8,
+    words[7]! & 0xff,
+  ].join(".");
+}
+
 function assertPublicAddress(address: string): void {
   const version = isIP(address);
   if (!version) throw new Error(`DNS returned an invalid address: ${address}`);
+  const embedded = version === 6 ? embeddedIpv4(address) : undefined;
   const denied =
-    version === 4
-      ? blocked4.check(address, "ipv4")
+    version === 4 || embedded
+      ? blocked4.check(embedded ?? address, "ipv4")
       : blocked6.check(address, "ipv6");
   if (denied)
     throw new Error(`Remote source resolves to a denied address: ${address}`);
@@ -170,6 +226,7 @@ async function withTimeout<T>(
   milliseconds: number,
   message: string,
 ): Promise<T> {
+  assertTimerDelay(milliseconds, "Remote timeout");
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -316,7 +373,11 @@ export async function fetchBounded(
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
         await response.body?.cancel();
-        if (!location || redirect === redirects)
+        if (!location)
+          throw new Error(
+            `Remote source ${url} returned redirect ${response.status} without a Location header.`,
+          );
+        if (redirect === redirects)
           throw new Error(`Too many redirects while fetching ${initialUrl}`);
         url = new URL(location, url);
         continue;

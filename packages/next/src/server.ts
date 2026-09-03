@@ -8,6 +8,8 @@ import {
   responseHeadersForContext,
   type GlyphConfig,
   type GlyphPayload,
+  type GlyphProtectionResult,
+  type OptionalScrambleOptions,
   type ResponseContext,
   type ScrambleOptions,
 } from "@brip/glyphscramble";
@@ -18,6 +20,11 @@ export interface NextGlyphs {
   getResponseContext(): Promise<ResponseContext>;
   /** Convert plaintext at the Server Component boundary. */
   scramble(text: string, options: ScrambleOptions): Promise<GlyphPayload>;
+  /** Explicit optional-block boundary; omitted results never contain plaintext. */
+  protect(
+    text: string,
+    options: OptionalScrambleOptions,
+  ): Promise<GlyphProtectionResult>;
   /** Independent context for Route Handlers, which are outside React cache. */
   beginRouteResponse(): ResponseContext;
   /** Export as GET and HEAD from the generated Node.js font Route Handler. */
@@ -85,6 +92,9 @@ async function initializeNextGlyphs(
     getResponseContext,
     async scramble(text, scrambleOptions) {
       return (await getResponseContext()).scrambleAsync(text, scrambleOptions);
+    },
+    async protect(text, scrambleOptions) {
+      return (await getResponseContext()).protectAsync(text, scrambleOptions);
     },
     beginRouteResponse: () => engine.beginResponse(),
     fontRoute: (request) => engine.fontResponse(request),

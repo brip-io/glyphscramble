@@ -17,6 +17,8 @@ GlyphScramble 0.1 accepts a local TTF, OTF, WOFF, or WOFF2 file; a direct HTTPS 
 | `cmap` encoding records                     |         64 |
 | Format-12 groups                            |    100,000 |
 | Decoded mappings                            |    250,000 |
+| Payload coverage ranges                     |      1,024 |
+| Bytes per payload coverage range            |         32 |
 
 Set `remote.maxBytes`, `remote.timeoutMs`, `remote.totalTimeoutMs`, or `remote.maxRedirects` to make the transport policy stricter. `maxRedirects: 0` disables redirects. A normalized face above the 2 MiB policy threshold requires explicit coverage or `allowLargeFont: true`; `maxNormalizedBytes` changes that policy threshold but cannot raise the 16 MiB parser ceiling in 0.1. Prefer a licensed upstream subset over raising these limits.
 
@@ -35,3 +37,34 @@ Preparation validates container headers, table-directory ordering and search fie
 The transformer preserves every table except `cmap` and the required `head.checkSumAdjustment`. It does not repair a malformed font. Format-12 selection follows a documented preference for Windows full-repertoire, Unicode full-repertoire, Windows BMP, then Unicode BMP records. A format-4 compatibility table is omitted if the complete BMP mapping cannot fit; it is never silently truncated.
 
 Every configured font needs an SPDX license expression and a notice file. Those fields record the publisher's acknowledgement; GlyphScramble does not determine whether a font may legally be modified or redistributed.
+
+## Repairing rejected fonts
+
+`GlyphFontError` reports a stable rejection code, the configured `family.face`,
+the underlying bounded parser reason, and this repair section. GlyphScramble
+does not silently repair input because doing so would change publisher-provided
+font bytes and could hide compatibility or licensing problems.
+
+Work on a copy and retain the source license and notices. Use
+[`ots-sanitize`](https://github.com/khaledhosny/ots) to validate/sanitize an
+OpenType input, and use [fonttools](https://fonttools.readthedocs.io/) to inspect
+or deliberately convert/subset it:
+
+```bash
+ots-sanitize copy-of-input.ttf
+fonttools ttLib.woff2 decompress copy-of-input.woff2
+pyftsubset copy-of-input.ttf --unicodes=U+0000-00FF --flavor=woff2 --output-file=subset.woff2
+```
+
+Then inspect and prepare the resulting copy again:
+
+```bash
+npx glyphscramble inspect subset.woff2
+npx glyphscramble prepare
+```
+
+A repaired file is still untrusted input and must pass the same checks. Confirm
+that subsetting preserves the scripts, variation axes, color tables, and layout
+features your protected block needs. Confirm separately that the font license
+permits modification and redistribution. TTC collections remain unsupported;
+extract a licensed individual face rather than raising a parser limit.

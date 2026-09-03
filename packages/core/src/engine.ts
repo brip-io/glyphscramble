@@ -9,7 +9,15 @@ import {
   type TokenKey,
   type TokenKeyRing,
 } from "./token.js";
-import { createPermutationPlan, encodeText } from "./unicode.js";
+import {
+  assertTextSupported,
+  createPermutationPlan,
+  encodeText,
+  UnsupportedTextError,
+} from "./unicode.js";
+import { assertPayloadWireSize, assertTimerDelay } from "./limits.js";
+import { assertGlyphPayload, assertGlyphPayloadOptions } from "./browser.js";
+import { GlyphContentError } from "./content-error.js";
 import { validateGlyphConfig } from "./config.js";
 import {
   ResponsePoolVariantProvider,
@@ -23,13 +31,16 @@ import type {
   GlyphDrainOptions,
   GlyphEngine,
   GlyphPayload,
+  GlyphProtectionResult,
   GlyphRuntimeEventHandler,
   ResponseContext,
+  OptionalScrambleOptions,
   ScrambleOptions,
 } from "./types.js";
 
 interface RuntimeFont extends PreparedFont {
   coverage: readonly string[];
+  mappableCodepoints: ReadonlySet<number>;
 }
 
 interface RuntimeFamily {
@@ -57,7 +68,7 @@ function keyFromEnvironment(id: string, secretEnv: string): TokenKey {
 }
 
 function tokenKeyRing(config: GlyphConfig): TokenKeyRing {
-  return {
+  const result = {
     current: keyFromEnvironment(
       config.rotation.keyId ?? "current",
       config.rotation.secretEnv,
@@ -66,6 +77,7 @@ function tokenKeyRing(config: GlyphConfig): TokenKeyRing {
       keyFromEnvironment(key.id, key.secretEnv),
     ),
   };
+  return result;
 }
 
 function payload(
@@ -85,7 +97,7 @@ function payload(
   const fileId = runtimeId(font);
   const fontUrl = `${config.routePrefix}/font/${encodeURIComponent(token)}/${encodeURIComponent(fileId)}.woff2`;
   const descriptors = font.metadata.descriptors;
-  return {
+  const result = {
     version: 2,
     encodedText,
     font: font.id,
@@ -112,6 +124,8 @@ function payload(
     ...(options.lang ? { lang: options.lang } : {}),
     ...(options.cspNonce ? { cspNonce: options.cspNonce } : {}),
   } as GlyphPayload;
+  assertGlyphPayload(result);
+  return result;
 }
 
 export async function createGlyphEngine(
@@ -138,9 +152,18 @@ export async function createGlyphEngine(
     const preparedFaces = preparedFamilies.get(id)!;
     const runtimeFaces = new Map<string, RuntimeFont>();
     for (const prepared of preparedFaces) {
+      const permutationPlan = createPermutationPlan(
+        prepared.metadata.codepoints,
+      );
+      const mappableCodepoints = new Set(
+        permutationPlan.groups
+          .filter((group) => group.values.length >= 2)
+          .flatMap((group) => group.values),
+      );
       const runtimeFont = {
         ...prepared,
         coverage: prepared.metadata.coverage,
+        mappableCodepoints,
       };
       runtimeFaces.set(prepared.faceId, runtimeFont);
       fonts.set(runtimeId(prepared), runtimeFont);
@@ -148,7 +171,7 @@ export async function createGlyphEngine(
         id: runtimeId(prepared),
         namespace: runtimeNamespace(runtimeFont),
         sfnt: prepared.sfnt,
-        permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
+        permutationPlan,
       });
     }
     const configuredDefault = config.fonts[id]!.defaultFace;
@@ -179,6 +202,11 @@ export async function createGlyphEngine(
     beginResponse(
       responseAcquisition: GlyphAcquisitionOptions = {},
     ): ResponseContext {
+      if (responseAcquisition.timeoutMs !== undefined)
+        assertTimerDelay(
+          responseAcquisition.timeoutMs,
+          "Response acquisition timeout",
+        );
       let lease: ReturnType<FontVariantProvider["acquire"]> | undefined;
       let leasePromise:
         Promise<ReturnType<FontVariantProvider["acquire"]>> | undefined;
@@ -211,6 +239,7 @@ export async function createGlyphEngine(
             responseAcquisition.timeoutMs ??
             config.runtime?.acquisitionTimeoutMs ??
             50;
+          assertTimerDelay(timeoutMs, "Response acquisition timeout");
           const signal = acquisition.signal ?? responseAcquisition.signal;
           leasePromise = variantProvider
             .acquireAsync(expiryAt(timeoutMs), {
@@ -262,6 +291,24 @@ export async function createGlyphEngine(
           );
         return font;
       };
+      const contentError = (error: UnsupportedTextError, font: RuntimeFont) =>
+        new GlyphContentError({
+          codepoint: error.codepoint,
+          normalization: error.normalization,
+          font: font.id,
+          face: font.faceId,
+        });
+      const validateText = (text: string, font: RuntimeFont) => {
+        assertPayloadWireSize(text);
+        try {
+          assertTextSupported(text, (codepoint) =>
+            font.mappableCodepoints.has(codepoint),
+          );
+        } catch (error) {
+          if (!(error instanceof UnsupportedTextError)) throw error;
+          throw contentError(error, font);
+        }
+      };
       const scrambleWithLease = (
         text: string,
         scrambleOptions: ScrambleOptions,
@@ -273,21 +320,53 @@ export async function createGlyphEngine(
           throw new Error(
             "The response font variant expired before text could be scrambled.",
           );
-        const encodedText = encodeText(text, mapping);
-        authorizedFaces.add(runtimeId(font));
-        const responseToken = ensureIssued();
-        return payload(
-          encodedText,
-          font,
-          responseToken,
-          config,
-          scrambleOptions,
-        );
+        let encodedText: string;
+        try {
+          encodedText = encodeText(text, mapping);
+        } catch (error) {
+          if (!(error instanceof UnsupportedTextError)) throw error;
+          throw contentError(error, font);
+        }
+        const faceId = runtimeId(font);
+        const alreadyAuthorized = authorizedFaces.has(faceId);
+        authorizedFaces.add(faceId);
+        try {
+          const responseToken = ensureIssued();
+          return payload(
+            encodedText,
+            font,
+            responseToken,
+            config,
+            scrambleOptions,
+          );
+        } catch (error) {
+          if (!alreadyAuthorized) authorizedFaces.delete(faceId);
+          issued = undefined;
+          issuedFaces = "";
+          throw error;
+        }
+      };
+      const scramble = (
+        text: string,
+        scrambleOptions: ScrambleOptions,
+      ): GlyphPayload => {
+        assertGlyphPayloadOptions(scrambleOptions);
+        const font = resolveFont(scrambleOptions);
+        validateText(text, font);
+        return scrambleWithLease(text, scrambleOptions, ensureLease());
+      };
+      const scrambleAsync = async (
+        text: string,
+        scrambleOptions: ScrambleOptions,
+        acquisition: GlyphAcquisitionOptions = {},
+      ): Promise<GlyphPayload> => {
+        assertGlyphPayloadOptions(scrambleOptions);
+        const font = resolveFont(scrambleOptions);
+        validateText(text, font);
+        const responseLease = await ensureLeaseAsync(acquisition);
+        return scrambleWithLease(text, scrambleOptions, responseLease);
       };
       return {
-        get token() {
-          return ensureIssued().token;
-        },
         get used() {
           return authorizedFaces.size > 0;
         },
@@ -298,18 +377,36 @@ export async function createGlyphEngine(
             ...(lease ? { variantId: lease.id } : {}),
           });
         },
-        scramble(text: string, scrambleOptions: ScrambleOptions): GlyphPayload {
-          resolveFont(scrambleOptions);
-          return scrambleWithLease(text, scrambleOptions, ensureLease());
-        },
-        async scrambleAsync(
+        scramble,
+        scrambleAsync,
+        protect(
           text: string,
-          scrambleOptions: ScrambleOptions,
+          scrambleOptions: OptionalScrambleOptions,
+        ): GlyphProtectionResult {
+          try {
+            return {
+              status: "protected",
+              payload: scramble(text, scrambleOptions),
+            };
+          } catch (error) {
+            if (!(error instanceof GlyphContentError)) throw error;
+            return { status: "omitted", error: error.diagnostic() };
+          }
+        },
+        async protectAsync(
+          text: string,
+          scrambleOptions: OptionalScrambleOptions,
           acquisition: GlyphAcquisitionOptions = {},
-        ): Promise<GlyphPayload> {
-          resolveFont(scrambleOptions);
-          const responseLease = await ensureLeaseAsync(acquisition);
-          return scrambleWithLease(text, scrambleOptions, responseLease);
+        ): Promise<GlyphProtectionResult> {
+          try {
+            return {
+              status: "protected",
+              payload: await scrambleAsync(text, scrambleOptions, acquisition),
+            };
+          } catch (error) {
+            if (!(error instanceof GlyphContentError)) throw error;
+            return { status: "omitted", error: error.diagnostic() };
+          }
         },
       };
     },
@@ -400,6 +497,8 @@ export async function createGlyphEngine(
     },
 
     async drain(drainOptions: GlyphDrainOptions = {}): Promise<void> {
+      if (drainOptions.timeoutMs !== undefined)
+        assertTimerDelay(drainOptions.timeoutMs, "Engine drain timeout");
       await variantProvider.drain(drainOptions);
     },
 

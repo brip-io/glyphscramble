@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checksum } from "../src/binary.js";
+import { buildCmap } from "../src/cmap.js";
 import { defineGlyphConfig } from "../src/config.js";
+import { GlyphFontError } from "../src/font-error.js";
 import {
   inspectFont,
   loadPreparedFont,
@@ -15,6 +17,7 @@ import {
 import { buildSfnt, parseSfnt } from "../src/sfnt.js";
 import type { GlyphConfig } from "../src/types.js";
 import { syntheticFont } from "./fixture.js";
+import { PACKAGE_VERSION } from "../src/generated/version.js";
 
 function woffFont(input: Uint8Array): Uint8Array {
   const parsed = parseSfnt(input);
@@ -167,6 +170,52 @@ function metadataFont(): Uint8Array {
 }
 
 describe("font-face preparation", () => {
+  it("reports corrupt fonts with a stable code, target, and repair path", async () => {
+    let failure: unknown;
+    try {
+      await inspectFont(new Uint8Array([0, 1, 2, 3]), "body");
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(GlyphFontError);
+    expect(failure).toMatchObject({
+      code: "GLYPH_FONT_CONTAINER_INVALID",
+      target: "body.default",
+    });
+    expect((failure as Error).message).toMatch(
+      /body\.default.*OTS\/fonttools.*FONT-SOURCES\.md#repairing-rejected-fonts/i,
+    );
+  });
+
+  it("rejects prepared coverage that exceeds the browser wire boundary", async () => {
+    const { cwd, config } = await localFixture();
+    const parsed = parseSfnt(syntheticFont());
+    const mapping = new Map<number, number>();
+    for (let index = 0; index < 1_025; index++)
+      mapping.set(0x1000 + index * 2, 1);
+    const tables = new Map(parsed.tables);
+    tables.set("cmap", buildCmap(mapping));
+    await writeFile(
+      join(cwd, "fonts/body.ttf"),
+      buildSfnt({ ...parsed, tables }),
+    );
+    const unboundedCoverage: GlyphConfig = {
+      ...config,
+      maxNormalizedBytes: 4 * 1024 * 1024,
+      fonts: {
+        body: {
+          ...config.fonts.body!,
+          coverage: undefined,
+        },
+      },
+    };
+    await expect(
+      prepareGlyphFonts(unboundedCoverage, { cwd }),
+    ).rejects.toMatchObject({
+      code: "GLYPH_FONT_COVERAGE_INVALID",
+      target: "body.default",
+    });
+  });
   it("writes lockfile v2 transactionally with effective coverage and notices", async () => {
     const { cwd, config } = await localFixture();
     const lock = await prepareGlyphFonts(config, {
@@ -174,7 +223,7 @@ describe("font-face preparation", () => {
       generatedAt: "2026-09-02T00:00:00.000Z",
     });
     expect(lock.version).toBe(2);
-    expect(lock.toolVersion).toBe("0.1.0-beta.0");
+    expect(lock.toolVersion).toBe(PACKAGE_VERSION);
     expect(lock.fonts.body?.defaultFace).toBe("default");
     const face = lock.fonts.body?.faces.default;
     expect(face?.codepoints).toEqual(

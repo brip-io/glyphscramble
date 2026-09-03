@@ -1,10 +1,17 @@
 import type { GlyphPayload } from "./types.js";
+import {
+  assertCoverageWireBounds,
+  assertPayloadWireSize,
+  assertTimerDelay,
+  MAX_COVERAGE_RANGES,
+  MAX_GLYPH_PAYLOAD_BYTES,
+  MAX_TIMER_DELAY_MS,
+} from "./limits.js";
 
-export const MAX_GLYPH_PAYLOAD_BYTES = 1024 * 1024;
+export { MAX_GLYPH_PAYLOAD_BYTES } from "./limits.js";
 const MAX_IDENTIFIER_LENGTH = 32;
 const MAX_TOKEN_LENGTH = 8 * 1024;
 const MAX_FONT_URL_LENGTH = 16 * 1024;
-const MAX_COVERAGE_RANGES = 1024;
 const SAFE_IDENTIFIER = /^[a-z][a-z0-9_-]{0,31}$/i;
 const SAFE_FAMILY = /^[a-z][a-z0-9_-]{0,127}$/i;
 const SAFE_FONT_URL = /^\/[a-z0-9._~%/-]+$/i;
@@ -100,6 +107,7 @@ function stringArrayAt(
     throw new TypeError(`${path} is invalid.`);
   for (const [index, item] of value.entries())
     stringAt(item, `${path}[${index}]`, { max: 32, pattern });
+  assertCoverageWireBounds(value as string[], path);
   return value as string[];
 }
 
@@ -112,6 +120,19 @@ function isUnicodeScalarString(value: string): boolean {
     } else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
   }
   return true;
+}
+
+export function assertGlyphPayloadOptions(value: {
+  lang?: unknown;
+  cspNonce?: unknown;
+}): void {
+  if (value.lang !== undefined)
+    stringAt(value.lang, "payload.lang", { max: 64, pattern: SAFE_LANG });
+  if (value.cspNonce !== undefined)
+    stringAt(value.cspNonce, "payload.cspNonce", {
+      max: 256,
+      pattern: SAFE_NONCE,
+    });
 }
 
 /**
@@ -220,13 +241,7 @@ export function assertGlyphPayload(
     rotation.reusableAcrossResponses !== false
   )
     throw new TypeError("payload.rotation is invalid.");
-  if (payload.lang !== undefined)
-    stringAt(payload.lang, "payload.lang", { max: 64, pattern: SAFE_LANG });
-  if (payload.cspNonce !== undefined)
-    stringAt(payload.cspNonce, "payload.cspNonce", {
-      max: 256,
-      pattern: SAFE_NONCE,
-    });
+  assertGlyphPayloadOptions(payload);
   if (
     family !== `GlyphScramble-${font}-${faceId}-${family.slice(-16)}` ||
     !/^[a-f0-9]{16}$/i.test(family.slice(-16))
@@ -241,11 +256,7 @@ export function assertGlyphPayload(
   )
     throw new TypeError("payload.fontUrl is inconsistent with its token.");
 
-  const maxBytes = options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES;
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
-    throw new TypeError("maxBytes must be a positive safe integer.");
-  if (new TextEncoder().encode(JSON.stringify(payload)).byteLength > maxBytes)
-    throw new TypeError(`payload exceeds the ${maxBytes} byte limit.`);
+  assertPayloadWireSize(payload, options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES);
 }
 
 /** CSP sources required by the runtime's same-origin font and bundled script. */
@@ -400,8 +411,7 @@ export function mountGlyphPayload(
 ): GlyphMountHandle {
   const document = element.ownerDocument;
   const timeoutMs = options.timeoutMs ?? 8_000;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
-    throw new TypeError("timeoutMs must be a positive safe integer.");
+  assertTimerDelay(timeoutMs, "timeoutMs");
   const originalStyle = {
     fontFamily: element.style.fontFamily,
     fontWeight: element.style.fontWeight,
@@ -444,6 +454,10 @@ export function mountGlyphPayload(
       element.hidden = false;
       return "error";
     }
+    if (expiresInMs > MAX_TIMER_DELAY_MS)
+      throw new TypeError(
+        `payload.expiresAt requires a timer greater than ${MAX_TIMER_DELAY_MS} milliseconds.`,
+      );
 
     let acquired: ReturnType<typeof acquireFace>;
     try {

@@ -4,6 +4,7 @@ import {
   glyphCspDirectives,
   mountGlyphPayload,
 } from "../src/browser.js";
+import { MAX_TIMER_DELAY_MS } from "../src/limits.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -255,6 +256,22 @@ describe("GlyphPayload validation", () => {
     });
     expect(() => mountGlyphPayload(env.element(), value)).toThrow(/css/);
     expect(FakeFontFace.created).toHaveLength(0);
+  });
+
+  it("rejects timeout and expiry delays beyond the platform timer ceiling", async () => {
+    const env = environment();
+    expect(() =>
+      mountGlyphPayload(env.element(), payload(), {
+        timeoutMs: MAX_TIMER_DELAY_MS + 1,
+      }),
+    ).toThrow(/2147483647/);
+
+    const farFuture = payload();
+    farFuture.expiresAt =
+      Math.floor((Date.now() + MAX_TIMER_DELAY_MS + 60_000) / 1_000) + 1;
+    const mount = mountGlyphPayload(env.element(), farFuture);
+    await expect(mount.ready).rejects.toThrow(/2147483647/);
+    mount.destroy();
   });
 });
 

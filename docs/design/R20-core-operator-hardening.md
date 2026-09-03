@@ -1,6 +1,6 @@
 # [R20] Core contract and operator hardening
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#37](https://github.com/brip-io/glyphscramble/issues/37)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#37](https://github.com/brip-io/glyphscramble/issues/37)
 > **Blocked by:** R04-R06 and R11 · **Blocks:** R12 release qualification
 
 ## Objective

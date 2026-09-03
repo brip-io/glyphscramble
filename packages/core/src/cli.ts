@@ -11,6 +11,7 @@ import { createPermutation } from "./unicode.js";
 import type { DoctorFinding, GlyphConfig } from "./types.js";
 import { initProject } from "./init.js";
 import { loadGlyphConfig } from "./config-loader.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
 
 const HELP = `GlyphScramble by BRIP
 
@@ -298,6 +299,10 @@ async function main(): Promise<void> {
     command === "-h"
   ) {
     process.stdout.write(HELP);
+    return;
+  }
+  if (command === "--version" || command === "-v") {
+    process.stdout.write(`${PACKAGE_VERSION}\n`);
     return;
   }
   const parsed = parseArgs({

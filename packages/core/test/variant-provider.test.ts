@@ -22,6 +22,7 @@ import {
   type VariantProviderOptions,
 } from "../src/variant-provider.js";
 import { syntheticFont } from "./fixture.js";
+import { MAX_TIMER_DELAY_MS } from "../src/limits.js";
 
 const face: VariantFace = {
   id: "body@default",
@@ -56,6 +57,29 @@ const bytesGenerator: VariantGenerator = async (_face, seed) =>
   new TextEncoder().encode(seed);
 
 describe("response variant pool", () => {
+  it("rejects per-call timer overrides and lease expiries beyond the ceiling", async () => {
+    const now = 1_000;
+    const provider = new ResponsePoolVariantProvider(
+      [face],
+      options({ poolLowWatermark: 1, poolHighWatermark: 1 }),
+      bytesGenerator,
+      () => now,
+    );
+    await provider.start();
+    expect(() => provider.acquire(now + MAX_TIMER_DELAY_MS + 1)).toThrow(
+      /2147483647/,
+    );
+    await expect(
+      provider.acquireAsync(now + 1_000, {
+        timeoutMs: MAX_TIMER_DELAY_MS + 1,
+      }),
+    ).rejects.toThrow(/2147483647/);
+    await expect(
+      provider.drain({ timeoutMs: MAX_TIMER_DELAY_MS + 1 }),
+    ).rejects.toThrow(/2147483647/);
+    expect(provider.metrics().leasesIssued).toBe(0);
+    await provider.close();
+  });
   it("leases each prepared mapping once and never crosses response ids", async () => {
     const provider = new ResponsePoolVariantProvider(
       [face],

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
 import { createGlyphEngine, responseHeadersForContext } from "../src/engine.js";
+import { GlyphContentError } from "../src/content-error.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
 import { buildStaticSite } from "../src/static-output.js";
 import { syntheticFont } from "./fixture.js";
@@ -311,10 +312,109 @@ describe("request engine", () => {
       "test secret with more than thirty two characters";
     const engine = await createGlyphEngine(config, { cwd });
     const value = engine.beginResponse().scramble("Secret", { font: "body" });
+    const middle = Math.floor(value.fontToken.length / 2);
+    const replacement = value.fontToken[middle] === "A" ? "B" : "A";
+    const tampered =
+      value.fontToken.slice(0, middle) +
+      replacement +
+      value.fontToken.slice(middle + 1);
     const response = await engine.fontResponse(
-      new Request(`https://example.test${value.fontUrl}x`),
+      new Request(
+        `https://example.test${value.fontUrl.replace(value.fontToken, tampered)}`,
+      ),
     );
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(401);
+    await engine.close();
+  });
+
+  it("rejects or explicitly omits unsupported blocks before leasing capacity", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const engine = await createGlyphEngine(config, { cwd });
+    const context = engine.beginResponse();
+    const leasesBefore = engine.metrics().leasesIssued;
+    const plaintext = "TOP SECRET €";
+
+    const omitted = context.protect(plaintext, {
+      font: "body",
+      unsupported: "omit",
+    });
+    expect(omitted).toMatchObject({
+      status: "omitted",
+      error: {
+        code: "GLYPH_CONTENT_UNSUPPORTED",
+        codepoint: "U+20AC",
+        normalization: "nfc",
+        font: "body",
+        face: "default",
+      },
+    });
+    expect(JSON.stringify(omitted)).not.toContain(plaintext);
+    expect(context.used).toBe(false);
+    expect("token" in context).toBe(false);
+    expect(engine.metrics().leasesIssued).toBe(leasesBefore);
+
+    let requiredFailure: unknown;
+    try {
+      context.scramble(plaintext, { font: "body" });
+    } catch (error) {
+      requiredFailure = error;
+    }
+    expect(requiredFailure).toBeInstanceOf(GlyphContentError);
+    expect((requiredFailure as Error).message).toMatch(
+      /U\+20AC.*body\.default.*normalize.*coverage/i,
+    );
+    expect((requiredFailure as Error).message).not.toContain(plaintext);
+    const nonNfc = await context.protectAsync("e\u0301", {
+      font: "body",
+      unsupported: "omit",
+    });
+    expect(nonNfc).toMatchObject({
+      status: "omitted",
+      error: { normalization: "not-nfc", font: "body", face: "default" },
+    });
+    expect(engine.metrics().leasesIssued).toBe(leasesBefore);
+
+    const protectedBlock = context.protect("Secret", {
+      font: "body",
+      unsupported: "omit",
+    });
+    expect(protectedBlock.status).toBe("protected");
+    expect(context.used).toBe(true);
+    await engine.close();
+  });
+
+  it("validates the complete client wire contract before marking a response used", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const engine = await createGlyphEngine(
+      {
+        ...config,
+        runtime: { poolLowWatermark: 2, poolHighWatermark: 2 },
+      },
+      { cwd },
+    );
+    const context = engine.beginResponse();
+    expect(() =>
+      context.scramble("Secret", {
+        font: "body",
+        lang: "x".repeat(65),
+      }),
+    ).toThrow(/payload\.lang/);
+    expect(context.used).toBe(false);
+    expect(context.usage().authorizedFaces).toEqual([]);
+    expect(engine.metrics().leasesIssued).toBe(0);
+
+    expect(() =>
+      context.scramble("Secret", {
+        font: "body",
+        cspNonce: "invalid nonce with spaces",
+      }),
+    ).toThrow(/payload\.cspNonce/);
+    expect(context.used).toBe(false);
+    expect(engine.metrics().leasesIssued).toBe(0);
     await engine.close();
   });
 

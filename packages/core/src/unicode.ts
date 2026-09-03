@@ -9,6 +9,21 @@ export const UNICODE_VERSION = "17.0.0" as const;
 export const PERMUTATION_ALGORITHM =
   "glyphscramble-aes-256-ctr-rejection-v2" as const;
 
+export class UnsupportedTextError extends Error {
+  constructor(
+    readonly codepoint: number,
+    readonly normalization: "nfc" | "not-nfc",
+  ) {
+    super(
+      `No Unicode-safe mapping for U+${codepoint
+        .toString(16)
+        .toUpperCase()
+        .padStart(4, "0")} (${normalization}).`,
+    );
+    this.name = "UnsupportedTextError";
+  }
+}
+
 const UINT32_RANGE = 0x1_0000_0000;
 const KEYSTREAM_BLOCK_BYTES = 256;
 const ZERO_KEYSTREAM_BLOCK = Buffer.alloc(KEYSTREAM_BLOCK_BYTES);
@@ -241,13 +256,49 @@ export function createPermutation(
   );
 }
 
+function firstNormalizationDifference(
+  text: string,
+  normalized: string,
+): number {
+  const original = [...text];
+  const canonical = [...normalized];
+  const length = Math.max(original.length, canonical.length);
+  for (let index = 0; index < length; index++) {
+    if (original[index] !== canonical[index])
+      return (original[index] ?? canonical[index] ?? "\uFFFD").codePointAt(0)!;
+  }
+  return original[0]?.codePointAt(0) ?? 0xfffd;
+}
+
+/** Validates content without allocating or acquiring a response variant. */
+export function assertTextSupported(
+  text: string,
+  supports: (codepoint: number) => boolean,
+): void {
+  const normalized = text.normalize("NFC");
+  if (text !== normalized)
+    throw new UnsupportedTextError(
+      firstNormalizationDifference(text, normalized),
+      "not-nfc",
+    );
+  for (const value of text) {
+    const codepoint = value.codePointAt(0)!;
+    if (isStructuralCodePoint(codepoint)) continue;
+    if (!propertySignature(codepoint) || !supports(codepoint))
+      throw new UnsupportedTextError(codepoint, "nfc");
+  }
+}
+
 export function encodeText(
   text: string,
   permutation: Permutation | CodePointMapping,
 ): string {
-  if (text !== text.normalize("NFC")) {
-    throw new Error("Protected text must be NFC-normalized before scrambling.");
-  }
+  const normalized = text.normalize("NFC");
+  if (text !== normalized)
+    throw new UnsupportedTextError(
+      firstNormalizationDifference(text, normalized),
+      "not-nfc",
+    );
   let encoded = "";
   const resolved = new Map<number, string>();
   for (const value of text) {
@@ -257,26 +308,17 @@ export function encodeText(
       encoded += cached;
       continue;
     }
-    const signature = propertySignature(cp);
-    if (!signature) {
-      if (isStructuralCodePoint(cp)) {
-        encoded += value;
-        resolved.set(cp, value);
-        continue;
-      }
-      throw new Error(
-        `No Unicode-safe mapping for U+${cp.toString(16).toUpperCase().padStart(4, "0")}.`,
-      );
+    if (isStructuralCodePoint(cp)) {
+      encoded += value;
+      resolved.set(cp, value);
+      continue;
     }
+    if (!propertySignature(cp)) throw new UnsupportedTextError(cp, "nfc");
     const mapped =
       "encode" in permutation
         ? permutation.encode.get(cp)
         : permutation.get(cp);
-    if (mapped === undefined) {
-      throw new Error(
-        `No Unicode-safe mapping for U+${cp.toString(16).toUpperCase().padStart(4, "0")}.`,
-      );
-    }
+    if (mapped === undefined) throw new UnsupportedTextError(cp, "nfc");
     const replacement = String.fromCodePoint(mapped);
     resolved.set(cp, replacement);
     encoded += replacement;
