@@ -19,12 +19,15 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 | R10 | [#11](https://github.com/brip-io/glyphscramble/issues/11) |
 | R11 | [#12](https://github.com/brip-io/glyphscramble/issues/12) |
 | R12 | [#13](https://github.com/brip-io/glyphscramble/issues/13) |
+| R13 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
+| R14 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
+| R15 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
 
 ## Repository metadata
 
 The milestone uses the repository labels `design`, `parent`, `priority:P0`, `priority:P1`, `size:M`, and `size:L`. R00 carries `parent`; every issue carries `design`, exactly one priority, exactly one size, and the beta-readiness milestone.
 
-R04 and R11 merged to `main` through [PR #15](https://github.com/brip-io/glyphscramble/pull/15) and [PR #16](https://github.com/brip-io/glyphscramble/pull/16). Their implementation issues are complete. R01 is the next available dependency-ordered implementation issue.
+R01-R06 and R11 are implemented on `main`. R07 is the active dependency-ordered adapter issue; R15 follows the final adapter contracts and precedes public documentation/release qualification.
 
 ## Verification
 

@@ -1,7 +1,7 @@
 # [R12] Cross-browser qualification and release gates
 
 > **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#13](https://github.com/brip-io/glyphscramble/issues/13)
-> **Blocked by:** R01-R11, R13, R14 · **Blocks:** public beta
+> **Blocked by:** R01-R11, R13-R15 · **Blocks:** public beta
 
 ## Objective
 
@@ -39,6 +39,7 @@ The current unit suite contains ten tests and the Playwright test only asserts t
 11. Publishing MUST require a protected release environment with recorded counsel/IP approval and an explicit checklist artifact.
 12. Documentation claims and version/status labels MUST be generated or checked against the qualification manifest.
 13. The R13 site and R14 demo MUST pass link, example, claim, agent-readable-output, accessibility, browser, CSP, no-JS, and performance gates against packed release candidates.
+14. R15 onboarding and distribution evidence MUST prove clean package-manager installs, correct npm dist-tags, OIDC provenance, immutable source evidence, SBOM/checksums, and version-pinned loader CDN parity.
 
 ## Design
 
@@ -55,6 +56,7 @@ Release runs only from an exact signed tag after the qualification workflow for 
 - `.github/workflows/ci.yml` and `release.yml`
 - dependency/release policies and public documentation
 - R13 documentation-site and R14 demo qualification artifacts
+- R15 onboarding and distribution qualification artifacts
 
 ## Testing strategy
 
