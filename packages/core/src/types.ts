@@ -91,6 +91,29 @@ export interface GlyphConfig {
   };
 }
 
+/**
+ * Publisher-facing configuration. Stable operational values are optional here
+ * and normalized by `defineGlyphConfig`; safety acknowledgements and font
+ * licensing remain explicit.
+ */
+export interface GlyphConfigInput extends Omit<
+  GlyphConfig,
+  "rotation" | "routePrefix" | "unsupported"
+> {
+  rotation?: {
+    scope?: "response";
+    keyId?: string;
+    secretEnv?: string;
+    previousKeys?: readonly {
+      id: string;
+      secretEnv: string;
+    }[];
+    tokenTtlSeconds?: number;
+  };
+  routePrefix?: `/${string}`;
+  unsupported?: "error";
+}
+
 declare const glyphPayloadBrand: unique symbol;
 
 export interface GlyphPayloadFace {
@@ -116,6 +139,8 @@ export interface GlyphPayload {
   readonly face: GlyphPayloadFace;
   readonly fontToken: string;
   readonly fontUrl: string;
+  /** Unix time in seconds after which this response mapping must not render. */
+  readonly expiresAt: number;
   readonly coverage: GlyphPayloadCoverage;
   readonly rotation: {
     readonly scope: "response";

@@ -1,25 +1,6 @@
 import { Worker } from "node:worker_threads";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 
-const WORKER_SOURCE = String.raw`
-const { parentPort, workerData } = require("node:worker_threads");
-
-const compressor = import(workerData.moduleUrl).then((module) => module.compress);
-
-parentPort.once("message", async ({ input }) => {
-  try {
-    const compress = await compressor;
-    const output = await compress(new Uint8Array(input));
-    const bytes = Uint8Array.from(output);
-    parentPort.postMessage({ output: bytes.buffer }, [bytes.buffer]);
-  } catch (error) {
-    parentPort.postMessage({
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
-`;
+const WORKER_URL = new URL("./woff2-worker.mjs", import.meta.url);
 
 function abortError(): Error {
   const error = new Error("WOFF2 generation was cancelled.");
@@ -34,13 +15,7 @@ export function compressWoff2InWorker(
 ): Promise<Uint8Array> {
   if (signal.aborted) return Promise.reject(abortError());
 
-  const moduleUrl = pathToFileURL(
-    createRequire(import.meta.url).resolve("woff2-encoder"),
-  ).href;
-  const worker = new Worker(WORKER_SOURCE, {
-    eval: true,
-    workerData: { moduleUrl },
-  });
+  const worker = new Worker(WORKER_URL);
   const transferable = input.slice().buffer;
 
   return new Promise<Uint8Array>((resolve, reject) => {

@@ -1,4 +1,4 @@
-import type { GlyphConfig } from "./types.js";
+import type { GlyphConfig, GlyphConfigInput } from "./types.js";
 import spdxParse from "spdx-expression-parse";
 import { parseCoverage } from "./coverage.js";
 
@@ -9,9 +9,23 @@ const MAX_TOKEN_TTL_SECONDS = 86_400;
 const MAX_STATIC_FONT_TIMEOUT_MS = 60_000;
 const TOKEN_KEY_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
 
-export function defineGlyphConfig<const T extends GlyphConfig>(config: T): T {
-  validateGlyphConfig(config);
-  return config;
+export function defineGlyphConfig(config: GlyphConfigInput): GlyphConfig {
+  const normalized: GlyphConfig = {
+    ...config,
+    rotation: {
+      scope: config.rotation?.scope ?? "response",
+      keyId: config.rotation?.keyId ?? "current",
+      secretEnv: config.rotation?.secretEnv ?? "GLYPHSCRAMBLE_SECRET",
+      ...(config.rotation?.previousKeys === undefined
+        ? {}
+        : { previousKeys: config.rotation.previousKeys }),
+      tokenTtlSeconds: config.rotation?.tokenTtlSeconds ?? 600,
+    },
+    routePrefix: config.routePrefix ?? "/_glyphscramble",
+    unsupported: config.unsupported ?? "error",
+  };
+  validateGlyphConfig(normalized);
+  return normalized;
 }
 
 export function validateGlyphConfig(config: GlyphConfig): void {

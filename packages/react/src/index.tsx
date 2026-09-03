@@ -21,22 +21,50 @@ export interface GlyphScrambleProps extends Omit<
   payload: GlyphPayload;
   as?: ElementType;
   fontTimeoutMs?: number;
+  errorText?: string;
+}
+
+function payloadMountKey(payload: GlyphPayload): string {
+  return JSON.stringify([
+    payload.version,
+    payload.encodedText,
+    payload.font,
+    payload.face.id,
+    payload.face.family,
+    payload.face.weight,
+    payload.face.style,
+    payload.face.stretch,
+    payload.face.unicodeRange,
+    payload.fontToken,
+    payload.fontUrl,
+    payload.expiresAt,
+    payload.coverage.identity,
+    payload.coverage.ranges,
+    payload.rotation.scope,
+    payload.rotation.variantMode,
+    payload.rotation.reusableAcrossResponses,
+    payload.lang ?? null,
+    payload.cspNonce ?? null,
+  ]);
 }
 
 export function GlyphScramble({
   payload,
   as = "span",
   fontTimeoutMs,
+  errorText,
   ...props
 }: GlyphScrambleProps) {
   const ref = useRef<HTMLElement>(null);
+  const mountKey = payloadMountKey(payload);
   useBrowserLayoutEffect(() => {
     if (!ref.current) return;
     const mount = mountGlyphPayload(ref.current, payload, {
       ...(fontTimeoutMs === undefined ? {} : { timeoutMs: fontTimeoutMs }),
+      ...(errorText === undefined ? {} : { errorText }),
     });
     return () => mount.destroy();
-  }, [payload, fontTimeoutMs]);
+  }, [mountKey, fontTimeoutMs, errorText]);
   return createElement(
     as,
     {

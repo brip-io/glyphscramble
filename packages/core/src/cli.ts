@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 import { performance } from "node:perf_hooks";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFile, readdir } from "node:fs/promises";
+import { basename, extname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { buildStaticSite, verifyStaticOutput } from "./static-output.js";
 import { createGlyphEngine } from "./engine.js";
 import { inspectFont, prepareGlyphFonts } from "./font-pipeline.js";
 import { createPermutation } from "./unicode.js";
 import type { DoctorFinding, GlyphConfig } from "./types.js";
+import { initProject } from "./init.js";
+import { loadGlyphConfig } from "./config-loader.js";
 
 const HELP = `GlyphScramble by BRIP
 
@@ -24,161 +25,6 @@ Usage:
 GlyphScramble raises the cost of bulk DOM scraping. It is not DRM and does not
 stop headless browsers, OCR, font analysis, plaintext APIs, feeds, or metadata.
 `;
-
-async function loadConfig(path: string): Promise<GlyphConfig> {
-  const absolute = resolve(path);
-  if (!existsSync(absolute))
-    throw new Error(`Configuration not found: ${absolute}`);
-  const imported = (await import(
-    `${pathToFileURL(absolute).href}?t=${Date.now()}`
-  )) as { default?: GlyphConfig };
-  if (!imported.default) throw new Error(`${path} must have a default export.`);
-  return imported.default;
-}
-
-function detectFramework(pkg: Record<string, unknown>): string {
-  const dependencies = {
-    ...(pkg.dependencies as object),
-    ...(pkg.devDependencies as object),
-  } as Record<string, string>;
-  if (dependencies.next) return "next";
-  if (dependencies.nuxt) return "nuxt";
-  if (dependencies["@sveltejs/kit"]) return "sveltekit";
-  if (dependencies.astro) return "astro";
-  return "vite";
-}
-
-function configTemplate(): string {
-  return `import { defineGlyphConfig } from "@brip/glyphscramble";
-
-export default defineGlyphConfig({
-  fonts: {
-    body: {
-      source: { kind: "file", path: "./fonts/body.woff2" },
-      license: { spdx: "OFL-1.1", file: "./licenses/OFL.txt" },
-    },
-  },
-  rotation: {
-    scope: "response",
-    keyId: "current",
-    secretEnv: "GLYPHSCRAMBLE_SECRET",
-    tokenTtlSeconds: 600,
-  },
-  runtime: {
-    variantMode: "response-pool",
-    poolLowWatermark: 2,
-    poolHighWatermark: 4,
-    generationConcurrency: 2,
-    generationQueueLimit: 64,
-    generationTimeoutMs: 10_000,
-    cacheMaxBytes: 64 * 1024 * 1024,
-  },
-  static: {
-    publicBasePath: "/",
-    fontLoadTimeoutMs: 8_000,
-    fontFailure: "generic-error",
-  },
-  routePrefix: "/_glyphscramble",
-  unsupported: "error",
-  // Required: protected blocks are aria-hidden and must be non-essential.
-  accessibilityRiskAcknowledged: true,
-});
-`;
-}
-
-interface IntegrationArtifact {
-  path: string;
-  content: string;
-}
-
-function integrationTemplates(framework: string): {
-  artifacts: IntegrationArtifact[];
-  packageName: string;
-} {
-  switch (framework) {
-    case "next":
-      return {
-        packageName: "@brip/glyphscramble-next",
-        artifacts: [
-          {
-            path: "glyphscramble.next.ts",
-            content: `import config from "./glyphscramble.config";\nimport { createNextGlyphs } from "@brip/glyphscramble-next";\n\nexport const glyphs = await createNextGlyphs(config);\n`,
-          },
-          {
-            path: "app/_glyphscramble/font/[token]/[face]/route.ts",
-            content: `import { glyphs } from "../../../../../glyphscramble.next";\n\nexport const dynamic = "force-dynamic";\nexport const GET = glyphs.fontRoute;\nexport const HEAD = glyphs.fontRoute;\n`,
-          },
-          {
-            path: "proxy.ts",
-            content: `import { NextResponse, type NextRequest } from "next/server";\nimport { markNextRequestHeaders } from "@brip/glyphscramble-next";\n\nexport function proxy(request: NextRequest) {\n  const requestHeaders = markNextRequestHeaders(request.headers);\n  const response = NextResponse.next({ request: { headers: requestHeaders } });\n  response.headers.set("Cache-Control", "private, no-store");\n  return response;\n}\n`,
-          },
-        ],
-      };
-    case "nuxt":
-      return {
-        packageName: "@brip/glyphscramble-nuxt",
-        artifacts: [
-          {
-            path: "modules/glyphscramble.ts",
-            content: `export { default } from "@brip/glyphscramble-nuxt/module";\n`,
-          },
-          {
-            path: "server/middleware/glyphscramble.ts",
-            content: `import config from "../../glyphscramble.config";\nimport { createNuxtGlyphs } from "@brip/glyphscramble-nuxt";\nimport { defineEventHandler, setResponseHeader, toWebRequest } from "h3";\n\nconst glyphs = await createNuxtGlyphs(config);\nexport default defineEventHandler(async (event) => {\n  const request = toWebRequest(event);\n  if (new URL(request.url).pathname.startsWith(config.routePrefix + "/font/")) return glyphs.engine.fontResponse(request);\n  event.context.glyphscramble = glyphs.engine.beginResponse();\n  setResponseHeader(event, "Cache-Control", "private, no-store");\n});\n`,
-          },
-        ],
-      };
-    case "sveltekit":
-      return {
-        packageName: "@brip/glyphscramble-sveltekit",
-        artifacts: [
-          {
-            path: "src/hooks.server.ts",
-            content: `import config from "../glyphscramble.config";\nimport { createGlyphHandle } from "@brip/glyphscramble-sveltekit";\n\nexport const handle = await createGlyphHandle(config);\n`,
-          },
-        ],
-      };
-    case "astro":
-      return {
-        packageName: "@brip/glyphscramble-astro",
-        artifacts: [
-          {
-            path: "src/middleware.ts",
-            content: `import config from "../glyphscramble.config";\nimport { createAstroGlyphMiddleware } from "@brip/glyphscramble-astro";\n\nexport const onRequest = await createAstroGlyphMiddleware(config);\n`,
-          },
-        ],
-      };
-    default:
-      return {
-        packageName: "@brip/glyphscramble-vite",
-        artifacts: [
-          {
-            path: "glyphscramble.vite.ts",
-            content: `import config from "./glyphscramble.config";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n\nexport default glyphscrambleStatic(config);\n`,
-          },
-        ],
-      };
-  }
-}
-
-async function init(frameworkOverride?: string): Promise<void> {
-  const pkg = JSON.parse(await readFile("package.json", "utf8")) as Record<
-    string,
-    unknown
-  >;
-  const framework = frameworkOverride ?? detectFramework(pkg);
-  const integration = integrationTemplates(framework);
-  if (!existsSync("glyphscramble.config.ts"))
-    await writeFile("glyphscramble.config.ts", configTemplate());
-  for (const artifact of integration.artifacts) {
-    await mkdir(dirname(resolve(artifact.path)), { recursive: true });
-    if (!existsSync(artifact.path))
-      await writeFile(artifact.path, artifact.content);
-  }
-  process.stdout.write(
-    `Initialized ${framework}. Install @brip/glyphscramble and ${integration.packageName}, add a licensed font, then run glyphscramble prepare.\n`,
-  );
-}
 
 async function sourceFiles(root: string): Promise<string[]> {
   const paths: string[] = [];
@@ -253,7 +99,7 @@ async function doctor(root: string): Promise<DoctorFinding[]> {
 }
 
 async function benchmark(configPath: string): Promise<void> {
-  const config = await loadConfig(configPath);
+  const config = await loadGlyphConfig(configPath);
   const lock = await prepareGlyphFonts(config);
   const family = Object.values(lock.fonts)[0];
   if (!family) throw new Error("No font configured.");
@@ -410,10 +256,23 @@ async function main(): Promise<void> {
       "font-timeout-ms": { type: "string" },
     },
   });
-  if (command === "init") await init(parsed.values.framework);
-  else if (command === "prepare") {
+  if (command === "init") {
+    const result = await initProject({
+      ...(parsed.values.framework
+        ? { framework: parsed.values.framework }
+        : {}),
+    });
+    process.stdout.write(
+      `Initialized ${result.framework}. Install @brip/glyphscramble and ${result.packageName}, add a licensed font, then run glyphscramble prepare.\n`,
+    );
+    if (result.created.length)
+      process.stdout.write(`Created: ${result.created.join(", ")}\n`);
+    if (result.existing.length)
+      process.stdout.write(`Already present: ${result.existing.join(", ")}\n`);
+    for (const note of result.notes) process.stdout.write(`Note: ${note}\n`);
+  } else if (command === "prepare") {
     const lock = await prepareGlyphFonts(
-      await loadConfig(parsed.values.config!),
+      await loadGlyphConfig(parsed.values.config!),
     );
     process.stdout.write(
       `Prepared ${Object.keys(lock.fonts).length} font(s).\n`,
@@ -450,7 +309,7 @@ async function main(): Promise<void> {
         "static --existing-output must be either replace or reject.",
       );
     const result = await buildStaticSite(
-      await loadConfig(parsed.values.config!),
+      await loadGlyphConfig(parsed.values.config!),
       {
         inputDir: parsed.values.input,
         outputDir: parsed.values.output,

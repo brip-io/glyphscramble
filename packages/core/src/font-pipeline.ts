@@ -552,7 +552,9 @@ export async function prepareGlyphFonts(
     await mkdir(resolve(staging, "licenses"), { recursive: true });
     for (const [familyId, configFont] of Object.entries(config.fonts)) {
       const notice = new Uint8Array(
-        await readFile(resolve(cwd, configFont.license.file)),
+        await readFile(
+          /* turbopackIgnore: true */ resolve(cwd, configFont.license.file),
+        ),
       );
       const noticeFile = `licenses/${familyId}.LICENSE.txt`;
       await writeFile(resolve(staging, noticeFile), notice);

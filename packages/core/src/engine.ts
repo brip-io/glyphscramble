@@ -73,10 +73,11 @@ function tokenKeyRing(config: GlyphConfig): TokenKeyRing {
 function payload(
   encodedText: string,
   font: RuntimeFont,
-  token: string,
+  issued: ReturnType<typeof issueToken>,
   config: GlyphConfig,
   options: ScrambleOptions,
 ): GlyphPayload {
+  const token = issued.token;
   const short = createHash("sha256")
     .update(token)
     .update(runtimeNamespace(font))
@@ -100,6 +101,7 @@ function payload(
     },
     fontToken: token,
     fontUrl,
+    expiresAt: issued.exp,
     coverage: {
       identity: font.metadata.identity,
       ranges: font.coverage,
@@ -249,7 +251,7 @@ export async function createGlyphEngine(
           return payload(
             encodedText,
             font,
-            responseToken.token,
+            responseToken,
             config,
             scrambleOptions,
           );

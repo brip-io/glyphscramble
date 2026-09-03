@@ -31,13 +31,14 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm run clean && tsc -p tsconfig.json && cp src/woff2-worker.mjs dist/woff2-worker.mjs",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@unicode/unicode-17.0.0": "^1.6.17",
     "css-tree": "^3.2.1",
+    "jiti": "^2.6.1",
     "parse5": "^8.0.0",
     "spdx-expression-parse": "^4.0.0",
     "undici": "^7.29.0",

@@ -23,6 +23,29 @@ function config(runtime: GlyphConfig["runtime"]): GlyphConfig {
 }
 
 describe("runtime configuration", () => {
+  it("normalizes safe defaults while keeping font licensing and accessibility explicit", () => {
+    expect(
+      defineGlyphConfig({
+        fonts: {
+          body: {
+            source: { kind: "file", path: "./body.ttf" },
+            license: { spdx: "OFL-1.1", file: "./OFL.txt" },
+          },
+        },
+        accessibilityRiskAcknowledged: true,
+      }),
+    ).toMatchObject({
+      rotation: {
+        scope: "response",
+        keyId: "current",
+        secretEnv: "GLYPHSCRAMBLE_SECRET",
+        tokenTtlSeconds: 600,
+      },
+      routePrefix: "/_glyphscramble",
+      unsupported: "error",
+    });
+  });
+
   it("requires a serialization-safe root-relative route prefix", () => {
     const value = config(undefined);
     for (const routePrefix of [
