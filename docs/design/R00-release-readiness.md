@@ -76,7 +76,7 @@ Bind font work to authorized faces, fix cache/HEAD/error behavior, support secre
 
 **Exit criterion:** token replay, expiry, malformed paths, concurrency, face authorization, cache bounds, and selective response headers pass deterministic tests.
 
-#### R06 · Client payload and font-load lifecycle · **M** · **In review in [PR #25](https://github.com/brip-io/glyphscramble/pull/25)**
+#### R06 · Client payload and font-load lifecycle · **M** · **Implemented in [PR #25](https://github.com/brip-io/glyphscramble/pull/25)**
 
 Replace arbitrary CSS injection with a validated wire contract and leak-free, cancellable font registration shared by all UI adapters.
 
