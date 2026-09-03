@@ -70,7 +70,7 @@ Emit content-addressed, subpath-safe static assets with correct accessibility an
 
 **Exit criterion:** an atomic static deployment remains correct across rebuilds, CDN caching, CSP enforcement, font failure, and accessibility-tree inspection.
 
-#### R05 · Request-engine lifecycle and abuse boundaries · **M** · **In progress**
+#### R05 · Request-engine lifecycle and abuse boundaries · **M** · **Implemented in [PR #23](https://github.com/brip-io/glyphscramble/pull/23)**
 
 Bind font work to authorized faces, fix cache/HEAD/error behavior, support secret rotation, and expose whether a response actually used protection.
 
