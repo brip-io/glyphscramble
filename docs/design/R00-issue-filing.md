@@ -24,7 +24,7 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 
 The milestone uses the repository labels `design`, `parent`, `priority:P0`, `priority:P1`, `size:M`, and `size:L`. R00 carries `parent`; every issue carries `design`, exactly one priority, exactly one size, and the beta-readiness milestone.
 
-R04 and R11 are implemented on stacked branches. Their issues remain open until the corresponding pull requests merge. R01 is the next available dependency-ordered implementation issue after those branches land.
+R04 and R11 merged to `main` through [PR #15](https://github.com/brip-io/glyphscramble/pull/15) and [PR #16](https://github.com/brip-io/glyphscramble/pull/16). Their implementation issues are complete. R01 is the next available dependency-ordered implementation issue.
 
 ## Verification
 
