@@ -115,8 +115,13 @@ export function encodeText(text: string, permutation: Permutation): string {
     const cp = value.codePointAt(0)!;
     const signature = propertySignature(cp);
     if (!signature) {
-      encoded += value;
-      continue;
+      if (isStructuralCodePoint(cp)) {
+        encoded += value;
+        continue;
+      }
+      throw new Error(
+        `No Unicode-safe mapping for U+${cp.toString(16).toUpperCase().padStart(4, "0")}.`,
+      );
     }
     const mapped = permutation.encode.get(cp);
     if (mapped === undefined) {

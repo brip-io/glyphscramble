@@ -176,7 +176,8 @@ const structuralRanges = compactBooleanRanges((cp) => {
     general === "Control" ||
     general === "Format" ||
     general.endsWith("_Separator") ||
-    general.endsWith("_Mark")
+    general.endsWith("_Mark") ||
+    general.endsWith("_Punctuation")
   );
 });
 
@@ -194,6 +195,7 @@ for (let cp = 0; cp < LIMIT; cp++) {
   const eligible =
     !defaultIgnorable.has(cp) &&
     combining[cp] === "0" &&
+    !general.endsWith("_Punctuation") &&
     (general.endsWith("_Letter") ||
       general.endsWith("_Number") ||
       emojiSets[0].has(cp));

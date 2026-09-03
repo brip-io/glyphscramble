@@ -46,11 +46,39 @@ Search crawlers receive encoded Unicode values. Even when the browser paints the
 
 Do not put plaintext into JSON-LD, `aria-label`, hidden DOM nodes, comments, hydration props, source maps, OpenGraph descriptions, or client bundles to compensate. That defeats the extraction boundary.
 
+## Static compiler boundary
+
+Static mode accepts an unprotected source directory and a separate sibling
+destination. It scans and validates the source before creating a fresh staging
+tree, then transactionally replaces the destination only after transformation,
+font generation, notice copying, and manifest creation succeed. A failed build
+leaves both the source and the previous publication untouched. Use
+`--existing-output reject` when deployment policy requires an absent output
+instead of replacement.
+
+The supported boundary is non-hydrated HTML. Within a marked block, the compiler
+rejects scripts, styles, noscript and template content, comments, forms, links,
+interactive controls, text-bearing attributes, and known framework hydration
+markers. It also rejects a protected block nested inside a known hydrated or
+interactive ancestor. This is a conservative refusal mechanism, not proof that
+an unknown generator is safe; register a `StaticHydrationDetector` for custom
+client-runtime markers.
+
+Nested markers using the ancestor's font are encoded once as part of the outer
+block and produce a manifest warning. A different nested font is ambiguous and
+fails. Unmarked HTML and non-HTML files retain their exact bytes. Always compile
+from the original generator output, never from a previously protected tree.
+
+`glyphscramble-static-manifest.json` records source HTML SHA-256 values,
+transformed files, selected fonts, the algorithm version, a one-way seed
+identity, and warnings. It contains neither the mapping seed nor protected
+plaintext.
+
 ## Caching
 
 Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. The matching font is private and immutable for the remaining token lifetime. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
 
-Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Cache its content-addressed font and CSS for a long time and rotate by rebuilding. Do not mix static pages from one build with assets from another.
+Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Rotate by rebuilding and deploy each output tree as one unit. Byte-derived immutable asset names and mixed-build deployment verification remain R03 release gates, so do not apply indefinite caching to the current beta asset names or mix pages and assets from different builds.
 
 ## Accessibility
 

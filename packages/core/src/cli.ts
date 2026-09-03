@@ -19,7 +19,7 @@ Usage:
   glyphscramble inspect <font-file>
   glyphscramble doctor [--root src]
   glyphscramble benchmark [--config glyphscramble.config.ts]
-  glyphscramble static --input dist --output dist-protected [--config glyphscramble.config.ts]
+  glyphscramble static --input dist --output dist-protected [--existing-output replace|reject] [--config glyphscramble.config.ts]
 
 GlyphScramble raises the cost of bulk DOM scraping. It is not DRM and does not
 stop headless browsers, OCR, font analysis, plaintext APIs, feeds, or metadata.
@@ -390,6 +390,7 @@ async function main(): Promise<void> {
       input: { type: "string" },
       output: { type: "string" },
       seed: { type: "string" },
+      "existing-output": { type: "string", default: "replace" },
     },
   });
   if (command === "init") await init(parsed.values.framework);
@@ -424,11 +425,17 @@ async function main(): Promise<void> {
   else if (command === "static") {
     if (!parsed.values.input || !parsed.values.output)
       throw new Error("static requires --input and --output.");
+    const existingOutput = parsed.values["existing-output"];
+    if (existingOutput !== "replace" && existingOutput !== "reject")
+      throw new Error(
+        "static --existing-output must be either replace or reject.",
+      );
     const result = await buildStaticSite(
       await loadConfig(parsed.values.config!),
       {
         inputDir: parsed.values.input,
         outputDir: parsed.values.output,
+        existingOutput,
         ...(parsed.values.seed ? { seed: parsed.values.seed } : {}),
       },
     );

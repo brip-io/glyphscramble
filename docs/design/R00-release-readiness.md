@@ -44,7 +44,7 @@ Remove whole-font WOFF2 compression from the latency-sensitive request path, int
 
 **Exit criterion:** supported reference faces meet the approved cold/warm p95 gates without duplicate concurrent work or unbounded memory.
 
-#### R02 · Static transform safety · **M**
+#### R02 · Static transform safety · **M** · **In progress**
 
 Make static output atomic and idempotent, reject raw-text/interactive/hydrated boundaries, and prove plaintext does not survive in supported static output.
 

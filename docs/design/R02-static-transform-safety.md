@@ -1,6 +1,6 @@
 # [R02] Static transform safety
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#3](https://github.com/brip-io/glyphscramble/issues/3)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#3](https://github.com/brip-io/glyphscramble/issues/3)
 > **Blocks:** R03, R10, R12
 
 ## Objective
@@ -74,3 +74,20 @@ The scanner maintains a denylist of raw-text and interactive elements and plugga
 ## Exit criteria
 
 Static output is deterministic and atomic, unsafe or hydrated marked content fails before publication, unmarked files remain byte-identical, and the source build is always recoverable.
+
+## Implementation notes
+
+`StaticBuildPlanner` walks a sorted source tree, rejects symlinks and lexical or
+canonical input/output overlap, hashes every source HTML file, and classifies
+only actual `data-glyphscramble-font` elements for transformation. Built-in and
+custom hydration detectors operate on safe element snapshots. Unsafe elements,
+interactive ancestors, comments, plaintext-bearing attributes, and ambiguous
+nested fonts report the source file and DOM path.
+
+`buildStaticSite` prepares only fonts selected by the plan, copies verified
+source bytes into a fresh sibling staging directory, transforms marked HTML
+from the original bytes, emits a deterministic plaintext-free manifest, and
+then swaps the completed tree into place with rollback. Existing output can be
+replaced or explicitly rejected. Same-font nested markers compile once and are
+recorded as warnings. Unknown non-structural Unicode values now fail closed
+instead of passing through unchanged.
