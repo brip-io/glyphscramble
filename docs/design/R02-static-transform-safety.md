@@ -1,6 +1,6 @@
 # [R02] Static transform safety
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress in [PR #21](https://github.com/brip-io/glyphscramble/pull/21) · **GitHub issue:** [#3](https://github.com/brip-io/glyphscramble/issues/3)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Implemented in [PR #21](https://github.com/brip-io/glyphscramble/pull/21) · **GitHub issue:** [#3](https://github.com/brip-io/glyphscramble/issues/3)
 > **Blocks:** R03, R10, R12
 
 ## Objective
