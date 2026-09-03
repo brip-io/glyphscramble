@@ -6,10 +6,10 @@ export const GET: APIRoute = ({ locals }) => {
   let rendered = false;
   return new Response(
     new ReadableStream({
-      pull(controller) {
+      async pull(controller) {
         if (rendered) return;
         rendered = true;
-        const payload = context.scramble("Lazy Astro stream value", {
+        const payload = await context.scrambleAsync("Lazy Astro stream value", {
           font: "body",
           lang: "en",
         });

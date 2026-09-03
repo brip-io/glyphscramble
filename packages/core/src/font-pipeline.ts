@@ -649,6 +649,22 @@ async function readLock(base: string): Promise<GlyphLockfile> {
   return parsed as GlyphLockfile;
 }
 
+async function readPreparedFace(
+  base: string,
+  id: string,
+  faceId: string,
+  entry: FontFaceMetadata,
+): Promise<PreparedFont> {
+  const sfnt = new Uint8Array(
+    await readFile(resolve(base, "fonts", id, `${faceId}.sfnt`)),
+  );
+  if (sha256(sfnt) !== entry.sha256)
+    throw new Error(
+      `Prepared font ${id}.${faceId} does not match its lockfile.`,
+    );
+  return { id, faceId, sfnt, metadata: entry };
+}
+
 export async function loadPreparedFont(
   id: string,
   cwd = process.cwd(),
@@ -667,14 +683,7 @@ export async function loadPreparedFont(
     throw new Error(
       `Face ${id}.${selectedFace} is not present in glyphscramble.lock.json.`,
     );
-  const sfnt = new Uint8Array(
-    await readFile(resolve(base, "fonts", id, `${selectedFace}.sfnt`)),
-  );
-  if (sha256(sfnt) !== entry.sha256)
-    throw new Error(
-      `Prepared font ${id}.${selectedFace} does not match its lockfile.`,
-    );
-  return { id, faceId: selectedFace, sfnt, metadata: entry };
+  return readPreparedFace(base, id, selectedFace, entry);
 }
 
 export async function loadPreparedFonts(
@@ -689,10 +698,35 @@ export async function loadPreparedFonts(
       `Font ${id} is not present in glyphscramble.lock.json. Run glyphscramble prepare.`,
     );
   return Promise.all(
-    Object.keys(family.faces).map((faceId) =>
-      loadPreparedFont(id, cwd, faceId),
+    Object.entries(family.faces).map(([faceId, entry]) =>
+      readPreparedFace(base, id, faceId, entry),
     ),
   );
+}
+
+/** Load every configured family through one lockfile read and one read per face. */
+export async function loadPreparedFontFamilies(
+  ids: readonly string[],
+  cwd = process.cwd(),
+): Promise<ReadonlyMap<string, readonly PreparedFont[]>> {
+  const base = resolve(cwd, ".glyphscramble");
+  const lock = await readLock(base);
+  const families = await Promise.all(
+    ids.map(async (id) => {
+      const family = lock.fonts[id];
+      if (!family)
+        throw new Error(
+          `Font ${id} is not present in glyphscramble.lock.json. Run glyphscramble prepare.`,
+        );
+      const faces = await Promise.all(
+        Object.entries(family.faces).map(([faceId, entry]) =>
+          readPreparedFace(base, id, faceId, entry),
+        ),
+      );
+      return [id, faces] as const;
+    }),
+  );
+  return new Map(families);
 }
 
 export async function toWoff2(font: SfntFont): Promise<Uint8Array> {

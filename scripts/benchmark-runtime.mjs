@@ -17,6 +17,7 @@ import {
   prepareGlyphFonts,
   ResponsePoolVariantProvider,
 } from "../packages/core/dist/index.js";
+import { evaluateSmokeGate } from "../packages/core/dist/benchmark-policy.js";
 
 const GENERATION_VARIANTS = 5;
 const REQUEST_ITERATIONS = 50;
@@ -111,9 +112,24 @@ async function run(label, source, ceilings) {
     for (let index = 0; index < COLD_ITERATIONS; index++) {
       const coldStarted = performance.now();
       const candidate = await createGlyphEngine(config, { cwd });
-      coldPool.push(performance.now() - coldStarted);
+      const poolFillMilliseconds = performance.now() - coldStarted;
+      coldPool.push(poolFillMilliseconds);
+      const capacity = candidate.capacityReport();
+      const measuredPoolFillResponsesPerSecond =
+        (GENERATION_VARIANTS * 1_000) / poolFillMilliseconds;
       generationRuns.push({
         phase: index === 0 ? "process-cold" : "process-warm",
+        poolFillMilliseconds: Number(poolFillMilliseconds.toFixed(3)),
+        predictedResponsesPerSecond: capacity.sustainableResponsesPerSecond,
+        measuredPoolFillResponsesPerSecond: Number(
+          measuredPoolFillResponsesPerSecond.toFixed(3),
+        ),
+        predictionRatio: Number(
+          (
+            measuredPoolFillResponsesPerSecond /
+            capacity.sustainableResponsesPerSecond
+          ).toFixed(3),
+        ),
         ...candidate.metrics().generationMilliseconds,
       });
       await candidate.close();
@@ -146,6 +162,10 @@ async function run(label, source, ceilings) {
         generationConcurrency: 2,
         generationQueueLimit: REQUEST_VARIANTS,
         generationTimeoutMs: 1_000,
+        acquisitionTimeoutMs: 50,
+        acquisitionQueueLimit: REQUEST_VARIANTS,
+        workerRecycleAfter: 256,
+        drainTimeoutMs: 1_000,
         cacheMaxBytes:
           (source.length + LARGE_REPERTOIRE_CODEPOINTS * 8) *
           REQUEST_VARIANTS *
@@ -166,7 +186,7 @@ async function run(label, source, ceilings) {
       .slice(0, 10_000);
     for (let index = 0; index < REQUEST_WARMUP_ITERATIONS; index++)
       warmupPayloads.push(
-        engine.beginResponse().scramble(sample, { font: "body" }),
+        await engine.beginResponse().scrambleAsync(sample, { font: "body" }),
       );
     await waitForProviderIdle(requestProvider);
     for (const payload of warmupPayloads) {
@@ -181,7 +201,9 @@ async function run(label, source, ceilings) {
     }
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
-      const payload = engine.beginResponse().scramble(sample, { font: "body" });
+      const payload = await engine
+        .beginResponse()
+        .scrambleAsync(sample, { font: "body" });
       encoding.push(performance.now() - acquired);
       payloads.push(payload);
     }
@@ -211,6 +233,27 @@ async function run(label, source, ceilings) {
       await font.arrayBuffer();
     }
     const requestMetrics = engine.metrics();
+    const warmGenerationSamples = generationRuns
+      .filter((run) => run.phase === "process-warm")
+      .flatMap((run) => run.samples);
+    const predictionRatios = generationRuns
+      .filter((run) => run.phase === "process-warm")
+      .map((run) => run.predictionRatio);
+    const capacityPrediction = {
+      lowerRatio: 0.5,
+      upperRatio: 1.25,
+      ratios: predictionRatios,
+      pass: predictionRatios.every((ratio) => ratio >= 0.5 && ratio <= 1.25),
+    };
+    const gates = {
+      coldPool: evaluateSmokeGate(coldPool, ceilings.coldPool),
+      warmGeneration: evaluateSmokeGate(
+        warmGenerationSamples,
+        ceilings.generationP95,
+      ),
+      encoding: evaluateSmokeGate(encoding, 5),
+      fontResponse: evaluateSmokeGate(response, 5),
+    };
     const result = {
       label,
       node: process.version,
@@ -221,18 +264,19 @@ async function run(label, source, ceilings) {
           0,
         ),
       coldPoolMilliseconds: stats(coldPool),
+      coldPoolSamplesMs: coldPool.map((value) => Number(value.toFixed(3))),
       generationRuns,
       preparedPoolFillMilliseconds: requestMetrics.generationMilliseconds,
       encodingMilliseconds: stats(encoding),
+      encodingSamplesMs: encoding.map((value) => Number(value.toFixed(3))),
       fontResponseMilliseconds: stats(response),
+      fontResponseSamplesMs: response.map((value) => Number(value.toFixed(3))),
       ceilings,
+      smokeGates: gates,
+      capacityPrediction,
       pass:
-        stats(coldPool).p95 < ceilings.coldPool &&
-        generationRuns
-          .filter((run) => run.phase === "process-warm")
-          .every((run) => run.p95 < ceilings.generationP95) &&
-        stats(encoding).p95 < 5 &&
-        stats(response).p95 < 5 &&
+        Object.values(gates).every((gate) => gate.pass) &&
+        capacityPrediction.pass &&
         requestMetrics.poolExhaustions === 0 &&
         requestMetrics.generationFailures === 0,
     };

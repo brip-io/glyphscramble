@@ -218,7 +218,7 @@ async function integrationTemplates(
           },
           {
             path: join(cwd, "server", "middleware", "glyphscramble.ts"),
-            content: `import config from "../../glyphscramble.config";\nimport { createNuxtGlyphs } from "@brip/glyphscramble-nuxt";\nimport { defineEventHandler, setResponseHeader, toWebRequest } from "h3";\n\nconst glyphs = await createNuxtGlyphs(config);\nexport default defineEventHandler(async (event) => {\n  const request = toWebRequest(event);\n  if (new URL(request.url).pathname.startsWith(config.routePrefix + "/font/")) return glyphs.engine.fontResponse(request);\n  event.context.glyphscramble = glyphs.engine.beginResponse();\n  setResponseHeader(event, "Cache-Control", "private, no-store");\n});\n`,
+            content: `import config from "../../glyphscramble.config";\nimport { createNuxtGlyphs } from "@brip/glyphscramble-nuxt";\nimport { defineEventHandler, setResponseHeader, toWebRequest } from "h3";\n\nconst glyphs = await createNuxtGlyphs(config);\nexport default defineEventHandler(async (event) => {\n  const request = toWebRequest(event);\n  if (new URL(request.url).pathname.startsWith(config.routePrefix + "/font/")) return glyphs.engine.fontResponse(request);\n  event.context.glyphscramble = glyphs.engine.beginResponse({ signal: request.signal });\n  setResponseHeader(event, "Cache-Control", "private, no-store");\n});\n`,
           },
         ],
       };

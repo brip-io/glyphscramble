@@ -53,6 +53,8 @@ describe("request engine", () => {
       "test secret with more than thirty two characters";
     const seed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const variantId = Buffer.alloc(16, 1).toString("base64url");
+    let now = 1_000_999;
+    let asyncExpiry = 0;
     const mapping = compactEncodeMapping(
       createPermutation(
         [..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"].map(
@@ -66,6 +68,11 @@ describe("request engine", () => {
     const provider: FontVariantProvider = {
       async start() {},
       acquire: () => ({ id: variantId, seed }),
+      acquireAsync: async (expiresAt) => {
+        asyncExpiry = expiresAt;
+        now += 2;
+        return { id: variantId, seed };
+      },
       mapping: (_lease, faceId) => {
         mappingReads++;
         return faceId === "body@default" ? mapping : undefined;
@@ -82,6 +89,9 @@ describe("request engine", () => {
         generationTimeouts: 0,
         generationCancellations: 0,
         generationOverloads: 0,
+        acquisitionWaits: 0,
+        acquisitionTimeouts: 0,
+        acquisitionCancellations: 0,
         expiredVariants: 0,
         capacityDrops: 0,
         readyVariants: 0,
@@ -89,6 +99,10 @@ describe("request engine", () => {
         cacheBytes: mapping.byteLength + 1,
         queueDepth: 0,
         activeGenerators: 0,
+        waitingRequests: 0,
+        draining: false,
+        workerRestarts: 0,
+        estimatedVariantBytes: mapping.byteLength + 1,
         generationMilliseconds: {
           count: 0,
           total: 0,
@@ -96,17 +110,51 @@ describe("request engine", () => {
           p50: 0,
           p95: 0,
           p99: 0,
+          samples: [],
         },
       }),
+      capacityReport: (tokenTtlSeconds, targetResponsesPerSecond) => ({
+        faceCount: 1,
+        hostParallelism: 1,
+        generationConcurrency: 1,
+        readyBurst: 1,
+        cacheMaxBytes: 1024,
+        estimatedVariantBytes: mapping.byteLength + 1,
+        cacheLimitedResponses: 1,
+        tokenTtlSeconds,
+        measuredFaceGenerationP95Ms: 1,
+        sustainableResponsesPerSecond: 1,
+        sustainableResponsesPerTtl: tokenTtlSeconds,
+        estimatedBytesAtSustainableRate: mapping.byteLength + 1,
+        ...(targetResponsesPerSecond === undefined
+          ? {}
+          : {
+              targetResponsesPerSecond,
+              targetFitsGeneration: true,
+              targetFitsCache: true,
+            }),
+        guidance: [],
+      }),
+      async drain() {},
       async close() {},
     };
     const engine = await createGlyphEngine(config, {
       cwd,
       variantProvider: provider,
+      now: () => now,
     });
     const result = engine.beginResponse().scramble("Secret", { font: "body" });
     expect(result.encodedText).not.toBe("Secret");
     expect(mappingReads).toBe(1);
+    const asyncResult = await engine
+      .beginResponse()
+      .scrambleAsync("Secret", { font: "body" });
+    expect(asyncResult.encodedText).not.toBe("Secret");
+    expect(asyncExpiry).toBeGreaterThanOrEqual(asyncResult.expiresAt * 1_000);
+    expect(engine.capacityReport(1)).toMatchObject({
+      targetResponsesPerSecond: 1,
+    });
+    await engine.drain();
     await engine.close();
   });
 

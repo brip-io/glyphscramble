@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { availableParallelism } from "node:os";
 import { performance } from "node:perf_hooks";
 import { buildSfnt, parseSfnt, remapCmap } from "./sfnt.js";
 import {
@@ -8,8 +9,16 @@ import {
   type Permutation,
   type PermutationPlan,
 } from "./unicode.js";
-import { compressWoff2InWorker } from "./worker-compressor.js";
-import type { GlyphEngineMetrics } from "./types.js";
+import { Woff2WorkerPool } from "./worker-compressor.js";
+import type {
+  GlyphAcquisitionOptions,
+  GlyphCapacityReport,
+  GlyphDrainOptions,
+  GlyphEngineMetrics,
+  GlyphRuntimeEvent,
+  GlyphRuntimeEventCode,
+  GlyphRuntimeEventHandler,
+} from "./types.js";
 
 export const DEFAULT_VARIANT_RUNTIME = {
   poolLowWatermark: 2,
@@ -17,6 +26,10 @@ export const DEFAULT_VARIANT_RUNTIME = {
   generationConcurrency: 2,
   generationQueueLimit: 64,
   generationTimeoutMs: 10_000,
+  acquisitionTimeoutMs: 50,
+  acquisitionQueueLimit: 128,
+  workerRecycleAfter: 256,
+  drainTimeoutMs: 30_000,
   cacheMaxBytes: 64 * 1024 * 1024,
 } as const;
 
@@ -34,6 +47,10 @@ export interface VariantProviderOptions {
   generationConcurrency: number;
   generationQueueLimit: number;
   generationTimeoutMs: number;
+  acquisitionTimeoutMs: number;
+  acquisitionQueueLimit: number;
+  workerRecycleAfter: number;
+  drainTimeoutMs: number;
   cacheMaxBytes: number;
 }
 
@@ -45,6 +62,10 @@ export interface FontVariantLease {
 export interface FontVariantProvider {
   start(): Promise<void>;
   acquire(expiresAt: number): FontVariantLease;
+  acquireAsync(
+    expiresAt: number,
+    options?: GlyphAcquisitionOptions,
+  ): Promise<FontVariantLease>;
   /** Server-only mapping boundary used by the request engine. */
   mapping(
     lease: FontVariantLease,
@@ -56,6 +77,11 @@ export interface FontVariantProvider {
     expectedSeed: string,
   ): Uint8Array | undefined;
   metrics(): GlyphEngineMetrics;
+  capacityReport(
+    tokenTtlSeconds: number,
+    targetResponsesPerSecond?: number,
+  ): GlyphCapacityReport;
+  drain(options?: GlyphDrainOptions): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -87,6 +113,13 @@ export class VariantCancelledError extends Error {
   }
 }
 
+export class VariantDrainingError extends Error {
+  constructor(message = "The font-variant provider is draining.") {
+    super(message);
+    this.name = "VariantDrainingError";
+  }
+}
+
 interface MutableMetrics {
   leasesIssued: number;
   poolExhaustions: number;
@@ -97,6 +130,9 @@ interface MutableMetrics {
   generationTimeouts: number;
   generationCancellations: number;
   generationOverloads: number;
+  acquisitionWaits: number;
+  acquisitionTimeouts: number;
+  acquisitionCancellations: number;
   expiredVariants: number;
   capacityDrops: number;
   generationCount: number;
@@ -177,6 +213,7 @@ class BoundedGenerationQueue {
       timedOut = true;
       controller.abort();
     }, this.timeoutMs);
+    timeout.unref?.();
     const cancelled = new Promise<never>((_resolve, reject) => {
       controller.signal.addEventListener(
         "abort",
@@ -235,15 +272,99 @@ class BoundedGenerationQueue {
 interface StoredVariant {
   id: string;
   seed: string;
-  faces: ReadonlyMap<
-    string,
-    {
-      font: Uint8Array;
-      mapping: CodePointMapping;
-    }
-  >;
+  faces: ReadonlyMap<string, GeneratedVariantFace>;
   bytes: number;
   expiresAt?: number;
+}
+
+interface ExpiryEntry {
+  id: string;
+  expiresAt: number;
+}
+
+/** Ordered expiry index used by the provider and tested at high cardinality. */
+export class OrderedExpiryIndex {
+  readonly #heap: ExpiryEntry[] = [];
+
+  get size(): number {
+    return this.#heap.length;
+  }
+
+  peek(): Readonly<ExpiryEntry> | undefined {
+    return this.#heap[0];
+  }
+
+  push(entry: ExpiryEntry): void {
+    this.#heap.push(entry);
+    let index = this.#heap.length - 1;
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (!this.#before(this.#heap[index]!, this.#heap[parent]!)) break;
+      [this.#heap[index], this.#heap[parent]] = [
+        this.#heap[parent]!,
+        this.#heap[index]!,
+      ];
+      index = parent;
+    }
+  }
+
+  popExpired(now: number): ExpiryEntry[] {
+    const expired: ExpiryEntry[] = [];
+    while (this.#heap[0] && this.#heap[0].expiresAt <= now)
+      expired.push(this.#pop()!);
+    return expired;
+  }
+
+  clear(): void {
+    this.#heap.length = 0;
+  }
+
+  #pop(): ExpiryEntry | undefined {
+    const first = this.#heap[0];
+    const last = this.#heap.pop();
+    if (!first || !last || this.#heap.length === 0) return first;
+    this.#heap[0] = last;
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      let next = index;
+      if (
+        this.#heap[left] &&
+        this.#before(this.#heap[left]!, this.#heap[next]!)
+      )
+        next = left;
+      if (
+        this.#heap[right] &&
+        this.#before(this.#heap[right]!, this.#heap[next]!)
+      )
+        next = right;
+      if (next === index) break;
+      [this.#heap[index], this.#heap[next]] = [
+        this.#heap[next]!,
+        this.#heap[index]!,
+      ];
+      index = next;
+    }
+    return first;
+  }
+
+  #before(left: ExpiryEntry, right: ExpiryEntry): boolean {
+    return (
+      left.expiresAt < right.expiresAt ||
+      (left.expiresAt === right.expiresAt && left.id < right.id)
+    );
+  }
+}
+
+interface AcquisitionWaiter {
+  readonly expiresAt: number;
+  readonly startedAt: number;
+  readonly signal: AbortSignal | undefined;
+  readonly resolve: (lease: FontVariantLease) => void;
+  readonly reject: (error: unknown) => void;
+  timer: ReturnType<typeof setTimeout>;
+  onAbort: (() => void) | undefined;
 }
 
 export type VariantGenerator = (
@@ -255,26 +376,46 @@ export type VariantGenerator = (
 
 async function defaultGenerator(
   face: VariantFace,
-  seed: string,
+  _seed: string,
   signal: AbortSignal,
   permutation: Permutation,
+  workers: Woff2WorkerPool,
 ): Promise<Uint8Array> {
-  await new Promise<void>((resolve) => setImmediate(resolve));
-  if (signal.aborted) throw new VariantCancelledError();
   const patched = buildSfnt(
     remapCmap(parseSfnt(face.sfnt), permutation.decode),
   );
-  return compressWoff2InWorker(patched, signal);
+  return workers.compress(patched, signal);
 }
 
 function randomId(bytes: number): string {
   return randomBytes(bytes).toString("base64url");
 }
 
+function compactMappingBytes(plan: PermutationPlan): number {
+  const entries = plan.groups.reduce(
+    (count, group) =>
+      count + (group.values.length < 2 ? 0 : group.values.length),
+    0,
+  );
+  let capacity = 2;
+  while (capacity * 0.7 < entries) capacity *= 2;
+  return capacity * Uint32Array.BYTES_PER_ELEMENT * 2;
+}
+
+function errorClass(error: unknown): string {
+  return error instanceof Error ? error.name : "UnknownError";
+}
+
 export class ResponsePoolVariantProvider implements FontVariantProvider {
-  readonly #ready: StoredVariant[] = [];
+  readonly #ready: Array<StoredVariant | undefined> = [];
   readonly #active = new Map<string, StoredVariant>();
+  readonly #expiry = new OrderedExpiryIndex();
+  readonly #waiters: AcquisitionWaiter[] = [];
+  readonly #drainResolvers = new Set<() => void>();
   readonly #queue: BoundedGenerationQueue;
+  readonly #workers: Woff2WorkerPool | undefined;
+  readonly #generator: VariantGenerator;
+  readonly #estimatedVariantBytes: number;
   readonly #counters: MutableMetrics = {
     leasesIssued: 0,
     poolExhaustions: 0,
@@ -285,6 +426,9 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     generationTimeouts: 0,
     generationCancellations: 0,
     generationOverloads: 0,
+    acquisitionWaits: 0,
+    acquisitionTimeouts: 0,
+    acquisitionCancellations: 0,
     expiredVariants: 0,
     capacityDrops: 0,
     generationCount: 0,
@@ -292,16 +436,25 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     generationMaxMs: 0,
     generationDurationsMs: [],
   };
+  #readyHead = 0;
   #bytes = 0;
+  #reservedBytes = 0;
   #generating = 0;
-  #closed = false;
+  #state: "running" | "draining" | "closed" = "running";
   #expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  #scheduledExpiry: number | undefined;
+  #drainPromise: Promise<void> | undefined;
+  #exhausted = false;
+  #cachedGenerationStats:
+    GlyphEngineMetrics["generationMilliseconds"] | undefined;
+  #cachedGenerationCount = -1;
 
   constructor(
     private readonly faces: readonly VariantFace[],
     private readonly options: VariantProviderOptions,
-    private readonly generator: VariantGenerator = defaultGenerator,
+    generator?: VariantGenerator,
     private readonly now: () => number = Date.now,
+    private readonly onEvent?: GlyphRuntimeEventHandler,
   ) {
     if (faces.length === 0)
       throw new Error("A variant provider requires at least one font face.");
@@ -313,15 +466,34 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       throw new Error(
         "Variant provider poolLowWatermark must not exceed poolHighWatermark.",
       );
+    this.#estimatedVariantBytes = faces.reduce(
+      (total, face) =>
+        total +
+        face.sfnt.byteLength +
+        compactMappingBytes(face.permutationPlan),
+      0,
+    );
     this.#queue = new BoundedGenerationQueue(
       options.generationConcurrency,
       options.generationQueueLimit,
       options.generationTimeoutMs,
       this.#counters,
     );
+    if (generator) this.#generator = generator;
+    else {
+      this.#workers = new Woff2WorkerPool(
+        options.generationConcurrency,
+        options.workerRecycleAfter,
+      );
+      this.#generator = (face, seed, signal, permutation) =>
+        defaultGenerator(face, seed, signal, permutation, this.#workers!);
+    }
   }
 
   async start(): Promise<void> {
+    if (this.#state !== "running")
+      throw new VariantCancelledError("Provider cannot be restarted.");
+    await this.#workers?.start();
     const results = await Promise.all(
       Array.from({ length: this.options.poolLowWatermark }, () =>
         this.#generateAndStore(true),
@@ -335,24 +507,93 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
   }
 
   acquire(expiresAt: number): FontVariantLease {
+    this.#assertRunning();
     this.#pruneExpired();
-    const variant = this.#ready.shift();
+    const variant = this.#shiftReady();
     if (!variant) {
       this.#counters.poolExhaustions++;
+      this.#exhausted = true;
+      this.#emit("pool-exhausted");
       this.#scheduleRefill();
       throw new VariantUnavailableError();
     }
-    variant.expiresAt = expiresAt;
-    this.#active.set(variant.id, variant);
-    this.#counters.leasesIssued++;
-    this.#scheduleExpiryMaintenance();
-    this.#scheduleRefill();
-    const variantId = variant.id;
-    const variantSeed = variant.seed;
-    return Object.freeze({
-      id: variantId,
-      seed: variantSeed,
+    return this.#lease(variant, expiresAt);
+  }
+
+  acquireAsync(
+    expiresAt: number,
+    acquisition: GlyphAcquisitionOptions = {},
+  ): Promise<FontVariantLease> {
+    try {
+      this.#assertRunning();
+      this.#pruneExpired();
+      const variant = this.#shiftReady();
+      if (variant) return Promise.resolve(this.#lease(variant, expiresAt));
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const timeoutMs =
+      acquisition.timeoutMs ?? this.options.acquisitionTimeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
+      return Promise.reject(
+        new TypeError(
+          "Variant acquisition timeout must be a positive integer.",
+        ),
+      );
+    if (acquisition.signal?.aborted) {
+      this.#counters.acquisitionCancellations++;
+      return Promise.reject(
+        new VariantCancelledError("Variant acquisition was cancelled."),
+      );
+    }
+    if (this.#waiters.length >= this.options.acquisitionQueueLimit) {
+      this.#counters.poolExhaustions++;
+      this.#exhausted = true;
+      this.#emit("pool-exhausted");
+      return Promise.reject(
+        new VariantOverloadError("The response acquisition queue is full."),
+      );
+    }
+    this.#counters.acquisitionWaits++;
+    this.#exhausted = true;
+    this.#emit("acquisition-wait");
+    const result = new Promise<FontVariantLease>((resolve, reject) => {
+      const waiter: AcquisitionWaiter = {
+        expiresAt,
+        startedAt: this.now(),
+        signal: acquisition.signal,
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          if (!this.#removeWaiter(waiter)) return;
+          this.#counters.poolExhaustions++;
+          this.#counters.acquisitionTimeouts++;
+          this.#emit("pool-exhausted", this.now() - waiter.startedAt);
+          reject(
+            new VariantUnavailableError(
+              "No one-use font variant became ready before the acquisition deadline.",
+            ),
+          );
+        }, timeoutMs),
+        onAbort: undefined,
+      };
+      waiter.timer.unref?.();
+      if (acquisition.signal) {
+        waiter.onAbort = () => {
+          if (!this.#removeWaiter(waiter)) return;
+          this.#counters.acquisitionCancellations++;
+          reject(
+            new VariantCancelledError("Variant acquisition was cancelled."),
+          );
+        };
+        acquisition.signal.addEventListener("abort", waiter.onAbort, {
+          once: true,
+        });
+      }
+      this.#waiters.push(waiter);
     });
+    this.#scheduleRefill();
+    return result;
   }
 
   mapping(
@@ -391,36 +632,159 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       generationTimeouts: this.#counters.generationTimeouts,
       generationCancellations: this.#counters.generationCancellations,
       generationOverloads: this.#counters.generationOverloads,
+      acquisitionWaits: this.#counters.acquisitionWaits,
+      acquisitionTimeouts: this.#counters.acquisitionTimeouts,
+      acquisitionCancellations: this.#counters.acquisitionCancellations,
       expiredVariants: this.#counters.expiredVariants,
       capacityDrops: this.#counters.capacityDrops,
-      readyVariants: this.#ready.length,
+      readyVariants: this.#readyCount(),
       activeVariants: this.#active.size,
       cacheBytes: this.#bytes,
       queueDepth: this.#queue.depth,
       activeGenerators: this.#queue.active,
-      generationMilliseconds: {
-        count: this.#counters.generationCount,
-        total: Number(this.#counters.generationTotalMs.toFixed(3)),
-        max: Number(this.#counters.generationMaxMs.toFixed(3)),
-        p50: percentile(this.#counters.generationDurationsMs, 0.5),
-        p95: percentile(this.#counters.generationDurationsMs, 0.95),
-        p99: percentile(this.#counters.generationDurationsMs, 0.99),
-      },
+      waitingRequests: this.#waiters.length,
+      draining: this.#state === "draining",
+      workerRestarts: this.#workers?.restarts ?? 0,
+      estimatedVariantBytes: this.#estimatedVariantBytes,
+      generationMilliseconds: this.#generationStats(),
     };
   }
 
+  capacityReport(
+    tokenTtlSeconds: number,
+    targetResponsesPerSecond?: number,
+  ): GlyphCapacityReport {
+    if (!Number.isFinite(tokenTtlSeconds) || tokenTtlSeconds <= 0)
+      throw new TypeError("Token TTL must be a positive number.");
+    if (
+      targetResponsesPerSecond !== undefined &&
+      (!Number.isFinite(targetResponsesPerSecond) ||
+        targetResponsesPerSecond <= 0)
+    )
+      throw new TypeError("Target response rate must be a positive number.");
+    const p95 = this.#generationStats().p95;
+    const sustainable =
+      p95 === 0
+        ? 0
+        : (this.options.generationConcurrency * 1000) /
+          (p95 * this.faces.length);
+    const perTtl = sustainable * tokenTtlSeconds;
+    const cacheLimited = Math.floor(
+      this.options.cacheMaxBytes / this.#estimatedVariantBytes,
+    );
+    const estimatedBytes = Math.ceil(
+      (perTtl + this.options.poolHighWatermark) * this.#estimatedVariantBytes,
+    );
+    const targetVariants =
+      targetResponsesPerSecond === undefined
+        ? undefined
+        : targetResponsesPerSecond * tokenTtlSeconds;
+    const guidance: string[] = [];
+    if (p95 === 0)
+      guidance.push(
+        "Run glyphscramble benchmark before sizing production traffic.",
+      );
+    if (this.options.generationConcurrency > availableParallelism())
+      guidance.push(
+        "runtime.generationConcurrency exceeds the host parallelism; benchmark a lower worker count to avoid CPU contention.",
+      );
+    if (cacheLimited < this.options.poolLowWatermark)
+      guidance.push(
+        "Increase runtime.cacheMaxBytes or reduce the prepared face set.",
+      );
+    if (perTtl > cacheLimited)
+      guidance.push(
+        "The measured generation rate can outpace retained-token cache capacity.",
+      );
+    if (
+      targetResponsesPerSecond !== undefined &&
+      targetResponsesPerSecond > sustainable
+    )
+      guidance.push(
+        "The target rate exceeds measured generation capacity; add CPU or reduce face cost.",
+      );
+    if (
+      targetVariants !== undefined &&
+      targetVariants + this.options.poolHighWatermark > cacheLimited
+    )
+      guidance.push(
+        "The target rate and token TTL exceed the configured cache capacity.",
+      );
+    if (guidance.length === 0)
+      guidance.push(
+        "Measured generation and retained-byte capacity fit the requested envelope.",
+      );
+    return {
+      faceCount: this.faces.length,
+      hostParallelism: availableParallelism(),
+      generationConcurrency: this.options.generationConcurrency,
+      readyBurst: this.options.poolHighWatermark,
+      cacheMaxBytes: this.options.cacheMaxBytes,
+      estimatedVariantBytes: this.#estimatedVariantBytes,
+      cacheLimitedResponses: cacheLimited,
+      tokenTtlSeconds,
+      measuredFaceGenerationP95Ms: p95,
+      sustainableResponsesPerSecond: Number(sustainable.toFixed(3)),
+      sustainableResponsesPerTtl: Number(perTtl.toFixed(3)),
+      estimatedBytesAtSustainableRate: estimatedBytes,
+      ...(targetResponsesPerSecond === undefined
+        ? {}
+        : {
+            targetResponsesPerSecond,
+            targetFitsGeneration: targetResponsesPerSecond <= sustainable,
+            targetFitsCache:
+              targetVariants! + this.options.poolHighWatermark <= cacheLimited,
+          }),
+      guidance: Object.freeze(guidance),
+    };
+  }
+
+  drain(options: GlyphDrainOptions = {}): Promise<void> {
+    if (this.#state === "closed") return Promise.resolve();
+    if (this.#drainPromise) return this.#drainPromise;
+    const timeoutMs = options.timeoutMs ?? this.options.drainTimeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
+      return Promise.reject(
+        new TypeError("Variant drain timeout must be a positive integer."),
+      );
+    const startedAt = this.now();
+    this.#state = "draining";
+    this.#emit("drain-started");
+    this.#rejectWaiters(new VariantDrainingError());
+    this.#clearReady();
+    this.#drainPromise = (async () => {
+      await this.#queue.close();
+      await this.#workers?.close();
+      await this.#waitForActive(timeoutMs, options.signal);
+      await this.#finishClose();
+      this.#emit("drain-complete", this.now() - startedAt);
+    })();
+    return this.#drainPromise;
+  }
+
   async close(): Promise<void> {
-    if (this.#closed) return;
-    this.#closed = true;
-    if (this.#expiryTimer) clearTimeout(this.#expiryTimer);
+    if (this.#state === "closed") return;
+    this.#state = "closed";
+    this.#rejectWaiters(new VariantCancelledError("Provider is closed."));
     await this.#queue.close();
-    this.#ready.length = 0;
-    this.#active.clear();
-    this.#bytes = 0;
+    await this.#workers?.close();
+    await this.#finishClose();
   }
 
   async #generateAndStore(required: boolean): Promise<boolean> {
-    if (this.#closed) return false;
+    if (this.#state !== "running") return false;
+    if (
+      this.#bytes + this.#reservedBytes + this.#estimatedVariantBytes >
+      this.options.cacheMaxBytes
+    ) {
+      this.#counters.capacityDrops++;
+      if (required)
+        throw new Error(
+          "runtime.cacheMaxBytes cannot hold the configured ready variants and active token lifetime.",
+        );
+      return false;
+    }
+    this.#reservedBytes += this.#estimatedVariantBytes;
     const id = randomId(16);
     const seed = randomId(32);
     try {
@@ -434,29 +798,26 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
                 seed,
                 face.namespace,
               );
-              const font = await this.generator(
+              const font = await this.#generator(
                 face,
                 seed,
                 signal,
                 permutation,
               );
               const mapping = compactEncodeMapping(permutation.encode);
-              const duration = performance.now() - started;
-              this.#counters.generations++;
-              this.#counters.generationCount++;
-              this.#counters.generationTotalMs += duration;
-              this.#counters.generationMaxMs = Math.max(
-                this.#counters.generationMaxMs,
-                duration,
-              );
-              if (this.#counters.generationDurationsMs.length === 256)
-                this.#counters.generationDurationsMs.shift();
-              this.#counters.generationDurationsMs.push(duration);
+              this.#recordGeneration(performance.now() - started);
               return { font, mapping };
             });
             return [face.id, generated] as const;
           } catch (error) {
             this.#counters.generationFailures++;
+            this.#emit(
+              error instanceof VariantTimeoutError
+                ? "generation-timeout"
+                : "generation-failed",
+              undefined,
+              errorClass(error),
+            );
             throw error;
           }
         }),
@@ -466,7 +827,7 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
           total + item[1].font.length + item[1].mapping.byteLength,
         0,
       );
-      if (this.#closed) return false;
+      if (this.#state !== "running") return false;
       this.#pruneExpired();
       if (this.#bytes + bytes > this.options.cacheMaxBytes) {
         this.#counters.capacityDrops++;
@@ -476,25 +837,29 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
           );
         return false;
       }
-      this.#ready.push({
+      const variant = {
         id,
         seed,
         faces: new Map(outputs),
         bytes,
-      });
+      } satisfies StoredVariant;
       this.#bytes += bytes;
+      if (!this.#serveWaiter(variant)) this.#ready.push(variant);
+      this.#emit("pool-depth");
       return true;
     } catch (error) {
       if (required) throw error;
       return false;
+    } finally {
+      this.#reservedBytes -= this.#estimatedVariantBytes;
     }
   }
 
   #scheduleRefill(): void {
-    if (this.#closed) return;
+    if (this.#state !== "running") return;
     this.#pruneExpired();
     while (
-      this.#ready.length + this.#generating <
+      this.#readyCount() + this.#generating <
       this.options.poolHighWatermark
     ) {
       this.#generating++;
@@ -505,14 +870,79 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     }
   }
 
+  #lease(variant: StoredVariant, expiresAt: number): FontVariantLease {
+    if (!Number.isFinite(expiresAt) || expiresAt <= this.now())
+      throw new TypeError("Variant expiry must be in the future.");
+    variant.expiresAt = expiresAt;
+    this.#active.set(variant.id, variant);
+    this.#expiry.push({ id: variant.id, expiresAt });
+    this.#counters.leasesIssued++;
+    if (this.#exhausted) {
+      this.#exhausted = false;
+      this.#emit("pool-recovered");
+    }
+    this.#scheduleExpiryMaintenance();
+    this.#scheduleRefill();
+    this.#emit("pool-depth");
+    return Object.freeze({ id: variant.id, seed: variant.seed });
+  }
+
+  #serveWaiter(variant: StoredVariant): boolean {
+    while (this.#waiters.length > 0) {
+      const waiter = this.#waiters.shift()!;
+      this.#clearWaiter(waiter);
+      if (waiter.signal?.aborted) {
+        this.#counters.acquisitionCancellations++;
+        waiter.reject(
+          new VariantCancelledError("Variant acquisition was cancelled."),
+        );
+        continue;
+      }
+      try {
+        const lease = this.#lease(variant, waiter.expiresAt);
+        this.#emit("acquisition-wait", this.now() - waiter.startedAt);
+        waiter.resolve(lease);
+        return true;
+      } catch (error) {
+        waiter.reject(error);
+      }
+    }
+    return false;
+  }
+
+  #shiftReady(): StoredVariant | undefined {
+    const variant = this.#ready[this.#readyHead];
+    if (!variant) return undefined;
+    this.#ready[this.#readyHead++] = undefined;
+    if (this.#readyHead >= 64 && this.#readyHead * 2 >= this.#ready.length) {
+      this.#ready.splice(0, this.#readyHead);
+      this.#readyHead = 0;
+    }
+    return variant;
+  }
+
+  #readyCount(): number {
+    return this.#ready.length - this.#readyHead;
+  }
+
+  #clearReady(): void {
+    for (let index = this.#readyHead; index < this.#ready.length; index++)
+      this.#bytes -= this.#ready[index]!.bytes;
+    this.#ready.length = 0;
+    this.#readyHead = 0;
+  }
+
   #pruneExpired(): void {
-    const now = this.now();
-    for (const [id, variant] of this.#active) {
-      if (variant.expiresAt === undefined || variant.expiresAt > now) continue;
-      this.#active.delete(id);
+    const expired = this.#expiry.popExpired(this.now());
+    for (const entry of expired) {
+      const variant = this.#active.get(entry.id);
+      if (!variant || variant.expiresAt !== entry.expiresAt) continue;
+      this.#active.delete(entry.id);
       this.#bytes -= variant.bytes;
       this.#counters.expiredVariants++;
+      this.#emit("variant-expired");
     }
+    if (expired.length > 0) this.#notifyDrained();
   }
 
   #mapping(
@@ -522,28 +952,24 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
   ): CodePointMapping | undefined {
     this.#pruneExpired();
     const variant = this.#active.get(variantId);
+    this.#scheduleExpiryMaintenance();
     return variant?.seed === expectedSeed
       ? variant.faces.get(faceId)?.mapping
       : undefined;
   }
 
   #scheduleExpiryMaintenance(): void {
-    if (this.#closed) return;
+    if (this.#state === "closed") return;
+    const nextExpiry = this.#expiry.peek()?.expiresAt;
+    if (nextExpiry === this.#scheduledExpiry && this.#expiryTimer) return;
     if (this.#expiryTimer) clearTimeout(this.#expiryTimer);
-    const nextExpiry = [...this.#active.values()].reduce(
-      (earliest, variant) =>
-        variant.expiresAt === undefined
-          ? earliest
-          : Math.min(earliest, variant.expiresAt),
-      Number.POSITIVE_INFINITY,
-    );
-    if (!Number.isFinite(nextExpiry)) {
-      this.#expiryTimer = undefined;
-      return;
-    }
+    this.#expiryTimer = undefined;
+    this.#scheduledExpiry = nextExpiry;
+    if (nextExpiry === undefined) return;
     this.#expiryTimer = setTimeout(
       () => {
         this.#expiryTimer = undefined;
+        this.#scheduledExpiry = undefined;
         this.#pruneExpired();
         this.#scheduleRefill();
         this.#scheduleExpiryMaintenance();
@@ -551,6 +977,134 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       Math.min(2_147_483_647, Math.max(1, nextExpiry - this.now())),
     );
     this.#expiryTimer.unref?.();
+  }
+
+  #removeWaiter(waiter: AcquisitionWaiter): boolean {
+    const index = this.#waiters.indexOf(waiter);
+    if (index < 0) return false;
+    this.#waiters.splice(index, 1);
+    this.#clearWaiter(waiter);
+    return true;
+  }
+
+  #clearWaiter(waiter: AcquisitionWaiter): void {
+    clearTimeout(waiter.timer);
+    if (waiter.signal && waiter.onAbort)
+      waiter.signal.removeEventListener("abort", waiter.onAbort);
+  }
+
+  #rejectWaiters(error: Error): void {
+    for (const waiter of this.#waiters.splice(0)) {
+      this.#clearWaiter(waiter);
+      waiter.reject(error);
+    }
+  }
+
+  #assertRunning(): void {
+    if (this.#state === "draining") throw new VariantDrainingError();
+    if (this.#state === "closed")
+      throw new VariantCancelledError("Provider is closed.");
+  }
+
+  async #waitForActive(timeoutMs: number, signal?: AbortSignal): Promise<void> {
+    this.#pruneExpired();
+    if (this.#active.size === 0) return;
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", finish);
+        this.#drainResolvers.delete(finish);
+        resolve();
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      timer.unref?.();
+      this.#drainResolvers.add(finish);
+      signal?.addEventListener("abort", finish, { once: true });
+      if (signal?.aborted) finish();
+    });
+  }
+
+  #notifyDrained(): void {
+    if (this.#active.size !== 0) return;
+    for (const resolve of this.#drainResolvers) resolve();
+    this.#drainResolvers.clear();
+  }
+
+  async #finishClose(): Promise<void> {
+    this.#state = "closed";
+    if (this.#expiryTimer) clearTimeout(this.#expiryTimer);
+    this.#expiryTimer = undefined;
+    this.#scheduledExpiry = undefined;
+    this.#clearReady();
+    this.#active.clear();
+    this.#expiry.clear();
+    this.#bytes = 0;
+    this.#reservedBytes = 0;
+    this.#notifyDrained();
+  }
+
+  #recordGeneration(duration: number): void {
+    this.#counters.generations++;
+    this.#counters.generationCount++;
+    this.#counters.generationTotalMs += duration;
+    this.#counters.generationMaxMs = Math.max(
+      this.#counters.generationMaxMs,
+      duration,
+    );
+    if (this.#counters.generationDurationsMs.length === 256)
+      this.#counters.generationDurationsMs.shift();
+    this.#counters.generationDurationsMs.push(duration);
+  }
+
+  #generationStats(): GlyphEngineMetrics["generationMilliseconds"] {
+    if (
+      this.#cachedGenerationStats &&
+      this.#cachedGenerationCount === this.#counters.generationCount
+    )
+      return this.#cachedGenerationStats;
+    this.#cachedGenerationCount = this.#counters.generationCount;
+    this.#cachedGenerationStats = Object.freeze({
+      count: this.#counters.generationCount,
+      total: Number(this.#counters.generationTotalMs.toFixed(3)),
+      max: Number(this.#counters.generationMaxMs.toFixed(3)),
+      p50: percentile(this.#counters.generationDurationsMs, 0.5),
+      p95: percentile(this.#counters.generationDurationsMs, 0.95),
+      p99: percentile(this.#counters.generationDurationsMs, 0.99),
+      samples: Object.freeze(
+        this.#counters.generationDurationsMs.map((value) =>
+          Number(value.toFixed(3)),
+        ),
+      ),
+    });
+    return this.#cachedGenerationStats;
+  }
+
+  #emit(
+    code: GlyphRuntimeEventCode,
+    durationMs?: number,
+    eventErrorClass?: string,
+  ): void {
+    if (!this.onEvent) return;
+    const event: GlyphRuntimeEvent = Object.freeze({
+      code,
+      timestamp: this.now(),
+      readyVariants: this.#readyCount(),
+      activeVariants: this.#active.size,
+      queueDepth: this.#queue.depth,
+      waitingRequests: this.#waiters.length,
+      ...(durationMs === undefined
+        ? {}
+        : { durationMs: Number(durationMs.toFixed(3)) }),
+      ...(eventErrorClass === undefined ? {} : { errorClass: eventErrorClass }),
+    });
+    try {
+      this.onEvent(event);
+    } catch {
+      // Operator callbacks cannot affect protection or expose request data.
+    }
   }
 }
 
@@ -561,6 +1115,10 @@ export function variantRuntimeOptions(
     generationConcurrency?: number;
     generationQueueLimit?: number;
     generationTimeoutMs?: number;
+    acquisitionTimeoutMs?: number;
+    acquisitionQueueLimit?: number;
+    workerRecycleAfter?: number;
+    drainTimeoutMs?: number;
     cacheMaxBytes?: number;
   } = {},
 ): VariantProviderOptions {
@@ -578,6 +1136,16 @@ export function variantRuntimeOptions(
     generationTimeoutMs:
       runtime.generationTimeoutMs ??
       DEFAULT_VARIANT_RUNTIME.generationTimeoutMs,
+    acquisitionTimeoutMs:
+      runtime.acquisitionTimeoutMs ??
+      DEFAULT_VARIANT_RUNTIME.acquisitionTimeoutMs,
+    acquisitionQueueLimit:
+      runtime.acquisitionQueueLimit ??
+      DEFAULT_VARIANT_RUNTIME.acquisitionQueueLimit,
+    workerRecycleAfter:
+      runtime.workerRecycleAfter ?? DEFAULT_VARIANT_RUNTIME.workerRecycleAfter,
+    drainTimeoutMs:
+      runtime.drainTimeoutMs ?? DEFAULT_VARIANT_RUNTIME.drainTimeoutMs,
     cacheMaxBytes:
       runtime.cacheMaxBytes ?? DEFAULT_VARIANT_RUNTIME.cacheMaxBytes,
   };

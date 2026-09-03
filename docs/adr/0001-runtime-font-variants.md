@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-03
-- Issues: [R01](../design/R01-runtime-font-generation.md), [R16](../design/R16-permutation-request-path.md)
+- Issues: [R01](../design/R01-runtime-font-generation.md), [R16](../design/R16-permutation-request-path.md), [R17](../design/R17-runtime-capacity-lifecycle.md)
 
 ## Context
 
@@ -66,9 +66,11 @@ v0.1.
 2. Refill work derives one versioned AES-256-CTR keystream per Unicode property
    group, uses rejection sampling for unbiased Fisher-Yates selection, patches
    `cmap`, and performs WOFF2 WASM compression in worker threads.
-3. A response context consumes one ready variant lazily on its first
-   `scramble()` call or token read; an unprotected context consumes nothing.
-   Pool exhaustion throws before plaintext can be emitted.
+3. A response context consumes one ready variant lazily on its first protected
+   call or token read; an unprotected context consumes nothing.
+   `scrambleAsync()` may wait within a bounded FIFO queue, while `scramble()` is
+   the explicit no-wait path. Timeout, cancellation, drain, or exhaustion throws
+   before plaintext can be emitted.
 4. The encrypted token carries a random variant id, its random seed, expiry, and
    the explicit `response-pool` mode.
 5. A variant is never assigned to a second response. Repeated GET/HEAD requests
@@ -79,15 +81,24 @@ v0.1.
 7. Ready and issued variants share one byte ceiling covering WOFF2 bytes and
    retained mappings. Ready variants and issued tokens both expire; valid
    issued variants are never evicted to make room.
-8. Generation has explicit concurrency, queue, timeout, cancellation, and
-   capacity limits. Every overload or missing-state path fails closed.
-9. Metrics expose counts, queue/cache gauges, and bounded timing percentiles.
-   They never contain text, seeds, tokens, mappings, or variant ids.
+8. Generation uses a persistent worker pool sized to concurrency, with crash
+   replacement, bounded recycling, deterministic shutdown, and explicit queue,
+   timeout, cancellation, and preflight/actual capacity limits.
+9. Active variants have direct map lookup and a min-heap expiry index. One timer
+   changes only with the earliest expiry; ordinary font reads never scan the
+   active set.
+10. Metrics expose counts, queue/cache gauges, bounded raw timing samples, and
+    cached percentiles. Typed events expose only aggregate operational fields.
+    They never contain text, seeds, tokens, mappings, or variant ids.
+11. Graceful drain refuses new leases, stops generation, discards ready work,
+    serves already-issued fonts until expiry or a bounded deadline, then closes.
 
 The defaults are a low watermark of 2, high watermark of 4, two concurrent
-generators, 64 queued face jobs, a 10-second per-face timeout, and a 64 MiB
-combined font-and-mapping cache. Unused ready variants remain random and bounded
-by the high watermark; issued variants expire with their tokens.
+generators, 64 queued face jobs, a 10-second per-face timeout, a 50 ms response
+wait, 128 response waiters, worker recycling after 256 jobs, a 30-second drain
+deadline, and a 64 MiB combined font-and-mapping cache. Unused ready variants
+remain random and bounded by the high watermark; issued variants expire with
+their tokens.
 
 The permutation algorithm identity is
 `glyphscramble-aes-256-ctr-rejection-v2`. HMAC-SHA-256 derives separate key and
