@@ -1,6 +1,6 @@
 # [R03] Static delivery, caching, CSP, and accessibility
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#4](https://github.com/brip-io/glyphscramble/issues/4)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In review in [PR #27](https://github.com/brip-io/glyphscramble/pull/27) · **GitHub issue:** [#4](https://github.com/brip-io/glyphscramble/issues/4)
 > **Blocked by:** R02, R04, R06 · **Blocks:** R10, R12
 
 ## Objective
@@ -59,6 +59,25 @@ The deployment manifest includes a build ID and asset graph. A `glyphscramble do
 - Accessibility-tree assertions before load, after success, and after failure.
 - Font 404, corrupt font, blocked CSS/JS, and timeout tests.
 - Manifest/hash tamper and mixed-build rejection tests.
+
+## Implementation evidence
+
+[PR #27](https://github.com/brip-io/glyphscramble/pull/27) introduces the
+version-2 static asset graph and deployment contract:
+
+- font, CSS, JavaScript, and manifest filenames carry SHA-256 byte identities
+  below a build-ID directory; font identities additionally bind the prepared
+  face, seed identity, algorithm, descriptors, and coverage;
+- configured root/subpath URLs are injected into transformed pages, while
+  native `hidden` plus persistent `aria-hidden` prevents a CSS or JavaScript
+  failure from exposing encoded text;
+- a strict-CSP external loader verifies the exact computed face and full text,
+  times out, and reveals only a separate generic live status on failure;
+- `doctor --static-output` checks manifest naming, build identity, asset bytes,
+  transformed-page references, and mixed-build output trees;
+- unit tests cover reproducibility, rotation, subpaths, tampering, mixed builds,
+  and configuration bounds; Playwright qualifies success, missing/corrupt
+  fonts, and blocked CSS/JavaScript in Chromium, Firefox, and WebKit.
 
 ## Risks
 

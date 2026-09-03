@@ -64,7 +64,7 @@ Harden untrusted font/CSS parsing, pin Unicode generation inputs, and qualify cm
 
 ### Release B — Correct runtime and delivery contracts
 
-#### R03 · Static delivery, caching, CSP, and accessibility · **M**
+#### R03 · Static delivery, caching, CSP, and accessibility · **M** · **In review in [PR #27](https://github.com/brip-io/glyphscramble/pull/27)**
 
 Emit content-addressed, subpath-safe static assets with correct accessibility and failure behavior.
 
