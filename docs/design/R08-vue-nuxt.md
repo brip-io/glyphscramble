@@ -1,6 +1,6 @@
 # [R08] Vue 3 and Nuxt 4 integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#9](https://github.com/brip-io/glyphscramble/issues/9)
 > **Blocked by:** R05, R06 · **Blocks:** R12
 
 ## Objective

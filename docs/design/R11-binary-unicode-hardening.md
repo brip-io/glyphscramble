@@ -1,6 +1,6 @@
 # [R11] Binary and Unicode hardening
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** [#12](https://github.com/brip-io/glyphscramble/issues/12)
 > **Requires:** R04 · **Blocks:** R01, R12
 
 ## Objective

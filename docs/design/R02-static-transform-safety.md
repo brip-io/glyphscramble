@@ -1,6 +1,6 @@
 # [R02] Static transform safety
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#3](https://github.com/brip-io/glyphscramble/issues/3)
 > **Blocks:** R03, R10, R12
 
 ## Objective

@@ -1,6 +1,6 @@
 # [R03] Static delivery, caching, CSP, and accessibility
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#4](https://github.com/brip-io/glyphscramble/issues/4)
 > **Blocked by:** R02, R04, R06 · **Blocks:** R10, R12
 
 ## Objective

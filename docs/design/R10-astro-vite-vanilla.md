@@ -1,6 +1,6 @@
 # [R10] Astro 7, Vite, and vanilla integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#11](https://github.com/brip-io/glyphscramble/issues/11)
 > **Blocked by:** R02, R03, R05, R06 · **Blocks:** R12
 
 ## Objective

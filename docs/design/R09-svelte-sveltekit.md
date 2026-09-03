@@ -1,6 +1,6 @@
 # [R09] Svelte 5 and SvelteKit 2 integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#10](https://github.com/brip-io/glyphscramble/issues/10)
 > **Blocked by:** R05, R06 · **Blocks:** R12
 
 ## Objective

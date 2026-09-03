@@ -1,6 +1,6 @@
 # [R04] Font-face resolution, coverage, and licensing
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** [#5](https://github.com/brip-io/glyphscramble/issues/5)
 > **Blocks:** R01, R03, R07-R12
 
 ## Objective
