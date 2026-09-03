@@ -120,7 +120,7 @@ async function run(label, source, ceilings) {
         generationTimeoutMs: 1_000,
         cacheMaxBytes: source.length * REQUEST_ITERATIONS * 3,
       },
-      () => Promise.resolve(new Uint8Array(source)),
+      () => Promise.resolve(source),
     );
     engine = await createGlyphEngine(config, {
       cwd,
