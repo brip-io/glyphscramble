@@ -9,6 +9,8 @@ import {
 } from "../src/generated/unicode17.js";
 import {
   createPermutation,
+  createPermutationFromPlan,
+  createPermutationPlan,
   encodeText,
   isStructuralCodePoint,
   propertySignature,
@@ -36,6 +38,17 @@ describe("Unicode-safe permutation", () => {
       expect(propertySignature(encoded)).toBe(propertySignature(original));
       expect(first.decode.get(encoded)).toBe(original);
     }
+  });
+
+  it("reuses precomputed property groups without changing the mapping", () => {
+    const seed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const direct = createPermutation(covered, seed, "body");
+    const planned = createPermutationFromPlan(
+      createPermutationPlan(covered),
+      seed,
+      "body",
+    );
+    expect(planned).toEqual(direct);
   });
 
   it("leaves segmentation and bidi controls unchanged", () => {

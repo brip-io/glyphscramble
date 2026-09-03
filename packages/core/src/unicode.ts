@@ -61,11 +61,17 @@ export interface Permutation {
   decode: ReadonlyMap<number, number>;
 }
 
-export function createPermutation(
+export interface PermutationPlan {
+  readonly groups: readonly {
+    readonly signature: string;
+    readonly values: readonly number[];
+  }[];
+}
+
+/** Precomputes stable Unicode-property groups shared by response seeds. */
+export function createPermutationPlan(
   codepoints: Iterable<number>,
-  seed: string,
-  namespace = "default",
-): Permutation {
+): PermutationPlan {
   const groups = new Map<string, number[]>();
   for (const cp of new Set(codepoints)) {
     const signature = propertySignature(cp);
@@ -74,11 +80,23 @@ export function createPermutation(
     group.push(cp);
     groups.set(signature, group);
   }
+  return {
+    groups: [...groups].map(([signature, values]) => ({
+      signature,
+      values: values.sort((left, right) => left - right),
+    })),
+  };
+}
 
+/** Applies a fresh seed to precomputed groups without reclassifying the face. */
+export function createPermutationFromPlan(
+  plan: PermutationPlan,
+  seed: string,
+  namespace = "default",
+): Permutation {
   const encode = new Map<number, number>();
   const decode = new Map<number, number>();
-  for (const [signature, values] of groups) {
-    values.sort((a, b) => a - b);
+  for (const { signature, values } of plan.groups) {
     if (values.length < 2) continue;
     const shuffled = [...values];
     for (let index = shuffled.length - 1; index > 0; index--) {
@@ -104,6 +122,18 @@ export function createPermutation(
     });
   }
   return { encode, decode };
+}
+
+export function createPermutation(
+  codepoints: Iterable<number>,
+  seed: string,
+  namespace = "default",
+): Permutation {
+  return createPermutationFromPlan(
+    createPermutationPlan(codepoints),
+    seed,
+    namespace,
+  );
 }
 
 export function encodeText(text: string, permutation: Permutation): string {

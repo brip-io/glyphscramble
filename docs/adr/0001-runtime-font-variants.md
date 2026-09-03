@@ -96,11 +96,15 @@ throughput. The first batch is labelled process-cold and is governed by the
 whole-pool startup ceiling; the next two are labelled process-warm and are
 governed by the per-generation p95 ceiling. This prevents one-time worker/WASM
 startup from being counted against both gates while keeping every measurement
-visible. Fifty response acquisitions and prepared-font lookups then exercise
-the production pool and engine with prebuilt byte payloads, keeping the 5 ms
-and 10 ms request-path gates meaningful instead of treating the slowest of only
-five shared-runner observations as a percentile. R12 still owns a naturally
-large real-font matrix.
+visible. The engine precomputes each prepared face's Unicode-property groups at
+startup; response seeds shuffle those stable groups without reclassifying the
+same codepoints on every request. Ten untimed acquisitions warm the Node/OpenSSL
+code paths and drain their prepared-byte refills before fifty independent,
+exactly 10,000-scalar response acquisitions and prepared-font lookups exercise
+the production pool and engine. This keeps the 5 ms and 10 ms steady-state
+request gates meaningful instead of charging process/JIT initialization twice
+or treating the slowest of only five shared-runner observations as a
+percentile. R12 still owns a naturally large real-font matrix.
 
 For R01, a prepared font response must remain below 5 ms p95 and a complete
 10,000-scalar response acquisition below 10 ms p95 on Node 22 and 24. CI

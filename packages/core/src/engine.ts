@@ -6,7 +6,13 @@ import {
   type TokenKey,
   type TokenKeyRing,
 } from "./token.js";
-import { createPermutation, encodeText, type Permutation } from "./unicode.js";
+import {
+  createPermutationFromPlan,
+  createPermutationPlan,
+  encodeText,
+  type Permutation,
+  type PermutationPlan,
+} from "./unicode.js";
 import { validateGlyphConfig } from "./config.js";
 import {
   ResponsePoolVariantProvider,
@@ -25,6 +31,7 @@ import type {
 interface RuntimeFont extends PreparedFont {
   codepoints: readonly number[];
   coverage: readonly string[];
+  permutationPlan: PermutationPlan;
 }
 
 interface RuntimeFamily {
@@ -128,6 +135,7 @@ export async function createGlyphEngine(
         ...prepared,
         codepoints: prepared.metadata.codepoints,
         coverage: prepared.metadata.coverage,
+        permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
       };
       runtimeFaces.set(prepared.faceId, runtimeFont);
       fonts.set(runtimeId(prepared), runtimeFont);
@@ -228,8 +236,8 @@ export async function createGlyphEngine(
           const namespace = runtimeNamespace(font);
           let permutation = permutations.get(namespace);
           if (!permutation) {
-            permutation = createPermutation(
-              font.codepoints,
+            permutation = createPermutationFromPlan(
+              font.permutationPlan,
               responseLease.seed,
               namespace,
             );

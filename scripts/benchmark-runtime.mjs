@@ -19,6 +19,8 @@ import {
 
 const GENERATION_VARIANTS = 5;
 const REQUEST_ITERATIONS = 50;
+const REQUEST_WARMUP_ITERATIONS = 10;
+const REQUEST_VARIANTS = REQUEST_ITERATIONS + REQUEST_WARMUP_ITERATIONS;
 const COLD_ITERATIONS = 3;
 const SECRET = "GLYPHSCRAMBLE_BENCHMARK_SECRET";
 
@@ -117,12 +119,12 @@ async function run(label, source, ceilings) {
     const requestProvider = new ResponsePoolVariantProvider(
       requestFaces,
       {
-        poolLowWatermark: REQUEST_ITERATIONS,
-        poolHighWatermark: REQUEST_ITERATIONS,
+        poolLowWatermark: REQUEST_VARIANTS,
+        poolHighWatermark: REQUEST_VARIANTS,
         generationConcurrency: 2,
-        generationQueueLimit: REQUEST_ITERATIONS,
+        generationQueueLimit: REQUEST_VARIANTS,
         generationTimeoutMs: 1_000,
-        cacheMaxBytes: source.length * REQUEST_ITERATIONS * 3,
+        cacheMaxBytes: source.length * REQUEST_VARIANTS * 3,
       },
       () => Promise.resolve(source),
     );
@@ -133,7 +135,12 @@ async function run(label, source, ceilings) {
     const acquisition = [];
     const response = [];
     const payloads = [];
-    const sample = "High value block. ".repeat(625);
+    const sample = "High value block. "
+      .repeat(Math.ceil(10_000 / "High value block. ".length))
+      .slice(0, 10_000);
+    for (let index = 0; index < REQUEST_WARMUP_ITERATIONS; index++)
+      engine.beginResponse().scramble(sample, { font: "body" });
+    await setImmediate();
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
