@@ -1,6 +1,6 @@
 # [R17] Runtime capacity, lifecycle, and observability
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#34](https://github.com/brip-io/glyphscramble/issues/34)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Implemented in [PR #47](https://github.com/brip-io/glyphscramble/pull/47) · **GitHub issue:** [#34](https://github.com/brip-io/glyphscramble/issues/34)
 > **Blocked by:** R16 · **Blocks:** R12 performance and reliability qualification
 
 ## Objective
@@ -82,4 +82,47 @@ A capacity report combines measured generation rate, configured concurrency, fac
 
 ## Exit criteria
 
-The runtime sustains its documented rate, absorbs bounded near-ready waits, performs no active-map scans on ordinary requests, reuses and closes workers, rejects impossible work before compression, exposes content-safe diagnostics, drains without invalidating live fonts prematurely, and produces stable CI plus controlled R12 performance evidence.
+The runtime sustains its documented rate, absorbs bounded near-ready waits, performs no active-map scans on ordinary requests, reuses and closes workers, rejects impossible work before compression, exposes content-safe diagnostics, drains without invalidating live fonts prematurely, and produces stable CI inputs for controlled R12 performance qualification.
+
+## Implementation evidence
+
+- [PR #47](https://github.com/brip-io/glyphscramble/pull/47) adds lazy
+  `scrambleAsync()` acquisition with FIFO queue, timeout, cancellation, and
+  queue bounds. Existing `scramble()` remains the explicit immediate
+  fail-closed path, and an unused response context consumes no variant.
+- `ResponsePoolVariantProvider` now separates ready, active, and ordered expiry
+  indexes; `font()` is a direct map lookup and one timer follows only the
+  heap's earliest expiry. A 12,000-entry ordered-index fixture and a regression
+  for unchanged timer scheduling pin those properties.
+- The provider reserves a conservative normalized-font-plus-mapping estimate
+  before queueing compression and reconciles actual retained bytes afterward.
+  Prepared families and their lockfile load once per engine startup, and
+  generation percentiles are cached until the bounded raw sample set changes.
+- A fixed-size `Woff2WorkerPool` reuses file-backed workers, transfers font
+  buffers, replaces crashed or cancelled workers before admitting dependent
+  work, recycles them at a configured job count, and closes outstanding
+  maintenance deterministically.
+- `onEvent`, `metrics()`, `capacityReport()`, `doctor --capacity`, and
+  `benchmark --target-rps` expose aggregate operational evidence without text,
+  mappings, tokens, seeds, variant IDs, or face names. Host parallelism and
+  worker oversubscription are included in capacity guidance.
+- `engine.drain()` rejects new leases and waiters, stops generation, and serves
+  issued fonts until expiry or a bounded deadline. Astro, Nuxt, and SvelteKit
+  propagate request aborts, the Next wrapper awaits the bounded async path, and
+  server examples drain on shutdown.
+- Runtime benchmark fixtures publish raw samples and compare p95-model capacity
+  with measured finite-pool throughput for 123 KB and padded 1 MB faces. The
+  smoke policy tolerates an isolated scheduler outlier but fails sustained
+  regression; R12 still owns controlled release qualification.
+- The reproducible WOFF 1.0 table-cache prototype reused 19 of 21 Inter tables
+  and loaded in Chromium, Firefox, and WebKit, but produced fonts 23.4% larger
+  than WOFF2. The reviewed v0.1 decision is therefore to retain WOFF2 and its
+  persistent worker pool.
+
+## Review record
+
+R17 closes review findings P3, P4, P5, P10, and D7, and operationally mitigates
+P2 and U1 without weakening their fail-closed boundary. It also closes the
+shared-runner methodology portion of P12. Process-local variants still require
+request affinity or an external provider; R12 owns controlled-hardware,
+multi-instance, and release qualification.

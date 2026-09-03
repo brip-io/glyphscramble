@@ -105,5 +105,5 @@ review. PR #44 removed modulo reduction and request-time repertoire work; the
 post-merge documentation audit found that P11's format 4 assignment remained
 open, so PR #45 corrected it before this design was marked implemented. R16
 also removed request-path work and measurement contamination that contributed
-to P12, while R17 and R12 retain ownership of stable shared-runner capacity and
-final qualification methodology.
+to P12. R17 now supplies stable shared-runner capacity methodology, while R12
+retains final controlled-hardware and release qualification.

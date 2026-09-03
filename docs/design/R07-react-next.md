@@ -53,8 +53,9 @@ Turbopack can evaluate the same user helper independently in the page and Route
 Handler bundles. `createNextGlyphs()` therefore stores its initialization
 promise in a process-global registry keyed by stable configuration and working
 directory. This preserves one process-local variant pool across those module
-boundaries and removes failed/closed entries. It does not solve cross-process
-or serverless coordination, which remains blocked on R17.
+boundaries and removes failed/closed entries. R17 adds bounded acquisition,
+capacity guidance, and drain for that process-local pool; cross-process or
+serverless coordination still requires affinity or an external provider.
 
 The React adapter keys its effect by serialized payload semantics rather than
 object identity, exposes the shared generic error option, and marks its server
