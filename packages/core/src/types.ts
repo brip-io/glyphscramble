@@ -166,8 +166,25 @@ export interface ScrambleOptions {
   cspNonce?: string;
 }
 
+export interface OptionalScrambleOptions extends ScrambleOptions {
+  /** Explicit per-block opt-in: omit unsupported content instead of throwing. */
+  unsupported: "omit";
+}
+
+export interface GlyphContentDiagnostic {
+  readonly code: "GLYPH_CONTENT_UNSUPPORTED";
+  readonly codepoint: string;
+  readonly normalization: "nfc" | "not-nfc";
+  readonly font: string;
+  readonly face: string;
+  readonly remediation: string;
+}
+
+export type GlyphProtectionResult =
+  | { readonly status: "protected"; readonly payload: GlyphPayload }
+  | { readonly status: "omitted"; readonly error: GlyphContentDiagnostic };
+
 export interface ResponseContext {
-  readonly token: string;
   /** True only after at least one protected payload has been emitted. */
   readonly used: boolean;
   usage(): ResponseUsage;
@@ -178,6 +195,17 @@ export interface ResponseContext {
     options: ScrambleOptions,
     acquisition?: GlyphAcquisitionOptions,
   ): Promise<GlyphPayload>;
+  /** Explicit optional-block boundary. Omitted results never contain plaintext. */
+  protect(
+    text: string,
+    options: OptionalScrambleOptions,
+  ): GlyphProtectionResult;
+  /** Async optional-block boundary with the same no-plaintext result contract. */
+  protectAsync(
+    text: string,
+    options: OptionalScrambleOptions,
+    acquisition?: GlyphAcquisitionOptions,
+  ): Promise<GlyphProtectionResult>;
 }
 
 export interface GlyphAcquisitionOptions {
@@ -342,7 +370,7 @@ export interface PreparedFontFamilyMetadata {
 
 export interface GlyphLockfile {
   version: 2;
-  toolVersion: "0.1.0-beta.0";
+  toolVersion: string;
   unicodeVersion: "17.0.0";
   generatedAt: string;
   fonts: Record<string, PreparedFontFamilyMetadata>;

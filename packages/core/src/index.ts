@@ -1,4 +1,17 @@
 export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
+export { PACKAGE_VERSION } from "./generated/version.js";
+export {
+  GLYPH_CONTENT_REPAIR_URL,
+  GlyphContentError,
+} from "./content-error.js";
+export { GLYPH_FONT_REPAIR_URL, GlyphFontError } from "./font-error.js";
+export type { GlyphFontErrorCode } from "./font-error.js";
+export {
+  MAX_COVERAGE_RANGES,
+  MAX_COVERAGE_RANGE_BYTES,
+  MAX_GLYPH_PAYLOAD_BYTES,
+  MAX_TIMER_DELAY_MS,
+} from "./limits.js";
 export {
   createGlyphEngine,
   protectedResponseHeaders,
@@ -76,6 +89,7 @@ export type {
 } from "./remote.js";
 export {
   compactEncodeMapping,
+  assertTextSupported,
   createPermutation,
   createPermutationFromPlan,
   createPermutationPlan,
@@ -84,6 +98,7 @@ export {
   PERMUTATION_ALGORITHM,
   propertySignature,
   UNICODE_VERSION,
+  UnsupportedTextError,
 } from "./unicode.js";
 export type {
   CodePointMapping,
@@ -108,6 +123,8 @@ export type {
   GlyphEngineMetrics,
   GlyphLockfile,
   GlyphPayload,
+  GlyphProtectionResult,
+  GlyphContentDiagnostic,
   GlyphPayloadCoverage,
   GlyphPayloadFace,
   GlyphRuntimeEvent,
@@ -116,5 +133,6 @@ export type {
   PreparedFontFamilyMetadata,
   ResponseContext,
   ResponseUsage,
+  OptionalScrambleOptions,
   ScrambleOptions,
 } from "./types.js";

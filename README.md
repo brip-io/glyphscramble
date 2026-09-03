@@ -114,6 +114,14 @@ must not be deployed across isolated instances without it. There is no implicit
 time-window fallback. See [Runtime capacity and shutdown](docs/RUNTIME-CAPACITY.md)
 for sizing, aggregate events, and graceful drain.
 
+Unsupported content fails before a response variant is leased. Required blocks
+use `scramble()`/`scrambleAsync()` and receive an actionable
+`GlyphContentError`; optional blocks can explicitly use
+`protect(..., { unsupported: "omit" })` (also available as `glyphs.protect()`
+in Next) and render a generic status when the result is `omitted`. The omitted
+result contains no source text. See
+[Unsupported content](docs/USAGE-GUIDE.md#unsupported-content).
+
 Generate production secrets with `openssl rand -base64 48`. To rotate without
 invalidating live documents, deploy a new `keyId` and current secret while
 retaining the prior ID/environment variable in `previousKeys` for at least the
@@ -218,6 +226,7 @@ glyphscramble inspect     report tables, coverage, format, axes, and color data
 glyphscramble doctor      find client risks, verify static output, or check runtime capacity
 glyphscramble benchmark   measure pool startup, sustainable rate, encoding, token validation, and font responses
 glyphscramble static      post-process a static build
+glyphscramble --version   print the package-derived CLI version
 ```
 
 ## Packages

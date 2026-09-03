@@ -21,6 +21,19 @@ face authorization, and variant availability before provider lookup. Invalid
 requests return controlled 4xx responses. `HEAD` reads only prepared bytes, and
 successful font cache lifetime never exceeds the remaining token lifetime.
 
+The encrypted token is a bearer coordination value, not a secret-content
+boundary, and it appears in the font URL path. That path is visible in browser
+developer tools and resource timing, can enter browser history when navigated
+or copied, and is commonly captured by reverse-proxy, CDN, load-balancer,
+application, tracing, and access logs. Redact the token path segment before
+logging (for example, normalize `/_glyphscramble/font/<token>/<face>` to
+`/_glyphscramble/font/[redacted]/<face>`), disable request-target capture for
+the route where practical, and never attach full font URLs to errors or traces.
+Keep protected documents `private, no-store`; cache successful fonts only as
+the handler specifies (`private`, immutable, and no longer than the remaining
+token lifetime). Do not promote these URLs into shared caches, analytics,
+referrer-bearing links, or monitoring labels.
+
 The variant bytes are process state and are retained only until token expiry. A process restart, request routed to the wrong instance, expired variant, generation timeout, full queue, or exhausted byte budget fails closed; the font endpoint never reconstructs the WOFF2 on its request path and never reassigns a consumed mapping. Deployments need affinity or a future external provider if documents and fonts can reach different instances. Metrics contain only counters, byte/queue gauges, and timings—never content, seeds, tokens, mappings, or variant ids.
 
 The font pipeline preserves outline, variation, color, GSUB, and GPOS bytes and replaces `cmap` plus required `head` checksum state. WOFF2 uses the Google WOFF2 implementation compiled to WASM in bounded worker jobs before a response consumes the variant. TTC collections are rejected in 0.1.

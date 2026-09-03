@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { availableParallelism } from "node:os";
+import { assertTimerDelay, MAX_TIMER_DELAY_MS } from "./limits.js";
 import { performance } from "node:perf_hooks";
 import { buildSfnt, parseSfnt, remapCmap } from "./sfnt.js";
 import {
@@ -462,6 +463,12 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       if (!Number.isSafeInteger(value) || value < 1)
         throw new Error(`Variant provider ${name} must be a positive integer.`);
     }
+    for (const name of [
+      "generationTimeoutMs",
+      "acquisitionTimeoutMs",
+      "drainTimeoutMs",
+    ] as const)
+      assertTimerDelay(options[name], `Variant provider ${name}`);
     if (options.poolLowWatermark > options.poolHighWatermark)
       throw new Error(
         "Variant provider poolLowWatermark must not exceed poolHighWatermark.",
@@ -508,6 +515,7 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
 
   acquire(expiresAt: number): FontVariantLease {
     this.#assertRunning();
+    this.#assertExpiry(expiresAt);
     this.#pruneExpired();
     const variant = this.#shiftReady();
     if (!variant) {
@@ -524,22 +532,18 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     expiresAt: number,
     acquisition: GlyphAcquisitionOptions = {},
   ): Promise<FontVariantLease> {
+    const timeoutMs =
+      acquisition.timeoutMs ?? this.options.acquisitionTimeoutMs;
     try {
       this.#assertRunning();
+      this.#assertExpiry(expiresAt);
+      assertTimerDelay(timeoutMs, "Variant acquisition timeout");
       this.#pruneExpired();
       const variant = this.#shiftReady();
       if (variant) return Promise.resolve(this.#lease(variant, expiresAt));
     } catch (error) {
       return Promise.reject(error);
     }
-    const timeoutMs =
-      acquisition.timeoutMs ?? this.options.acquisitionTimeoutMs;
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
-      return Promise.reject(
-        new TypeError(
-          "Variant acquisition timeout must be a positive integer.",
-        ),
-      );
     if (acquisition.signal?.aborted) {
       this.#counters.acquisitionCancellations++;
       return Promise.reject(
@@ -743,10 +747,11 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     if (this.#state === "closed") return Promise.resolve();
     if (this.#drainPromise) return this.#drainPromise;
     const timeoutMs = options.timeoutMs ?? this.options.drainTimeoutMs;
-    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
-      return Promise.reject(
-        new TypeError("Variant drain timeout must be a positive integer."),
-      );
+    try {
+      assertTimerDelay(timeoutMs, "Variant drain timeout");
+    } catch (error) {
+      return Promise.reject(error);
+    }
     const startedAt = this.now();
     this.#state = "draining";
     this.#emit("drain-started");
@@ -871,8 +876,7 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
   }
 
   #lease(variant: StoredVariant, expiresAt: number): FontVariantLease {
-    if (!Number.isFinite(expiresAt) || expiresAt <= this.now())
-      throw new TypeError("Variant expiry must be in the future.");
+    this.#assertExpiry(expiresAt);
     variant.expiresAt = expiresAt;
     this.#active.set(variant.id, variant);
     this.#expiry.push({ id: variant.id, expiresAt });
@@ -966,16 +970,18 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     this.#expiryTimer = undefined;
     this.#scheduledExpiry = nextExpiry;
     if (nextExpiry === undefined) return;
-    this.#expiryTimer = setTimeout(
-      () => {
-        this.#expiryTimer = undefined;
-        this.#scheduledExpiry = undefined;
-        this.#pruneExpired();
-        this.#scheduleRefill();
-        this.#scheduleExpiryMaintenance();
-      },
-      Math.min(2_147_483_647, Math.max(1, nextExpiry - this.now())),
+    const delay = Math.min(
+      MAX_TIMER_DELAY_MS,
+      Math.max(1, nextExpiry - this.now()),
     );
+    assertTimerDelay(delay, "Variant expiry maintenance delay");
+    this.#expiryTimer = setTimeout(() => {
+      this.#expiryTimer = undefined;
+      this.#scheduledExpiry = undefined;
+      this.#pruneExpired();
+      this.#scheduleRefill();
+      this.#scheduleExpiryMaintenance();
+    }, delay);
     this.#expiryTimer.unref?.();
   }
 
@@ -1004,6 +1010,12 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     if (this.#state === "draining") throw new VariantDrainingError();
     if (this.#state === "closed")
       throw new VariantCancelledError("Provider is closed.");
+  }
+
+  #assertExpiry(expiresAt: number): void {
+    if (!Number.isFinite(expiresAt) || expiresAt <= this.now())
+      throw new TypeError("Variant expiry must be in the future.");
+    assertTimerDelay(Math.ceil(expiresAt - this.now()), "Variant expiry delay");
   }
 
   async #waitForActive(timeoutMs: number, signal?: AbortSignal): Promise<void> {
