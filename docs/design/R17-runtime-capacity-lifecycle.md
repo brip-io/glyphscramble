@@ -11,6 +11,11 @@ Turn the one-use variant pool from a bounded burst buffer into an operable runti
 
 The 2026-09-03 review measured WOFF2 generation at roughly 430 ms for a 123 KB face and 2.2–2.4 s for a padded 1 MB face locally, approximately twice as slow on shared CI. Two generators therefore sustain only a few Latin responses per second and less than one large-face response per second. Exhaustion throws during page rendering. `acquire()` and `font()` scan the active map and re-arm expiry timers on every call; each compression spawns a worker; capacity is checked only after generation; non-required generation failures increment a counter without an operator event. The shared-runner 10 ms acquisition p95 gate is also marginal and has repeatedly left `main` red despite documentation-only changes.
 
+As immediate containment, CI runs the existing strict benchmark on every push
+to `main` and on pull requests that change core/runtime inputs; documentation-
+only pull requests no longer retry a timing gate they cannot affect. This does
+not alter the ceiling or replace the stable methodology required here.
+
 ## Goals
 
 - Express capacity as sustainable response rate, burst size, latency, CPU, and memory.
