@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
+import { setImmediate } from "node:timers/promises";
 import { URL } from "node:url";
 import {
   buildSfnt,
@@ -144,7 +145,7 @@ async function run(label, source, ceilings) {
     // prepared-byte refills settle before timing the separate font-response
     // phase, otherwise scheduler jitter is charged to whichever request happens
     // to yield next rather than to the pool-generation metric that owns it.
-    await new Promise((resolve) => setImmediate(resolve));
+    await setImmediate();
     for (const payload of payloads) {
       const responseStarted = performance.now();
       const font = await engine.fontResponse(
