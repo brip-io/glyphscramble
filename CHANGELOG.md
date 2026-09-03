@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Emit static fonts, CSS, JavaScript, and manifests under byte-derived build identities; add subpath-safe URLs, a strict-CSP fail-closed loader, persistent `aria-hidden` protection, generic accessible failure status, and deployment verification so stale CDN assets cannot silently pair with newer HTML.
 - Replace serialized payload CSS with a validated data-only contract and one reference-counted client lifecycle so exact font loads, reactive updates, CSP nonces, failures, and unmount cleanup behave consistently across framework adapters; precompute stable Unicode property groups so response rotation does not repeatedly classify the same face.
 - Bind encrypted tokens to validated lifetimes, rotating key IDs, prepared variants, and only the faces used by a response; malformed and unauthorized font requests now fail cheaply while unprotected framework responses retain their cache policy.
 - Compile static protection through a validated fresh-tree plan and transactional publish so unsafe, hydrated, stale-output, and unmappable content fails without changing the source or prior deployment.

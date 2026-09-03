@@ -80,6 +80,15 @@ export interface GlyphConfig {
     /** Combined byte ceiling for ready and issued WOFF2 variants. */
     cacheMaxBytes?: number;
   };
+  /** Build-time delivery policy for the reusable static mapping fallback. */
+  static?: {
+    /** Root-relative deployment path, for example `/` or `/docs`. */
+    publicBasePath?: `/${string}`;
+    /** Maximum wait before the generic fail-closed status is shown. */
+    fontLoadTimeoutMs?: number;
+    /** Static output never substitutes plaintext after a font failure. */
+    fontFailure?: "generic-error";
+  };
 }
 
 declare const glyphPayloadBrand: unique symbol;

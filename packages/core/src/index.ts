@@ -28,13 +28,20 @@ export {
   prepareGlyphFonts,
   summarizeCoverage,
 } from "./font-pipeline.js";
-export { buildStaticSite, STATIC_BUILD_WARNING } from "./static-site.js";
+export {
+  buildStaticSite,
+  STATIC_BUILD_WARNING,
+  staticGlyphCspDirectives,
+  verifyStaticOutput,
+} from "./static-output.js";
 export type {
   StaticBuildManifest,
+  StaticGlyphCspDirectives,
+  StaticManifestAsset,
   StaticManifestHtmlFile,
   StaticSiteOptions,
   StaticSiteResult,
-} from "./static-site.js";
+} from "./static-output.js";
 export {
   DEFAULT_STATIC_HYDRATION_DETECTORS,
   StaticBuildPlanError,

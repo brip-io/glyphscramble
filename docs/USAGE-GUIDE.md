@@ -69,10 +69,13 @@ block and produce a manifest warning. A different nested font is ambiguous and
 fails. Unmarked HTML and non-HTML files retain their exact bytes. Always compile
 from the original generator output, never from a previously protected tree.
 
-`glyphscramble-static-manifest.json` records source HTML SHA-256 values,
-transformed files, selected fonts, the algorithm version, a one-way seed
-identity, and warnings. It contains neither the mapping seed nor protected
-plaintext.
+The content-addressed static manifest records source HTML SHA-256 values,
+transformed files, the complete asset graph, selected font identities, the
+algorithm version, a one-way seed identity, and warnings. It contains neither
+the mapping seed nor protected plaintext. Run
+`glyphscramble doctor --static-output <directory>` before publishing; it rejects
+tampered assets, stale HTML references, and trees containing more than one
+build manifest.
 
 ## Caching
 
@@ -88,7 +91,10 @@ accepted. GlyphScramble derives a separate AES key for each ID and refuses
 startup if any configured secret is missing or shorter than 32 characters.
 Token lifetimes cannot exceed 24 hours.
 
-Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Rotate by rebuilding and deploy each output tree as one unit. Byte-derived immutable asset names and mixed-build deployment verification remain R03 release gates, so do not apply indefinite caching to the current beta asset names or mix pages and assets from different builds.
+Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Rotate by rebuilding and deploy each output tree as one unit. Font, CSS, JavaScript, and manifest names contain SHA-256 digests of their bytes and sit below a build-ID directory, so they may use long-lived immutable caching. HTML must revalidate, and a static manifest should use `no-cache`; never combine HTML and assets from different output trees.
+
+For exact subpath, cache, CSP, and atomic-publication settings, see
+[Static deployment](STATIC-DEPLOYMENT.md).
 
 ## Accessibility
 

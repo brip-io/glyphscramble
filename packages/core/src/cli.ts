@@ -5,7 +5,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { buildStaticSite } from "./static-site.js";
+import { buildStaticSite, verifyStaticOutput } from "./static-output.js";
 import { createGlyphEngine } from "./engine.js";
 import { inspectFont, prepareGlyphFonts } from "./font-pipeline.js";
 import { createPermutation } from "./unicode.js";
@@ -17,9 +17,9 @@ Usage:
   glyphscramble init [--framework next|nuxt|sveltekit|astro|vite]
   glyphscramble prepare [--config glyphscramble.config.ts]
   glyphscramble inspect <font-file>
-  glyphscramble doctor [--root src]
+  glyphscramble doctor [--root src] [--static-output dist-protected]
   glyphscramble benchmark [--config glyphscramble.config.ts]
-  glyphscramble static --input dist --output dist-protected [--existing-output replace|reject] [--config glyphscramble.config.ts]
+  glyphscramble static --input dist --output dist-protected [--public-base-path /] [--font-timeout-ms 8000] [--existing-output replace|reject] [--config glyphscramble.config.ts]
 
 GlyphScramble raises the cost of bulk DOM scraping. It is not DRM and does not
 stop headless browsers, OCR, font analysis, plaintext APIs, feeds, or metadata.
@@ -72,6 +72,11 @@ export default defineGlyphConfig({
     generationQueueLimit: 64,
     generationTimeoutMs: 10_000,
     cacheMaxBytes: 64 * 1024 * 1024,
+  },
+  static: {
+    publicBasePath: "/",
+    fontLoadTimeoutMs: 8_000,
+    fontFailure: "generic-error",
   },
   routePrefix: "/_glyphscramble",
   unsupported: "error",
@@ -400,6 +405,9 @@ async function main(): Promise<void> {
       output: { type: "string" },
       seed: { type: "string" },
       "existing-output": { type: "string", default: "replace" },
+      "static-output": { type: "string" },
+      "public-base-path": { type: "string" },
+      "font-timeout-ms": { type: "string" },
     },
   });
   if (command === "init") await init(parsed.values.framework);
@@ -419,7 +427,9 @@ async function main(): Promise<void> {
     );
     process.stdout.write(JSON.stringify(inspected.metadata, null, 2) + "\n");
   } else if (command === "doctor") {
-    const findings = await doctor(parsed.values.root!);
+    const findings = parsed.values["static-output"]
+      ? await verifyStaticOutput(parsed.values["static-output"])
+      : await doctor(parsed.values.root!);
     process.stdout.write(
       findings
         .map(
@@ -445,6 +455,12 @@ async function main(): Promise<void> {
         inputDir: parsed.values.input,
         outputDir: parsed.values.output,
         existingOutput,
+        ...(parsed.values["public-base-path"]
+          ? { publicBasePath: parsed.values["public-base-path"] }
+          : {}),
+        ...(parsed.values["font-timeout-ms"]
+          ? { fontLoadTimeoutMs: Number(parsed.values["font-timeout-ms"]) }
+          : {}),
         ...(parsed.values.seed ? { seed: parsed.values.seed } : {}),
       },
     );

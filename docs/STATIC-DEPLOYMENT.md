@@ -1,0 +1,97 @@
+# Static deployment
+
+Static mode is a per-build fallback for non-hydrated HTML. It preserves CDN
+caching, but every visitor receives the same downloadable mapping until the
+next build. Use per-response SSR for the highest-value material; use static
+mode only for optional, opted-in blocks where that weaker boundary is
+acceptable.
+
+## Configure and build
+
+```ts
+export default defineGlyphConfig({
+  // fonts, rotation, and the required accessibility acknowledgement omitted
+  static: {
+    publicBasePath: "/docs",
+    fontLoadTimeoutMs: 8_000,
+    fontFailure: "generic-error",
+  },
+});
+```
+
+`publicBasePath` is the URL prefix where the output root is mounted. Use `/`
+for a root deployment or a root-relative subpath such as `/docs`; nested pages
+receive the same absolute, subpath-safe asset URLs. Remote asset origins are
+not accepted in this field. Route them through the same public origin if a CDN
+stores the bytes elsewhere.
+
+```bash
+npx glyphscramble prepare
+npx glyphscramble static --input dist --output dist-protected
+npx glyphscramble doctor --static-output dist-protected
+```
+
+The publisher stages and verifies a complete sibling tree before replacing the
+destination. Upload that tree as one release. Do not merge it into an existing
+output directory: an old and new manifest in one tree is deliberately rejected
+as a mixed build. Hosts without an atomic directory swap should publish to a
+new versioned prefix, verify it, then switch routing to that prefix.
+
+## Cache policy
+
+The generated font, CSS, JavaScript, and manifest filenames contain SHA-256
+digests of their emitted bytes and live below `/_glyphscramble/<build-id>/`.
+Apply these response policies:
+
+| Resource                                           | Recommended `Cache-Control`                                              | Reason                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Hashed fonts, CSS, JavaScript, and license notices | `public, max-age=31536000, immutable`                                    | A changed byte creates a new build path; notices ship with that immutable build. |
+| Transformed HTML                                   | `public, max-age=0, must-revalidate` or the site's normal short HTML TTL | HTML selects the build and must not outlive its referenced asset tree.           |
+| Hashed manifest                                    | `public, no-cache`                                                       | The name is immutable, while revalidation keeps deployment checks operational.   |
+
+Keep the prior build directory available for at least the maximum HTML cache
+lifetime during a routing change. Run `doctor --static-output` on the exact
+tree being uploaded and, where possible, on a downloaded deployment artifact.
+
+## Content Security Policy
+
+All generated code and styles are external files. There is no inline script,
+inline style attribute, `eval`, or runtime nonce requirement in static mode.
+The smallest standalone policy is:
+
+```text
+default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'
+```
+
+The same values are available from `staticGlyphCspDirectives()`. Merge them
+with the site's existing image, connection, frame, and other sources rather
+than replacing a broader application policy. If a reverse proxy exposes the
+asset path from a separate origin, add that exact HTTPS origin to `script-src`,
+`style-src`, and `font-src`; a nonce authorizes inline code and does not
+authorize these external font or asset requests. CSP hashes are unnecessary
+for byte-addressed external files, though a host may add SRI independently.
+
+If CSS is blocked, the block's native `hidden` attribute prevents encoded text
+from appearing and the generic status remains visible. If JavaScript is
+blocked, the stylesheet reveals the generic status after the configured
+timeout. A missing, corrupt, or disallowed font follows the same fail-closed
+path.
+
+## Accessibility and SEO
+
+The compiler writes `hidden` and `aria-hidden="true"` into every protected
+element before the HTML reaches a browser. The attribute remains in loading,
+ready, and failure states. A separate live status contains only the generic
+failure message; no plaintext mirror is generated.
+
+This is intentionally not WCAG-conformant: a sighted reader may see content
+that assistive technology cannot access. Restrict protection to non-essential,
+opted-in high-value blocks and provide an accessible acquisition route outside
+the protected representation. Never protect navigation, headings, forms,
+prices required to transact, legal or safety text, or account recovery.
+
+Search crawlers see encoded scalars rather than meaningful words. Keep titles,
+descriptions, headings, link context, structured data, and enough nearby
+summary copy unprotected. Do not restore plaintext through hidden DOM,
+`aria-label`, JSON-LD, OpenGraph, feeds, source maps, or client bundles; each is
+a scraping side channel.
