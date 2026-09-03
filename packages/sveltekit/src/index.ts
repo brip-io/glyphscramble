@@ -1,6 +1,6 @@
 import {
   createGlyphEngine,
-  protectedResponseHeaders,
+  responseHeadersForContext,
   type GlyphConfig,
   type ResponseContext,
 } from "@brip/glyphscramble";
@@ -24,12 +24,13 @@ export async function createGlyphHandle(
   return async ({ event, resolve }) => {
     if (event.url.pathname.startsWith(`${config.routePrefix}/font/`))
       return engine.fontResponse(event.request);
-    event.locals.glyphscramble = engine.beginResponse();
+    const responseContext = engine.beginResponse();
+    event.locals.glyphscramble = responseContext;
     const response = await resolve(event);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: protectedResponseHeaders(response.headers),
+      headers: responseHeadersForContext(responseContext, response.headers),
     });
   };
 }

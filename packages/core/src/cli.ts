@@ -60,6 +60,7 @@ export default defineGlyphConfig({
   },
   rotation: {
     scope: "response",
+    keyId: "current",
     secretEnv: "GLYPHSCRAMBLE_SECRET",
     tokenTtlSeconds: 600,
   },
@@ -284,11 +285,17 @@ async function benchmark(configPath: string): Promise<void> {
       ),
     },
   };
-  const secretName = config.rotation.secretEnv;
-  const oldSecret = process.env[secretName];
-  if (!oldSecret)
-    process.env[secretName] =
-      "local glyphscramble benchmark secret, never used in production";
+  const secretEnvironments = [
+    config.rotation.secretEnv,
+    ...(config.rotation.previousKeys ?? []).map((key) => key.secretEnv),
+  ];
+  const oldSecrets = new Map(
+    secretEnvironments.map((name) => [name, process.env[name]]),
+  );
+  for (const name of secretEnvironments)
+    if (!process.env[name])
+      process.env[name] =
+        "local glyphscramble benchmark secret, never used in production";
   const encoding: number[] = [];
   const acquisition: number[] = [];
   const response: number[] = [];
@@ -348,8 +355,10 @@ async function benchmark(configPath: string): Promise<void> {
     );
   } finally {
     if (engine) await engine.close();
-    if (oldSecret === undefined) delete process.env[secretName];
-    else process.env[secretName] = oldSecret;
+    for (const [name, value] of oldSecrets) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 }
 

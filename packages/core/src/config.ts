@@ -5,6 +5,8 @@ import { parseCoverage } from "./coverage.js";
 const HTTPS = /^https:\/\//i;
 const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
 const MAX_RUNTIME_CACHE_BYTES = 1024 * 1024 * 1024;
+const MAX_TOKEN_TTL_SECONDS = 86_400;
+const TOKEN_KEY_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
 
 export function defineGlyphConfig<const T extends GlyphConfig>(config: T): T {
   validateGlyphConfig(config);
@@ -22,9 +24,32 @@ export function validateGlyphConfig(config: GlyphConfig): void {
   }
   if (
     !Number.isInteger(config.rotation.tokenTtlSeconds) ||
-    config.rotation.tokenTtlSeconds < 1
+    config.rotation.tokenTtlSeconds < 1 ||
+    config.rotation.tokenTtlSeconds > MAX_TOKEN_TTL_SECONDS
   ) {
-    throw new Error("rotation.tokenTtlSeconds must be a positive integer.");
+    throw new Error(
+      `rotation.tokenTtlSeconds must be a positive integer no greater than ${MAX_TOKEN_TTL_SECONDS}.`,
+    );
+  }
+  const currentKeyId = config.rotation.keyId ?? "current";
+  if (!TOKEN_KEY_ID.test(currentKeyId))
+    throw new Error(`Invalid rotation.keyId: ${currentKeyId}`);
+  if (!config.rotation.secretEnv)
+    throw new Error(
+      "rotation.secretEnv must name the current secret variable.",
+    );
+  const previousKeys = config.rotation.previousKeys ?? [];
+  if (previousKeys.length > 3)
+    throw new Error("rotation.previousKeys accepts at most three keys.");
+  const keyIds = new Set([currentKeyId]);
+  for (const key of previousKeys) {
+    if (!TOKEN_KEY_ID.test(key.id))
+      throw new Error(`Invalid previous token key id: ${key.id}`);
+    if (!key.secretEnv)
+      throw new Error(`Previous token key ${key.id} must name a secretEnv.`);
+    if (keyIds.has(key.id))
+      throw new Error(`Duplicate GlyphScramble token key id: ${key.id}`);
+    keyIds.add(key.id);
   }
   if (!config.routePrefix.startsWith("/") || config.routePrefix.endsWith("/")) {
     throw new Error("routePrefix must begin with, and not end with, '/'.");

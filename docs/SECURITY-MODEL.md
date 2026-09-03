@@ -12,7 +12,12 @@ The approved claim is: **GlyphScramble raises the cost of bulk DOM scraping.**
 | Client-side plaintext, API, RSS, JSON-LD, OpenGraph, CMS feed | Plaintext if publisher exposes it              | Outside the protected boundary |
 | Screenshot or copy by an authorized human                     | Recoverable content                            | Not prevented                  |
 
-Each response consumes one CSPRNG-seeded font variant from a bounded pre-generation pool. The AES-256-GCM encrypted, versioned, expiring token carries the random seed, random variant id, authorized configured faces, and explicit `response-pool` mode. Encryption prevents callers from minting arbitrary font work and coordinates the text/font pair. It does not make the content secret because the valid font contains a recoverable mapping.
+Each protected response consumes one CSPRNG-seeded font variant from a bounded pre-generation pool. The AES-256-GCM encrypted, versioned, expiring token carries a key ID, random seed, random variant ID, only the prepared faces used by that response context, issuance/expiry times, and explicit `response-pool` mode. Domain-separated active and previous keys support bounded zero-downtime rotation. Encryption prevents callers from minting arbitrary font work and coordinates the text/font pair. It does not make the content secret because the valid font contains a recoverable mapping.
+
+The font handler validates method, path encoding, token version/key/lifetime,
+face authorization, and variant availability before provider lookup. Invalid
+requests return controlled 4xx responses. `HEAD` reads only prepared bytes, and
+successful font cache lifetime never exceeds the remaining token lifetime.
 
 The variant bytes are process state and are retained only until token expiry. A process restart, request routed to the wrong instance, expired variant, generation timeout, full queue, or exhausted byte budget fails closed; the font endpoint never reconstructs the WOFF2 on its request path and never reassigns a consumed mapping. Deployments need affinity or a future external provider if documents and fonts can reach different instances. Metrics contain only counters, byte/queue gauges, and timings—never content, seeds, tokens, mappings, or variant ids.
 

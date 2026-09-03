@@ -1,114 +1,209 @@
 import {
   createCipheriv,
   createDecipheriv,
-  createHash,
+  createHmac,
   randomBytes,
-  timingSafeEqual,
 } from "node:crypto";
 
+const TOKEN_VERSION = 2;
+const TOKEN_MAX_BYTES = 4_096;
+const KEY_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
+const FACE_ID = /^[a-z][a-z0-9_-]*@[a-z][a-z0-9_-]*$/i;
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+
+export interface TokenKey {
+  readonly id: string;
+  readonly secret: string;
+}
+
+export interface TokenKeyRing {
+  readonly current: TokenKey;
+  readonly previous?: readonly TokenKey[];
+}
+
 export interface TokenClaims {
-  readonly v: 1;
+  readonly v: 2;
+  readonly kid: string;
   readonly seed: string;
   readonly iat: number;
   readonly exp: number;
-  readonly variant?: string;
-  readonly variantMode?: "response-pool";
-  readonly faces?: readonly string[];
+  readonly variant: string;
+  readonly variantMode: "response-pool";
+  readonly faces: readonly string[];
 }
 
 export interface TokenCoordination {
-  readonly seed?: string;
-  readonly variant?: string;
-  readonly variantMode?: "response-pool";
-  readonly faces?: readonly string[];
+  readonly seed: string;
+  readonly variant: string;
+  readonly variantMode: "response-pool";
+  readonly faces: readonly string[];
 }
 
-function keyFromSecret(secret: string): Buffer {
-  if (secret.length < 32)
+export interface TokenValidationOptions {
+  readonly now?: number;
+  readonly maxLifetimeSeconds: number;
+  readonly maxClockSkewSeconds?: number;
+  readonly maxFaces?: number;
+}
+
+function validateKey(key: TokenKey): void {
+  if (!KEY_ID.test(key.id)) throw new Error(`Invalid token key id: ${key.id}`);
+  if (key.secret.length < 32)
     throw new Error(
-      "GLYPHSCRAMBLE_SECRET must contain at least 32 characters.",
+      `GlyphScramble token key ${key.id} must contain at least 32 characters.`,
     );
-  return createHash("sha256").update(secret, "utf8").digest();
+}
+
+function keyFromSecret(key: TokenKey): Buffer {
+  validateKey(key);
+  return createHmac("sha256", key.secret)
+    .update("glyphscramble:token-key:v2\0", "utf8")
+    .update(key.id, "utf8")
+    .digest();
+}
+
+function decodeBase64Url(value: string, label: string): Buffer {
+  if (!BASE64URL.test(value)) throw new Error(`Malformed ${label}.`);
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.length === 0 || decoded.toString("base64url") !== value)
+    throw new Error(`Malformed ${label}.`);
+  return decoded;
+}
+
+function validateCoordination(coordination: TokenCoordination): void {
+  if (decodeBase64Url(coordination.seed, "token seed").length !== 32)
+    throw new Error("GlyphScramble token seed must be 32 bytes.");
+  if (decodeBase64Url(coordination.variant, "variant id").length !== 16)
+    throw new Error("GlyphScramble variant id must be 16 bytes.");
+  if (coordination.variantMode !== "response-pool")
+    throw new Error("Unsupported GlyphScramble token mode.");
+  if (
+    !Array.isArray(coordination.faces) ||
+    coordination.faces.some((face) => !FACE_ID.test(face)) ||
+    new Set(coordination.faces).size !== coordination.faces.length
+  )
+    throw new Error(
+      "GlyphScramble token faces must be unique prepared face ids.",
+    );
 }
 
 export function issueToken(
-  secret: string,
+  key: TokenKey,
   ttlSeconds: number,
+  coordination: TokenCoordination,
   now = Date.now(),
-  coordination: TokenCoordination = {},
 ): TokenClaims & { token: string } {
-  const iat = Math.floor(now / 1000);
+  validateKey(key);
+  validateCoordination(coordination);
+  if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1)
+    throw new Error("GlyphScramble token lifetime must be a positive integer.");
+  const iat = Math.floor(now / 1_000);
   const claims: TokenClaims = {
-    v: 1,
-    seed: coordination.seed ?? randomBytes(32).toString("base64url"),
+    v: TOKEN_VERSION,
+    kid: key.id,
+    seed: coordination.seed,
     iat,
     exp: iat + ttlSeconds,
-    ...(coordination.variant ? { variant: coordination.variant } : {}),
-    ...(coordination.variantMode
-      ? { variantMode: coordination.variantMode }
-      : {}),
-    ...(coordination.faces ? { faces: coordination.faces } : {}),
+    variant: coordination.variant,
+    variantMode: coordination.variantMode,
+    faces: [...coordination.faces].sort(),
   };
+  const keyId = Buffer.from(key.id, "utf8");
+  const header = Buffer.concat([
+    Buffer.from([TOKEN_VERSION, keyId.length]),
+    keyId,
+  ]);
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", keyFromSecret(secret), iv);
-  cipher.setAAD(Buffer.from("glyphscramble:v1"));
+  const cipher = createCipheriv("aes-256-gcm", keyFromSecret(key), iv);
+  cipher.setAAD(header);
   const body = Buffer.concat([
     cipher.update(JSON.stringify(claims)),
     cipher.final(),
   ]);
-  const tag = cipher.getAuthTag();
   return {
     ...claims,
-    token: Buffer.concat([Buffer.from([1]), iv, tag, body]).toString(
+    token: Buffer.concat([header, iv, cipher.getAuthTag(), body]).toString(
       "base64url",
     ),
   };
 }
 
+function keyMap(keyRing: TokenKeyRing): ReadonlyMap<string, TokenKey> {
+  const keys = [keyRing.current, ...(keyRing.previous ?? [])];
+  if (keys.length > 4)
+    throw new Error("GlyphScramble accepts at most three previous token keys.");
+  const result = new Map<string, TokenKey>();
+  for (const key of keys) {
+    validateKey(key);
+    if (result.has(key.id))
+      throw new Error(`Duplicate GlyphScramble token key id: ${key.id}`);
+    result.set(key.id, key);
+  }
+  return result;
+}
+
 export function readToken(
   token: string,
-  secret: string,
-  now = Date.now(),
+  keyRing: TokenKeyRing,
+  options: TokenValidationOptions,
 ): TokenClaims {
   let packed: Buffer;
   try {
-    packed = Buffer.from(token, "base64url");
+    packed = decodeBase64Url(token, "GlyphScramble token");
   } catch {
     throw new Error("Malformed GlyphScramble token.");
   }
-  if (
-    packed.length < 30 ||
-    !timingSafeEqual(packed.subarray(0, 1), Buffer.from([1]))
-  ) {
+  if (packed.length > TOKEN_MAX_BYTES)
+    throw new Error("Malformed GlyphScramble token.");
+  if (packed.length < 31 || packed[0] !== TOKEN_VERSION)
     throw new Error("Unsupported GlyphScramble token.");
-  }
-  const iv = packed.subarray(1, 13);
-  const tag = packed.subarray(13, 29);
-  const body = packed.subarray(29);
+  const keyIdLength = packed[1]!;
+  const headerLength = 2 + keyIdLength;
+  if (keyIdLength < 1 || packed.length < headerLength + 29)
+    throw new Error("Malformed GlyphScramble token.");
+  const keyId = packed.subarray(2, headerLength).toString("utf8");
+  if (!KEY_ID.test(keyId)) throw new Error("Malformed GlyphScramble token.");
+  const key = keyMap(keyRing).get(keyId);
+  if (!key) throw new Error("Unknown GlyphScramble token key.");
+  const header = packed.subarray(0, headerLength);
+  const iv = packed.subarray(headerLength, headerLength + 12);
+  const tag = packed.subarray(headerLength + 12, headerLength + 28);
+  const body = packed.subarray(headerLength + 28);
   try {
-    const decipher = createDecipheriv("aes-256-gcm", keyFromSecret(secret), iv);
-    decipher.setAAD(Buffer.from("glyphscramble:v1"));
+    const decipher = createDecipheriv("aes-256-gcm", keyFromSecret(key), iv);
+    decipher.setAAD(header);
     decipher.setAuthTag(tag);
     const claims = JSON.parse(
       Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8"),
     ) as TokenClaims;
+    const nowSeconds = Math.floor((options.now ?? Date.now()) / 1_000);
+    const skew = options.maxClockSkewSeconds ?? 30;
     if (
-      claims.v !== 1 ||
+      claims.v !== TOKEN_VERSION ||
+      claims.kid !== keyId ||
+      !Number.isSafeInteger(claims.iat) ||
+      !Number.isSafeInteger(claims.exp) ||
+      claims.iat < 0 ||
+      claims.iat > nowSeconds + skew ||
+      claims.exp <= claims.iat ||
+      claims.exp - claims.iat > options.maxLifetimeSeconds ||
       typeof claims.seed !== "string" ||
-      !Number.isInteger(claims.exp) ||
-      (claims.variant !== undefined && typeof claims.variant !== "string") ||
-      (claims.variantMode !== undefined &&
-        claims.variantMode !== "response-pool") ||
-      (claims.faces !== undefined &&
-        (!Array.isArray(claims.faces) ||
-          claims.faces.some((face) => typeof face !== "string")))
+      typeof claims.variant !== "string" ||
+      claims.variantMode !== "response-pool" ||
+      !Array.isArray(claims.faces) ||
+      claims.faces.length > (options.maxFaces ?? 64)
     )
-      throw new Error();
-    if (claims.exp <= Math.floor(now / 1000))
+      throw new Error("Invalid GlyphScramble token claims.");
+    validateCoordination(claims);
+    if (claims.exp <= nowSeconds)
       throw new Error("Expired GlyphScramble token.");
     return claims;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Expired"))
+    if (
+      error instanceof Error &&
+      (error.message.startsWith("Expired") ||
+        error.message.startsWith("Invalid GlyphScramble token claims"))
+    )
       throw error;
     throw new Error("Invalid or tampered GlyphScramble token.");
   }

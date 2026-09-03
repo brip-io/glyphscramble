@@ -1,6 +1,6 @@
 # [R05] Request-engine lifecycle and abuse boundaries
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#6](https://github.com/brip-io/glyphscramble/issues/6)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress in [PR #23](https://github.com/brip-io/glyphscramble/pull/23) · **GitHub issue:** [#6](https://github.com/brip-io/glyphscramble/issues/6)
 > **Blocked by:** R01, R04, R11 · **Blocks:** R07-R10, R12
 
 ## Objective
@@ -68,3 +68,18 @@ The font handler is split into parse, authenticate, authorize, acquire, and resp
 ## Exit criteria
 
 Only authorized faces can be acquired, malformed or expired requests fail cheaply, caches are bounded and coalesced, secrets rotate safely, and unprotected responses preserve their cacheability.
+
+## Implementation notes
+
+Version 2 tokens carry an authenticated key ID and strictly validated issuance,
+expiry, seed, variant, mode, and face claims. The active key plus at most three
+previous keys are loaded from environment variables at startup and derive
+domain-separated AES keys. A response context leases one R01 variant, issues
+progressively authorized tokens as new faces are used, and exposes a
+content-free immutable usage snapshot.
+
+The font route returns controlled method/path/token/authorization errors before
+variant lookup, serves `HEAD` only from prepared bytes, and computes cache age
+from the remaining validated lifetime. Astro, Nuxt, and SvelteKit inspect
+context use after rendering; Next remains route-scoped because its proxy cannot
+observe downstream RSC rendering and is completed by R07.

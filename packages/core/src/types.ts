@@ -40,7 +40,14 @@ export interface GlyphConfig {
   fonts: Readonly<Record<string, FontConfig>>;
   rotation: {
     scope: "response";
+    /** Stable identifier embedded in v2 tokens; change it when rotating secrets. */
+    keyId?: string;
     secretEnv: string;
+    /** Decryption-only keys retained for tokens issued before a rotation. */
+    previousKeys?: readonly {
+      id: string;
+      secretEnv: string;
+    }[];
     tokenTtlSeconds: number;
   };
   routePrefix: `/${string}`;
@@ -105,7 +112,17 @@ export interface ScrambleOptions {
 
 export interface ResponseContext {
   readonly token: string;
+  /** True only after at least one protected payload has been emitted. */
+  readonly used: boolean;
+  usage(): ResponseUsage;
   scramble(text: string, options: ScrambleOptions): GlyphPayload;
+}
+
+export interface ResponseUsage {
+  readonly used: boolean;
+  readonly authorizedFaces: readonly string[];
+  /** Opaque one-use provider identity; never log or expose it to clients. */
+  readonly variantId?: string;
 }
 
 export interface GlyphEngineMetrics {
