@@ -5,7 +5,9 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist/**",
+      "**/.next/**",
       "**/node_modules/**",
+      "**/out/**",
       "packages/core/src/generated/**",
     ],
   },

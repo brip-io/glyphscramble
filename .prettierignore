@@ -1,4 +1,7 @@
 dist
+.next
+out
 node_modules
+.pnpm-store
 pnpm-lock.yaml
 packages/core/src/generated

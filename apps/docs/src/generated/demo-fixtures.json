@@ -1,0 +1,56 @@
+{
+  "sentence": "Independent research deserves deliberate access.",
+  "generatedWith": "@brip/glyphscramble 0.1.0-beta.0",
+  "runtime": {
+    "a": {
+      "id": "runtime-a",
+      "label": "Response A",
+      "encodedText": "Jicawaicaiv nabaynle cabanfab cakjoanyva yllabb.",
+      "family": "GlyphScrambleDemo-runtime-a",
+      "fontFile": "/demo-fixtures/runtime-a.woff2",
+      "fontIdentity": "874771be9274af048984d7a9c728cc754cfc1de766690c1ac25cac9693308d33",
+      "token": "response token (redacted)",
+      "fontUrl": "/_glyphscramble/font/[token]/body%40default.woff2",
+      "documentCache": "private, no-store",
+      "fontCache": "private, max-age=600, immutable"
+    },
+    "b": {
+      "id": "runtime-b",
+      "label": "Response B",
+      "encodedText": "Amoshsmosml gsrsigku osrsgasr ospzesgils ikksrr.",
+      "family": "GlyphScrambleDemo-runtime-b",
+      "fontFile": "/demo-fixtures/runtime-b.woff2",
+      "fontIdentity": "2e7ff2ebbd2952093073466b750c5c7465fc4e4d77452b77b07f768ce4cf0fee",
+      "token": "response token (redacted)",
+      "fontUrl": "/_glyphscramble/font/[token]/body%40default.woff2",
+      "documentCache": "private, no-store",
+      "fontCache": "private, max-age=600, immutable"
+    }
+  },
+  "static": {
+    "a": {
+      "id": "static-a",
+      "label": "Build A",
+      "encodedText": "Xauzezauzao mzkzqmxf uzkzmdzk uzrctzmqoz qxxzkk.",
+      "family": "GlyphScrambleStatic-body-f0523796da913f12",
+      "fontFile": "/demo-fixtures/static-a.woff2",
+      "fontIdentity": "4d7aaac00e426cdf4ba25a3d5c8833089d1f63986fc271de98801607346c7b6f",
+      "fontUrl": "/_glyphscramble/62068f787b17b3f7d9ee7c6dbcdc5190782a80302b2c30697fcec8150187d637/body.4d7aaac00e426cdf4ba25a3d5c8833089d1f63986fc271de98801607346c7b6f.woff2",
+      "documentCache": "public, revalidate",
+      "fontCache": "public, immutable",
+      "buildId": "62068f787b17b3f7d9ee7c6dbcdc5190782a80302b2c30697fcec8150187d637"
+    },
+    "b": {
+      "id": "static-b",
+      "label": "Build B",
+      "encodedText": "Ncwueucwuch sumuqsbo wumuskum wuxtvusqhu qbbumm.",
+      "family": "GlyphScrambleStatic-body-aa2c6fa8f3196513",
+      "fontFile": "/demo-fixtures/static-b.woff2",
+      "fontIdentity": "1d77f69aafc5a0c730842a4b3a9b0182aa46d1e86eb6af8e582c8f107856a23a",
+      "fontUrl": "/_glyphscramble/401ecc18253e99953de6e1907c82d6a391d34a06dc1c30f12eed28a9e9383669/body.1d77f69aafc5a0c730842a4b3a9b0182aa46d1e86eb6af8e582c8f107856a23a.woff2",
+      "documentCache": "public, revalidate",
+      "fontCache": "public, immutable",
+      "buildId": "401ecc18253e99953de6e1907c82d6a391d34a06dc1c30f12eed28a9e9383669"
+    }
+  }
+}
