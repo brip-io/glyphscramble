@@ -1,6 +1,6 @@
 # [R10] Astro 7, Vite, and vanilla integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#11](https://github.com/brip-io/glyphscramble/issues/11)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #41](https://github.com/brip-io/glyphscramble/pull/41), corrected by [PR #42](https://github.com/brip-io/glyphscramble/pull/42) · **GitHub issue:** [#11](https://github.com/brip-io/glyphscramble/issues/11)
 > **Blocked by:** R02, R03, R05, R06 · **Blocks:** R12
 
 ## Objective
@@ -97,3 +97,31 @@ presenting buffering as a universal server adapter.
 ## Exit criteria
 
 Astro SSR and non-hydrated static fixtures, a normal Vite build, and a generic Node/Fetch server all work from documented setup, preserve selective caching, and satisfy the shared leakage and failure contracts.
+
+## Implementation evidence
+
+- `packages/astro/src/index.ts` implements typed, route-selective middleware with
+  bounded lazy-stream buffering; `packages/astro/src/GlyphScramble.astro`
+  delegates each block to the shared custom-element lifecycle.
+- `packages/vite/src/index.ts` is a real Vite plugin that derives paths from
+  `ResolvedConfig`, builds through a private staging tree, publishes atomically,
+  and removes stale protected output across repeated builds.
+- `packages/core/src/init.ts` safely scaffolds conventional Astro and Vite
+  projects and refuses ambiguous Vite configuration instead of rewriting it.
+- `examples/astro-ssr`, `examples/astro-static`, `examples/vite-static`, and
+  `examples/node-fetch` are executable consumer fixtures rather than snippets.
+- `tests/r10` exercises lazy Astro rendering, overflow/failure behavior, static
+  refusal, non-root Vite output, repeat rotation, leakage scans, and the generic
+  Node/Fetch boundary. CI runs the consumer suite independently.
+- `packages/core/src/worker-compressor.ts` resolves the exported,
+  self-contained file-backed `woff2-worker.mjs`; PR #42 removed the temporary
+  eval-backed bundler workaround and proves the same artifact in Next and Astro.
+
+## Review record
+
+R10 closes the Astro/Vite/vanilla portions of findings S1, B4, U4, and D6 from
+the 2026-09-03 repository review. It also exposed an S7 regression during the
+post-merge documentation audit; PR #42 restored a no-eval, file-backed worker
+before this design was marked implemented. The dedicated R10 suite covers the
+lazy-stream and component lifecycle boundaries. Full browser-matrix and
+client-navigation qualification remains intentionally centralized in R12.

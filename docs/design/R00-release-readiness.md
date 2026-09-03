@@ -96,7 +96,7 @@ Ship a proper Nuxt Kit module plus reactive Vue payload handling and Nitro integ
 
 Ship typed, compiled Svelte artifacts and composable SvelteKit hooks/endpoints with navigation coverage.
 
-#### R10 · Astro 7, Vite, and vanilla · **M**
+#### R10 · Astro 7, Vite, and vanilla · **M** · **Implemented in [PR #41](https://github.com/brip-io/glyphscramble/pull/41), corrected by [PR #42](https://github.com/brip-io/glyphscramble/pull/42)**
 
 Ship typed Astro middleware/components, a functional Vite integration, explicit non-hydrated static constraints, and generic Fetch/Node examples.
 

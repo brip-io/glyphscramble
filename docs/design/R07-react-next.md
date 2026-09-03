@@ -93,8 +93,9 @@ From `init`, a Next 16 App Router fixture renders multiple protected blocks thro
   detection and the three-file config/helper/route scaffold.
 - `packages/core/src/config-loader.ts` loads TypeScript config consistently on
   Node 22 and 24 instead of depending on evolving native syntax stripping.
-- `packages/core/src/worker-compressor.ts` uses a publishable worker module;
-  the real Next build proves its bundled URL resolves without eval.
+- `packages/core/src/worker-compressor.ts` resolves a self-contained,
+  file-backed worker through the package export; the real Next build proves the
+  installed-package path works without eval.
 - `packages/next/src/server.ts` supplies the request boundary, request-local
   context, process-global module deduplication, and GET/HEAD handler.
 - `examples/next` and `tests/next` prove full HTML/RSC leakage resistance,
