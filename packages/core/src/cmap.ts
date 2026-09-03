@@ -314,9 +314,35 @@ function format4(mapping: ReadonlyMap<number, number>): Uint8Array | undefined {
   const all = [...mapping]
     .filter(([cp]) => cp <= 0xffff && cp !== 0xffff)
     .sort(([a], [b]) => a - b);
-  // One single-codepoint segment per mapping is larger but maximally predictable.
-  const segCount = all.length + 1;
-  const glyphCount = all.length;
+  interface Segment {
+    start: number;
+    end: number;
+    delta: number;
+    glyphs: number[] | undefined;
+  }
+  const segments: Segment[] = [];
+  for (let index = 0; index < all.length;) {
+    const startIndex = index;
+    while (index + 1 < all.length && all[index + 1]![0] === all[index]![0] + 1)
+      index++;
+    const run = all.slice(startIndex, index + 1);
+    const firstDelta = (run[0]![1] - run[0]![0]) & 0xffff;
+    const constantDelta = run.every(
+      ([cp, glyph]) => ((glyph - cp) & 0xffff) === firstDelta,
+    );
+    segments.push({
+      start: run[0]![0],
+      end: run.at(-1)![0],
+      delta: constantDelta ? firstDelta : 0,
+      glyphs: constantDelta ? undefined : run.map(([, glyph]) => glyph),
+    });
+    index++;
+  }
+  const segCount = segments.length + 1;
+  const glyphCount = segments.reduce(
+    (count, segment) => count + (segment.glyphs?.length ?? 0),
+    0,
+  );
   const length = 16 + segCount * 8 + glyphCount * 2;
   // A partial format 4 would disagree with the authoritative format 12. Omit
   // it when the 16-bit format cannot represent the complete BMP mapping.
@@ -336,16 +362,22 @@ function format4(mapping: ReadonlyMap<number, number>): Uint8Array | undefined {
   const deltaOffset = startOffset + segCount * 2;
   const rangeOffset = deltaOffset + segCount * 2;
   const glyphOffset = rangeOffset + segCount * 2;
-  all.forEach(([cp, glyph], index) => {
-    view.setUint16(endOffset + index * 2, cp);
-    view.setUint16(startOffset + index * 2, cp);
-    view.setInt16(deltaOffset + index * 2, 0);
-    // Address is relative to this rangeOffset word.
+  let glyphIndex = 0;
+  segments.forEach((segment, index) => {
+    view.setUint16(endOffset + index * 2, segment.end);
+    view.setUint16(startOffset + index * 2, segment.start);
+    view.setInt16(deltaOffset + index * 2, segment.delta);
+    if (!segment.glyphs) return;
+    // The offset is measured from this segment's idRangeOffset word to its
+    // first glyphIdArray entry, not from the start of the array.
     view.setUint16(
       rangeOffset + index * 2,
-      glyphOffset + index * 2 - (rangeOffset + index * 2),
+      glyphOffset + glyphIndex * 2 - (rangeOffset + index * 2),
     );
-    view.setUint16(glyphOffset + index * 2, glyph);
+    for (const glyph of segment.glyphs) {
+      view.setUint16(glyphOffset + glyphIndex * 2, glyph);
+      glyphIndex++;
+    }
   });
   const sentinel = segCount - 1;
   view.setUint16(endOffset + sentinel * 2, 0xffff);

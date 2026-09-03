@@ -4,6 +4,39 @@ import { buildCmap, parseCmap, parseVariationSequences } from "../src/cmap.js";
 import { buildSfnt, parseSfnt, remapCmap } from "../src/sfnt.js";
 import { syntheticFont } from "./fixture.js";
 
+function extractSubtable(
+  bytes: Uint8Array,
+  platform: number,
+  encoding: number,
+): Uint8Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let index = 0; index < view.getUint16(2); index++) {
+    const record = 4 + index * 8;
+    if (
+      view.getUint16(record) === platform &&
+      view.getUint16(record + 2) === encoding
+    ) {
+      const offset = view.getUint32(record + 4);
+      const format = view.getUint16(offset);
+      const length =
+        format === 4 ? view.getUint16(offset + 2) : view.getUint32(offset + 4);
+      return bytes.slice(offset, offset + length);
+    }
+  }
+  throw new Error("Missing test cmap subtable.");
+}
+
+function wrapWindowsBmp(subtable: Uint8Array): Uint8Array {
+  const output = new Uint8Array(12 + subtable.length);
+  const view = new DataView(output.buffer);
+  view.setUint16(2, 1);
+  view.setUint16(4, 3);
+  view.setUint16(6, 1);
+  view.setUint32(8, 12);
+  output.set(subtable, 12);
+  return output;
+}
+
 describe("OpenType cmap patcher", () => {
   it("round trips formats 4, 12, and 14", () => {
     const mapping = new Map([
@@ -45,31 +78,8 @@ describe("OpenType cmap patcher", () => {
   it("selects the Windows full-repertoire subtable independent of record order", () => {
     const unicode = buildCmap(new Map([[0x41, 3]]));
     const windows = buildCmap(new Map([[0x41, 9]]));
-    const extract = (bytes: Uint8Array, platform: number, encoding: number) => {
-      const view = new DataView(
-        bytes.buffer,
-        bytes.byteOffset,
-        bytes.byteLength,
-      );
-      for (let index = 0; index < view.getUint16(2); index++) {
-        const record = 4 + index * 8;
-        if (
-          view.getUint16(record) === platform &&
-          view.getUint16(record + 2) === encoding
-        ) {
-          const offset = view.getUint32(record + 4);
-          const format = view.getUint16(offset);
-          const length =
-            format === 4
-              ? view.getUint16(offset + 2)
-              : view.getUint32(offset + 4);
-          return bytes.slice(offset, offset + length);
-        }
-      }
-      throw new Error("Missing test cmap subtable.");
-    };
-    const format4 = extract(unicode, 3, 1);
-    const format12 = extract(windows, 3, 10);
+    const format4 = extractSubtable(unicode, 3, 1);
+    const format12 = extractSubtable(windows, 3, 10);
     const format4Offset = 20;
     const format12Offset = format4Offset + format4.length;
     const combined = new Uint8Array(format12Offset + format12.length);
@@ -129,12 +139,38 @@ describe("OpenType cmap patcher", () => {
     expect(() => parseCmap(crossing)).toThrow(/format 12 group/);
   });
 
-  it("omits format 4 instead of emitting a truncated BMP mapping", () => {
+  it("compacts contiguous BMP mappings into format 4 segments", () => {
+    const mapping = new Map<number, number>();
+    for (let index = 0; index < 7_000; index++)
+      mapping.set(0x20 + index, ((index * 37) % 8_000) + 1);
+    const cmap = buildCmap(mapping);
+    const compact = extractSubtable(cmap, 3, 1);
+    const view = new DataView(compact.buffer);
+    expect(view.getUint16(6) / 2).toBe(2);
+    expect(compact.length).toBe(14_032);
+    expect(parseCmap(wrapWindowsBmp(compact))).toEqual(mapping);
+    expect(parseCmap(cmap)).toEqual(mapping);
+  });
+
+  it("uses a delta segment when a contiguous BMP run has one offset", () => {
     const mapping = new Map<number, number>();
     for (let codepoint = 0; codepoint < 7_000; codepoint++)
       mapping.set(codepoint, codepoint + 1);
-    const cmap = buildCmap(mapping);
-    expect(new DataView(cmap.buffer).getUint16(2)).toBe(2);
-    expect(parseCmap(cmap)).toEqual(mapping);
+    const compact = extractSubtable(buildCmap(mapping), 3, 1);
+    expect(compact.length).toBe(32);
+    expect(parseCmap(wrapWindowsBmp(compact))).toEqual(mapping);
+  });
+
+  it("keeps format 4 only when the complete compact table fits", () => {
+    const mapping = new Map<number, number>();
+    for (let index = 0; index < 32_751; index++)
+      mapping.set(index, ((index * 37) % 40_000) + 1);
+    const fitting = buildCmap(mapping);
+    expect(extractSubtable(fitting, 3, 1).length).toBe(65_534);
+
+    mapping.set(32_751, 1);
+    const overflowing = buildCmap(mapping);
+    expect(new DataView(overflowing.buffer).getUint16(2)).toBe(2);
+    expect(parseCmap(overflowing)).toEqual(mapping);
   });
 });
