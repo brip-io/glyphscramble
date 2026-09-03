@@ -2,6 +2,13 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { inspectFont } from "../src/font-pipeline.js";
+import { parseCmap } from "../src/cmap.js";
+import { buildSfnt, parseSfnt, remapCmap } from "../src/sfnt.js";
+import {
+  createPermutationPlan,
+  encodeText,
+  type Permutation,
+} from "../src/unicode.js";
 import {
   ResponsePoolVariantProvider,
   VariantCancelledError,
@@ -11,12 +18,13 @@ import {
   type VariantGenerator,
   type VariantProviderOptions,
 } from "../src/variant-provider.js";
+import { syntheticFont } from "./fixture.js";
 
 const face: VariantFace = {
   id: "body@default",
   namespace: "body@default:fixture",
   sfnt: new Uint8Array([0]),
-  codepoints: [0x41, 0x42],
+  permutationPlan: createPermutationPlan([0x41, 0x42]),
 };
 
 const interFixture = createRequire(import.meta.url).resolve(
@@ -73,7 +81,8 @@ describe("response variant pool", () => {
     );
     await provider.start();
     const lease = provider.acquire(1_100);
-    expect(provider.metrics().cacheBytes).toBe(12);
+    const mappingBytes = provider.mapping(lease, face.id)!.byteLength;
+    expect(provider.metrics().cacheBytes).toBe(12 + mappingBytes);
     now = 1_101;
     expect(provider.font(lease.id, face.id, lease.seed)).toBeUndefined();
     expect(provider.metrics()).toMatchObject({
@@ -90,7 +99,7 @@ describe("response variant pool", () => {
       options({
         poolLowWatermark: 1,
         poolHighWatermark: 1,
-        cacheMaxBytes: 12,
+        cacheMaxBytes: 12 + 32,
       }),
       async () => new Uint8Array(12),
     );
@@ -101,16 +110,35 @@ describe("response variant pool", () => {
       expiredVariants: 1,
       readyVariants: 1,
       activeVariants: 0,
-      cacheBytes: 12,
+      cacheBytes: 12 + 32,
     });
     expect(() => provider.acquire(Date.now() + 1_000)).not.toThrow();
+    await provider.close();
+  });
+
+  it("never starts refill generation inline with lease acquisition", async () => {
+    let generations = 0;
+    const provider = new ResponsePoolVariantProvider(
+      [face],
+      options({ poolLowWatermark: 1, poolHighWatermark: 1 }),
+      async () => {
+        generations++;
+        return new Uint8Array(12);
+      },
+    );
+    await provider.start();
+    expect(generations).toBe(1);
+    provider.acquire(Date.now() + 1_000);
+    expect(generations).toBe(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(generations).toBe(2);
     await provider.close();
   });
 
   it("fails startup when the byte ceiling cannot retain its low watermark", async () => {
     const provider = new ResponsePoolVariantProvider(
       [face],
-      options({ cacheMaxBytes: 15 }),
+      options({ cacheMaxBytes: 42 }),
       async () => new Uint8Array(10),
     );
     await expect(provider.start()).rejects.toThrow(/cacheMaxBytes/);
@@ -194,7 +222,7 @@ describe("response variant pool", () => {
           id: "inter@default",
           namespace: `inter@default:${prepared.metadata.identity}`,
           sfnt: prepared.sfnt,
-          codepoints: prepared.metadata.codepoints,
+          permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
         },
       ],
       options({
@@ -218,4 +246,73 @@ describe("response variant pool", () => {
     expect(ticks).toBeGreaterThan(5);
     await provider.close();
   }, 10_000);
+
+  it("retains the exact generated mapping for every face and releases it on expiry", async () => {
+    let now = 1_000;
+    const source = syntheticFont();
+    const originalCmap = parseCmap(parseSfnt(source).tables.get("cmap")!);
+    const faces: VariantFace[] = [
+      {
+        id: "body@latin",
+        namespace: "body@latin:fixture",
+        sfnt: source,
+        permutationPlan: createPermutationPlan(
+          [..."ABCD"].map((value) => value.codePointAt(0)!),
+        ),
+      },
+      {
+        id: "body@hebrew",
+        namespace: "body@hebrew:fixture",
+        sfnt: source,
+        permutationPlan: createPermutationPlan(
+          [..."אבג"].map((value) => value.codePointAt(0)!),
+        ),
+      },
+    ];
+    const generated = new Map<string, Permutation>();
+    const provider = new ResponsePoolVariantProvider(
+      faces,
+      options({
+        poolLowWatermark: 1,
+        poolHighWatermark: 1,
+        cacheMaxBytes: source.length * 3,
+      }),
+      async (generatedFace, seed, _signal, permutation) => {
+        generated.set(`${seed}:${generatedFace.id}`, permutation);
+        return buildSfnt(
+          remapCmap(parseSfnt(generatedFace.sfnt), permutation.decode),
+        );
+      },
+      () => now,
+    );
+    await provider.start();
+    const lease = provider.acquire(1_100);
+
+    for (const generatedFace of faces) {
+      const permutation = generated.get(`${lease.seed}:${generatedFace.id}`)!;
+      const retained = provider.mapping(lease, generatedFace.id)!;
+      const output = provider.font(lease.id, generatedFace.id, lease.seed)!;
+      const outputCmap = parseCmap(parseSfnt(output).tables.get("cmap")!);
+      expect(retained.byteLength).toBeGreaterThanOrEqual(retained.size * 8);
+      expect(retained.byteLength).toBeLessThan(retained.size * 24);
+      for (const [original, encoded] of permutation.encode) {
+        expect(retained.get(original)).toBe(encoded);
+        expect(outputCmap.get(encoded)).toBe(originalCmap.get(original));
+      }
+      const sample = generatedFace.id === "body@latin" ? "ABCD" : "אבג";
+      expect(encodeText(sample, retained)).toBe(
+        encodeText(sample, permutation),
+      );
+    }
+
+    now = 1_101;
+    expect(provider.mapping(lease, "body@latin")).toBeUndefined();
+    expect(provider.mapping(lease, "body@hebrew")).toBeUndefined();
+    expect(provider.metrics()).toMatchObject({
+      activeVariants: 0,
+      cacheBytes: 0,
+      expiredVariants: 1,
+    });
+    await provider.close();
+  });
 });

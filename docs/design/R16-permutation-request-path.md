@@ -1,6 +1,6 @@
 # [R16] Permutation and request-path efficiency
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#33](https://github.com/brip-io/glyphscramble/issues/33)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#33](https://github.com/brip-io/glyphscramble/issues/33)
 > **Blocked by:** R01 and R11 · **Blocks:** R12 performance qualification
 
 ## Objective
@@ -37,9 +37,9 @@ The 2026-09-03 repository review confirmed that `defaultGenerator` computes a pe
 
 ## Design
 
-Derive a per-group keystream key using the existing seed, namespace, Unicode version, and property-group identity. Generate 32-bit words in blocks through a Node cryptographic stream primitive and use rejection sampling before Fisher–Yates selection. `defaultGenerator` receives the engine's plan, creates the permutation once, patches `cmap`, and returns both compressed bytes and an immutable compact mapping. `StoredVariant` owns that mapping; `FontVariantLease` exposes read-only encode lookup for authorized faces.
+Derive per-group AES-256-CTR key/counter material using the existing seed plus length-delimited algorithm, namespace, Unicode-version, and property-group identities. Generate 32-bit words in blocks and use rejection sampling before Fisher–Yates selection. The provider applies the engine's precomputed plan once, passes that exact permutation to `defaultGenerator` for `cmap` patching, and retains an immutable typed-array hash lookup beside the compressed bytes. The server-only provider contract resolves that lookup from a live lease; mappings never enter payloads or tokens.
 
-The engine encodes text directly through the leased mapping. A defensive invariant compares a digest of the retained decode map to the generated face identity in tests and optional development diagnostics.
+The engine encodes text directly through the leased mapping. Tests compare every retained encode entry with the permutation supplied to the generator and with the resulting `cmap` glyph target.
 
 ## Scope and deliverables
 

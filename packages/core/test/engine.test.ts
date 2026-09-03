@@ -7,6 +7,8 @@ import { createGlyphEngine, responseHeadersForContext } from "../src/engine.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
 import { buildStaticSite } from "../src/static-output.js";
 import { syntheticFont } from "./fixture.js";
+import { compactEncodeMapping, createPermutation } from "../src/unicode.js";
+import type { FontVariantProvider } from "../src/variant-provider.js";
 
 const oldSecret = process.env.GLYPHSCRAMBLE_SECRET;
 const oldPreviousSecret = process.env.GLYPHSCRAMBLE_SECRET_PREVIOUS;
@@ -45,6 +47,69 @@ async function fixture() {
 }
 
 describe("request engine", () => {
+  it("accepts retained mappings from a custom variant provider", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const seed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const variantId = Buffer.alloc(16, 1).toString("base64url");
+    const mapping = compactEncodeMapping(
+      createPermutation(
+        [..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"].map(
+          (value) => value.codePointAt(0)!,
+        ),
+        seed,
+        "custom-provider",
+      ).encode,
+    );
+    let mappingReads = 0;
+    const provider: FontVariantProvider = {
+      async start() {},
+      acquire: () => ({ id: variantId, seed }),
+      mapping: (_lease, faceId) => {
+        mappingReads++;
+        return faceId === "body@default" ? mapping : undefined;
+      },
+      font: () => new Uint8Array([1]),
+      metrics: () => ({
+        variantMode: "response-pool",
+        leasesIssued: 1,
+        poolExhaustions: 0,
+        fontHits: 0,
+        fontMisses: 0,
+        generations: 0,
+        generationFailures: 0,
+        generationTimeouts: 0,
+        generationCancellations: 0,
+        generationOverloads: 0,
+        expiredVariants: 0,
+        capacityDrops: 0,
+        readyVariants: 0,
+        activeVariants: 1,
+        cacheBytes: mapping.byteLength + 1,
+        queueDepth: 0,
+        activeGenerators: 0,
+        generationMilliseconds: {
+          count: 0,
+          total: 0,
+          max: 0,
+          p50: 0,
+          p95: 0,
+          p99: 0,
+        },
+      }),
+      async close() {},
+    };
+    const engine = await createGlyphEngine(config, {
+      cwd,
+      variantProvider: provider,
+    });
+    const result = engine.beginResponse().scramble("Secret", { font: "body" });
+    expect(result.encodedText).not.toBe("Secret");
+    expect(mappingReads).toBe(1);
+    await engine.close();
+  });
+
   it("rejects a weak runtime secret before generating variants", async () => {
     const { cwd, config } = await fixture();
     process.env.GLYPHSCRAMBLE_SECRET = "too short";

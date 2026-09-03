@@ -73,11 +73,20 @@ export type {
   HostResolver,
 } from "./remote.js";
 export {
+  compactEncodeMapping,
   createPermutation,
+  createPermutationFromPlan,
+  createPermutationPlan,
   encodeText,
   isStructuralCodePoint,
+  PERMUTATION_ALGORITHM,
   propertySignature,
   UNICODE_VERSION,
+} from "./unicode.js";
+export type {
+  CodePointMapping,
+  Permutation,
+  PermutationPlan,
 } from "./unicode.js";
 export type {
   DoctorFinding,

@@ -6,13 +6,7 @@ import {
   type TokenKey,
   type TokenKeyRing,
 } from "./token.js";
-import {
-  createPermutationFromPlan,
-  createPermutationPlan,
-  encodeText,
-  type Permutation,
-  type PermutationPlan,
-} from "./unicode.js";
+import { createPermutationPlan, encodeText } from "./unicode.js";
 import { validateGlyphConfig } from "./config.js";
 import {
   ResponsePoolVariantProvider,
@@ -29,9 +23,7 @@ import type {
 } from "./types.js";
 
 interface RuntimeFont extends PreparedFont {
-  codepoints: readonly number[];
   coverage: readonly string[];
-  permutationPlan: PermutationPlan;
 }
 
 interface RuntimeFamily {
@@ -129,18 +121,23 @@ export async function createGlyphEngine(
   const now = options.now ?? Date.now;
   const fonts = new Map<string, RuntimeFont>();
   const families = new Map<string, RuntimeFamily>();
+  const variantFaces: VariantFace[] = [];
   for (const id of Object.keys(config.fonts)) {
     const preparedFaces = await loadPreparedFonts(id, options.cwd);
     const runtimeFaces = new Map<string, RuntimeFont>();
     for (const prepared of preparedFaces) {
       const runtimeFont = {
         ...prepared,
-        codepoints: prepared.metadata.codepoints,
         coverage: prepared.metadata.coverage,
-        permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
       };
       runtimeFaces.set(prepared.faceId, runtimeFont);
       fonts.set(runtimeId(prepared), runtimeFont);
+      variantFaces.push({
+        id: runtimeId(prepared),
+        namespace: runtimeNamespace(runtimeFont),
+        sfnt: prepared.sfnt,
+        permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
+      });
     }
     const configuredDefault = config.fonts[id]!.defaultFace;
     const defaultFace =
@@ -150,12 +147,6 @@ export async function createGlyphEngine(
     if (!defaultFace) throw new Error(`Font ${id} has no prepared faces.`);
     families.set(id, { defaultFace, faces: runtimeFaces });
   }
-  const variantFaces: VariantFace[] = [...fonts.values()].map((font) => ({
-    id: runtimeId(font),
-    namespace: runtimeNamespace(font),
-    sfnt: font.sfnt,
-    codepoints: font.codepoints,
-  }));
   const variantProvider =
     options.variantProvider ??
     new ResponsePoolVariantProvider(
@@ -207,7 +198,6 @@ export async function createGlyphEngine(
         issuedFaces = faceKey;
         return issued;
       };
-      const permutations = new Map<string, Permutation>();
       return {
         get token() {
           return ensureIssued().token;
@@ -235,17 +225,15 @@ export async function createGlyphEngine(
               `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
             );
           const responseLease = ensureLease();
-          const namespace = runtimeNamespace(font);
-          let permutation = permutations.get(namespace);
-          if (!permutation) {
-            permutation = createPermutationFromPlan(
-              font.permutationPlan,
-              responseLease.seed,
-              namespace,
+          const mapping = variantProvider.mapping(
+            responseLease,
+            runtimeId(font),
+          );
+          if (!mapping)
+            throw new Error(
+              "The response font variant expired before text could be scrambled.",
             );
-            permutations.set(namespace, permutation);
-          }
-          const encodedText = encodeText(text, permutation);
+          const encodedText = encodeText(text, mapping);
           authorizedFaces.add(runtimeId(font));
           const responseToken = ensureIssued();
           return payload(

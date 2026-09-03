@@ -100,7 +100,8 @@ read) consumes a variant exactly once; an unused response context consumes
 nothing. If demand outruns the bounded pool or active tokens fill the byte budget,
 it throws before plaintext is emitted. A process restart invalidates live font
 tokens, so keep HTML and its font route on the same stateful engine instance and
-size the cache for generated font bytes × responses within the token TTL. The
+size the cache for generated font bytes plus retained mapping storage × responses
+within the token TTL. The
 Next adapter deduplicates page and Route Handler module instances inside one
 Node process. Multi-process, serverless, and horizontally scaled Next delivery
 still require an external variant provider planned for R17; the beta must not

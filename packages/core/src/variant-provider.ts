@@ -1,7 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { buildSfnt, parseSfnt, remapCmap } from "./sfnt.js";
-import { createPermutation } from "./unicode.js";
+import {
+  compactEncodeMapping,
+  createPermutationFromPlan,
+  type CodePointMapping,
+  type Permutation,
+  type PermutationPlan,
+} from "./unicode.js";
 import { compressWoff2InWorker } from "./worker-compressor.js";
 import type { GlyphEngineMetrics } from "./types.js";
 
@@ -19,7 +25,7 @@ export interface VariantFace {
   id: string;
   namespace: string;
   sfnt: Uint8Array;
-  codepoints: readonly number[];
+  permutationPlan: PermutationPlan;
 }
 
 export interface VariantProviderOptions {
@@ -39,6 +45,11 @@ export interface FontVariantLease {
 export interface FontVariantProvider {
   start(): Promise<void>;
   acquire(expiresAt: number): FontVariantLease;
+  /** Server-only mapping boundary used by the request engine. */
+  mapping(
+    lease: FontVariantLease,
+    faceId: string,
+  ): CodePointMapping | undefined;
   font(
     variantId: string,
     faceId: string,
@@ -94,11 +105,16 @@ interface MutableMetrics {
   generationDurationsMs: number[];
 }
 
-type GenerationTask = (signal: AbortSignal) => Promise<Uint8Array>;
+interface GeneratedVariantFace {
+  font: Uint8Array;
+  mapping: CodePointMapping;
+}
+
+type GenerationTask = (signal: AbortSignal) => Promise<GeneratedVariantFace>;
 
 interface QueueItem {
   task: GenerationTask;
-  resolve(value: Uint8Array): void;
+  resolve(value: GeneratedVariantFace): void;
   reject(error: unknown): void;
 }
 
@@ -124,7 +140,7 @@ class BoundedGenerationQueue {
     return this.#active;
   }
 
-  run(task: GenerationTask): Promise<Uint8Array> {
+  run(task: GenerationTask): Promise<GeneratedVariantFace> {
     if (this.#closed)
       return Promise.reject(new VariantCancelledError("Provider is closed."));
     if (
@@ -134,7 +150,7 @@ class BoundedGenerationQueue {
       this.counters.generationOverloads++;
       return Promise.reject(new VariantOverloadError());
     }
-    const result = new Promise<Uint8Array>((resolve, reject) => {
+    const result = new Promise<GeneratedVariantFace>((resolve, reject) => {
       this.#pending.push({ task, resolve, reject });
     });
     this.#drain();
@@ -172,7 +188,13 @@ class BoundedGenerationQueue {
       );
     });
 
-    Promise.race([item.task(controller.signal), cancelled])
+    const task = new Promise<void>((resolve) => setImmediate(resolve)).then(
+      () => {
+        if (controller.signal.aborted) throw new VariantCancelledError();
+        return item.task(controller.signal);
+      },
+    );
+    Promise.race([task, cancelled])
       .then(item.resolve)
       .catch((error: unknown) => {
         if (timedOut) {
@@ -213,7 +235,13 @@ class BoundedGenerationQueue {
 interface StoredVariant {
   id: string;
   seed: string;
-  fonts: ReadonlyMap<string, Uint8Array>;
+  faces: ReadonlyMap<
+    string,
+    {
+      font: Uint8Array;
+      mapping: CodePointMapping;
+    }
+  >;
   bytes: number;
   expiresAt?: number;
 }
@@ -222,16 +250,17 @@ export type VariantGenerator = (
   face: VariantFace,
   seed: string,
   signal: AbortSignal,
+  permutation: Permutation,
 ) => Promise<Uint8Array>;
 
 async function defaultGenerator(
   face: VariantFace,
   seed: string,
   signal: AbortSignal,
+  permutation: Permutation,
 ): Promise<Uint8Array> {
   await new Promise<void>((resolve) => setImmediate(resolve));
   if (signal.aborted) throw new VariantCancelledError();
-  const permutation = createPermutation(face.codepoints, seed, face.namespace);
   const patched = buildSfnt(
     remapCmap(parseSfnt(face.sfnt), permutation.decode),
   );
@@ -318,7 +347,19 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     this.#counters.leasesIssued++;
     this.#scheduleExpiryMaintenance();
     this.#scheduleRefill();
-    return { id: variant.id, seed: variant.seed };
+    const variantId = variant.id;
+    const variantSeed = variant.seed;
+    return Object.freeze({
+      id: variantId,
+      seed: variantSeed,
+    });
+  }
+
+  mapping(
+    lease: FontVariantLease,
+    faceId: string,
+  ): CodePointMapping | undefined {
+    return this.#mapping(lease.id, faceId, lease.seed);
   }
 
   font(
@@ -329,7 +370,9 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
     this.#pruneExpired();
     const variant = this.#active.get(variantId);
     const output =
-      variant?.seed === expectedSeed ? variant.fonts.get(faceId) : undefined;
+      variant?.seed === expectedSeed
+        ? variant.faces.get(faceId)?.font
+        : undefined;
     if (output) this.#counters.fontHits++;
     else this.#counters.fontMisses++;
     this.#scheduleExpiryMaintenance();
@@ -384,9 +427,20 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       const outputs = await Promise.all(
         this.faces.map(async (face) => {
           try {
-            const output = await this.#queue.run(async (signal) => {
+            const generated = await this.#queue.run(async (signal) => {
               const started = performance.now();
-              const generated = await this.generator(face, seed, signal);
+              const permutation = createPermutationFromPlan(
+                face.permutationPlan,
+                seed,
+                face.namespace,
+              );
+              const font = await this.generator(
+                face,
+                seed,
+                signal,
+                permutation,
+              );
+              const mapping = compactEncodeMapping(permutation.encode);
               const duration = performance.now() - started;
               this.#counters.generations++;
               this.#counters.generationCount++;
@@ -398,16 +452,20 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
               if (this.#counters.generationDurationsMs.length === 256)
                 this.#counters.generationDurationsMs.shift();
               this.#counters.generationDurationsMs.push(duration);
-              return generated;
+              return { font, mapping };
             });
-            return [face.id, output] as const;
+            return [face.id, generated] as const;
           } catch (error) {
             this.#counters.generationFailures++;
             throw error;
           }
         }),
       );
-      const bytes = outputs.reduce((total, item) => total + item[1].length, 0);
+      const bytes = outputs.reduce(
+        (total, item) =>
+          total + item[1].font.length + item[1].mapping.byteLength,
+        0,
+      );
       if (this.#closed) return false;
       this.#pruneExpired();
       if (this.#bytes + bytes > this.options.cacheMaxBytes) {
@@ -421,7 +479,7 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       this.#ready.push({
         id,
         seed,
-        fonts: new Map(outputs),
+        faces: new Map(outputs),
         bytes,
       });
       this.#bytes += bytes;
@@ -455,6 +513,18 @@ export class ResponsePoolVariantProvider implements FontVariantProvider {
       this.#bytes -= variant.bytes;
       this.#counters.expiredVariants++;
     }
+  }
+
+  #mapping(
+    variantId: string,
+    faceId: string,
+    expectedSeed: string,
+  ): CodePointMapping | undefined {
+    this.#pruneExpired();
+    const variant = this.#active.get(variantId);
+    return variant?.seed === expectedSeed
+      ? variant.faces.get(faceId)?.mapping
+      : undefined;
   }
 
   #scheduleExpiryMaintenance(): void {

@@ -10,6 +10,7 @@ import { URL } from "node:url";
 import {
   buildSfnt,
   createGlyphEngine,
+  createPermutationPlan,
   inspectFont,
   loadPreparedFonts,
   parseSfnt,
@@ -22,6 +23,7 @@ const REQUEST_ITERATIONS = 50;
 const REQUEST_WARMUP_ITERATIONS = 10;
 const REQUEST_VARIANTS = REQUEST_ITERATIONS + REQUEST_WARMUP_ITERATIONS;
 const COLD_ITERATIONS = 3;
+const LARGE_REPERTOIRE_CODEPOINTS = 20_000;
 const SECRET = "GLYPHSCRAMBLE_BENCHMARK_SECRET";
 
 const require = createRequire(
@@ -53,6 +55,17 @@ function stats(values) {
       ].toFixed(3),
     );
   return { p50: at(0.5), p95: at(0.95), p99: at(0.99) };
+}
+
+async function waitForProviderIdle(provider) {
+  const deadline = performance.now() + 5_000;
+  while (true) {
+    const metrics = provider.metrics();
+    if (metrics.queueDepth === 0 && metrics.activeGenerators === 0) return;
+    if (performance.now() >= deadline)
+      throw new Error("Prepared request-provider refill did not become idle.");
+    await setImmediate();
+  }
 }
 
 async function run(label, source, ceilings) {
@@ -110,11 +123,20 @@ async function run(label, source, ceilings) {
     // the production pool implementation, filled with already-prepared byte
     // payloads so a statistically useful request sample does not generate 50
     // additional compressed fonts.
+    const largeRepertoire = Array.from(
+      { length: LARGE_REPERTOIRE_CODEPOINTS },
+      (_, index) => 0x4e00 + index,
+    );
     const requestFaces = (await loadPreparedFonts("body", cwd)).map((face) => ({
       id: `${face.id}@${face.faceId}`,
       namespace: `${face.id}@${face.faceId}:${face.metadata.identity}`,
       sfnt: face.sfnt,
-      codepoints: face.metadata.codepoints,
+      // The provider owns this deliberately large plan. scramble() must consume
+      // its retained lookup rather than performing repertoire-sized work.
+      permutationPlan: createPermutationPlan([
+        ...face.metadata.codepoints,
+        ...largeRepertoire,
+      ]),
     }));
     const requestProvider = new ResponsePoolVariantProvider(
       requestFaces,
@@ -124,7 +146,10 @@ async function run(label, source, ceilings) {
         generationConcurrency: 2,
         generationQueueLimit: REQUEST_VARIANTS,
         generationTimeoutMs: 1_000,
-        cacheMaxBytes: source.length * REQUEST_VARIANTS * 3,
+        cacheMaxBytes:
+          (source.length + LARGE_REPERTOIRE_CODEPOINTS * 8) *
+          REQUEST_VARIANTS *
+          2,
       },
       () => Promise.resolve(source),
     );
@@ -132,7 +157,7 @@ async function run(label, source, ceilings) {
       cwd,
       variantProvider: requestProvider,
     });
-    const acquisition = [];
+    const encoding = [];
     const response = [];
     const payloads = [];
     const warmupPayloads = [];
@@ -143,7 +168,7 @@ async function run(label, source, ceilings) {
       warmupPayloads.push(
         engine.beginResponse().scramble(sample, { font: "body" }),
       );
-    await setImmediate();
+    await waitForProviderIdle(requestProvider);
     for (const payload of warmupPayloads) {
       const font = await engine.fontResponse(
         new globalThis.Request(`https://benchmark.invalid${payload.fontUrl}`),
@@ -157,7 +182,7 @@ async function run(label, source, ceilings) {
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
-      acquisition.push(performance.now() - acquired);
+      encoding.push(performance.now() - acquired);
       payloads.push(payload);
     }
 
@@ -165,7 +190,7 @@ async function run(label, source, ceilings) {
     // prepared-byte refills settle before timing the separate font-response
     // phase, otherwise scheduler jitter is charged to whichever request happens
     // to yield next rather than to the pool-generation metric that owns it.
-    await setImmediate();
+    await waitForProviderIdle(requestProvider);
     const fontResponses = [];
     for (const payload of payloads) {
       const responseStarted = performance.now();
@@ -190,10 +215,15 @@ async function run(label, source, ceilings) {
       label,
       node: process.version,
       normalizedBytes,
+      requestRepertoireCodepoints:
+        requestFaces[0].permutationPlan.groups.reduce(
+          (total, group) => total + group.values.length,
+          0,
+        ),
       coldPoolMilliseconds: stats(coldPool),
       generationRuns,
       preparedPoolFillMilliseconds: requestMetrics.generationMilliseconds,
-      acquisitionMilliseconds: stats(acquisition),
+      encodingMilliseconds: stats(encoding),
       fontResponseMilliseconds: stats(response),
       ceilings,
       pass:
@@ -201,7 +231,7 @@ async function run(label, source, ceilings) {
         generationRuns
           .filter((run) => run.phase === "process-warm")
           .every((run) => run.p95 < ceilings.generationP95) &&
-        stats(acquisition).p95 < 10 &&
+        stats(encoding).p95 < 5 &&
         stats(response).p95 < 5 &&
         requestMetrics.poolExhaustions === 0 &&
         requestMetrics.generationFailures === 0,
