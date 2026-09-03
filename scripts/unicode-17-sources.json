@@ -1,0 +1,32 @@
+{
+  "unicodeVersion": "17.0.0",
+  "package": {
+    "name": "@unicode/unicode-17.0.0",
+    "version": "1.6.17"
+  },
+  "sources": {
+    "UnicodeData.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt",
+      "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+    },
+    "EastAsianWidth.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt",
+      "sha256": "ea7ce50f3444a050333448dffef1cadd9325af55cbb764b4a2280faf52170a33"
+    },
+    "ArabicShaping.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/ArabicShaping.txt",
+      "sha256": "39afa01e680e27d0fd10b67a9b27be13fbaa3d0efecfb5be45991de9a0d267d0"
+    }
+  },
+  "conformanceTests": {
+    "bidi": "https://www.unicode.org/Public/17.0.0/ucd/BidiTest.txt",
+    "bidiCharacters": "https://www.unicode.org/Public/17.0.0/ucd/BidiCharacterTest.txt",
+    "grapheme": "https://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakTest.txt",
+    "line": "https://www.unicode.org/Public/17.0.0/ucd/auxiliary/LineBreakTest.txt",
+    "word": "https://www.unicode.org/Public/17.0.0/ucd/auxiliary/WordBreakTest.txt"
+  },
+  "generated": {
+    "path": "packages/core/src/generated/unicode17.ts",
+    "sha256": "a7d5470fbcc5d01e6306efb672dc3d16e1d94a1e9ece74b37aed0584a2692e4b"
+  }
+}

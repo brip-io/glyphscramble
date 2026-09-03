@@ -138,8 +138,10 @@ describe("request engine", () => {
     const fetcher = (async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : String(input);
       return url.startsWith("https://fonts.googleapis.com/")
-        ? new Response(css)
-        : new Response(syntheticFont());
+        ? new Response(css, { headers: { "content-type": "text/css" } })
+        : new Response(syntheticFont(), {
+            headers: { "content-type": "font/ttf" },
+          });
     }) as typeof fetch;
     await prepareGlyphFonts(config, { cwd, fetcher });
     process.env.GLYPHSCRAMBLE_SECRET =

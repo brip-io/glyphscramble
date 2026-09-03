@@ -19,7 +19,19 @@ import {
 } from "./coverage.js";
 import { validateGlyphConfig } from "./config.js";
 import { extractFontMetadata } from "./font-metadata.js";
-import { buildSfnt, fontCodepoints, parseSfnt, type SfntFont } from "./sfnt.js";
+import {
+  DEFAULT_FONT_PARSE_LIMITS,
+  buildSfnt,
+  fontCodepoints,
+  parseSfnt,
+  woff2DeclaredSize,
+  type SfntFont,
+} from "./sfnt.js";
+import {
+  fetchBounded,
+  type FetchedResource,
+  type HostResolver,
+} from "./remote.js";
 import type {
   FontConfig,
   FontFaceDescriptors,
@@ -30,7 +42,6 @@ import type {
   PreparedFontFamilyMetadata,
 } from "./types.js";
 
-const DEFAULT_REMOTE_BYTES = 8 * 1024 * 1024;
 const DEFAULT_NORMALIZED_BYTES = 2 * 1024 * 1024;
 const GLYPH_USER_AGENT =
   "GlyphScramble/0.1 (+https://github.com/brip-io/glyphscramble)";
@@ -52,12 +63,6 @@ export interface CssFontFace {
   stretch: string;
   unicodeRange: readonly string[];
   sourceUrl: string;
-}
-
-interface FetchedResource {
-  bytes: Uint8Array;
-  url: string;
-  contentType: string;
 }
 
 interface ResolvedFace {
@@ -84,48 +89,6 @@ interface NormalizedFont {
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-async function limitedFetch(
-  initialUrl: string,
-  config: GlyphConfig,
-  accept: string,
-  fetcher: typeof fetch,
-  userAgent = GLYPH_USER_AGENT,
-): Promise<FetchedResource> {
-  let url = new URL(initialUrl);
-  const redirects = config.remote?.maxRedirects ?? 3;
-  const maxBytes = config.remote?.maxBytes ?? DEFAULT_REMOTE_BYTES;
-  for (let redirect = 0; redirect <= redirects; redirect++) {
-    if (url.protocol !== "https:")
-      throw new Error(`Remote source must remain HTTPS: ${url}`);
-    const response = await fetcher(url, {
-      headers: { accept, "user-agent": userAgent },
-      redirect: "manual",
-      signal: AbortSignal.timeout(config.remote?.timeoutMs ?? 10_000),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location || redirect === redirects)
-        throw new Error(`Too many redirects while fetching ${initialUrl}`);
-      url = new URL(location, url);
-      continue;
-    }
-    if (!response.ok)
-      throw new Error(`Remote source ${url} returned ${response.status}.`);
-    const declared = Number(response.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > maxBytes)
-      throw new Error(`Remote source exceeds ${maxBytes} bytes.`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.length > maxBytes)
-      throw new Error(`Remote source exceeds ${maxBytes} bytes.`);
-    return {
-      bytes,
-      url: url.href,
-      contentType: response.headers.get("content-type") ?? "",
-    };
-  }
-  throw new Error(`Unable to fetch ${initialUrl}`);
 }
 
 function cssString(value: string): string {
@@ -279,6 +242,7 @@ async function resolveFamily(
   config: GlyphConfig,
   cwd: string,
   fetcher: typeof fetch,
+  resolver?: HostResolver,
 ): Promise<ResolvedFamily> {
   if (font.source.kind === "file") {
     const faces = Object.entries(font.faces ?? { default: {} });
@@ -301,12 +265,14 @@ async function resolveFamily(
     const faces = Object.entries(font.faces ?? { default: {} });
     if (faces.length !== 1)
       throw new Error(`Direct font ${id} accepts exactly one face selector.`);
-    const result = await limitedFetch(
-      font.source.url,
+    const result = await fetchBounded(font.source.url, {
+      accept: "font/woff2,font/woff,font/ttf,font/otf,*/*;q=0.1",
       config,
-      "font/woff2,font/woff,font/ttf,font/otf,*/*;q=0.1",
       fetcher,
-    );
+      kind: "font",
+      ...(resolver ? { resolver } : {}),
+      userAgent: GLYPH_USER_AGENT,
+    });
     return {
       sourceUrl: result.url,
       sourceSha256: sha256(result.bytes),
@@ -324,13 +290,14 @@ async function resolveFamily(
     };
   }
 
-  const css = await limitedFetch(
-    font.source.url,
+  const css = await fetchBounded(font.source.url, {
+    accept: "text/css",
     config,
-    "text/css",
     fetcher,
-    GOOGLE_FONTS_USER_AGENT,
-  );
+    kind: "css",
+    ...(resolver ? { resolver } : {}),
+    userAgent: GOOGLE_FONTS_USER_AGENT,
+  });
   const candidates = parseCssFontFaces(
     new TextDecoder().decode(css.bytes),
     css.url,
@@ -367,12 +334,14 @@ async function resolveFamily(
     selected.map(async ({ id: faceId, selector, candidate }) => {
       let pending = fetched.get(candidate.sourceUrl);
       if (!pending) {
-        pending = limitedFetch(
-          candidate.sourceUrl,
+        pending = fetchBounded(candidate.sourceUrl, {
+          accept: "font/woff2,font/woff,font/ttf,font/otf,*/*;q=0.1",
           config,
-          "font/woff2,font/woff,font/ttf,font/otf,*/*;q=0.1",
           fetcher,
-        );
+          kind: "font",
+          ...(resolver ? { resolver } : {}),
+          userAgent: GLYPH_USER_AGENT,
+        });
         fetched.set(candidate.sourceUrl, pending);
       }
       const result = await pending;
@@ -405,21 +374,30 @@ function signature(bytes: Uint8Array): string {
   return String.fromCharCode(...bytes.subarray(0, 4));
 }
 
-async function normalizeFont(input: Uint8Array): Promise<NormalizedFont> {
+async function normalizeFont(
+  input: Uint8Array,
+  maxOutputBytes = DEFAULT_FONT_PARSE_LIMITS.maxOutputBytes,
+): Promise<NormalizedFont> {
   const magic = signature(input);
   let sfnt: Uint8Array;
   let container: NormalizedFont["container"];
   if (magic === "wOF2") {
+    woff2DeclaredSize(input, { maxOutputBytes });
     sfnt = new Uint8Array(await decompress(input));
+    if (sfnt.length > maxOutputBytes)
+      throw new Error(`WOFF2 output exceeds ${maxOutputBytes} bytes.`);
     container = "woff2";
   } else if (magic === "wOFF") {
-    sfnt = buildSfnt(parseSfnt(input));
+    sfnt = buildSfnt(parseSfnt(input, { maxOutputBytes }));
     container = "woff";
   } else {
-    sfnt = buildSfnt(parseSfnt(input));
+    sfnt = buildSfnt(parseSfnt(input, { maxOutputBytes }));
     container = "sfnt";
   }
-  const parsed = parseSfnt(sfnt);
+  const parsed = parseSfnt(sfnt, {
+    maxInputBytes: maxOutputBytes,
+    maxOutputBytes,
+  });
   return {
     sfnt,
     container,
@@ -551,6 +529,7 @@ export async function prepareGlyphFonts(
     cwd?: string;
     outputDir?: string;
     fetcher?: typeof fetch;
+    resolver?: HostResolver;
     generatedAt?: string;
   } = {},
 ): Promise<GlyphLockfile> {
@@ -583,6 +562,7 @@ export async function prepareGlyphFonts(
         config,
         cwd,
         options.fetcher ?? fetch,
+        options.resolver,
       );
       const family: PreparedFontFamilyMetadata = {
         id: familyId,
@@ -607,7 +587,11 @@ export async function prepareGlyphFonts(
       };
       await mkdir(resolve(staging, "fonts", familyId), { recursive: true });
       for (const resolvedFace of resolvedFamily.faces) {
-        const normalized = await normalizeFont(resolvedFace.bytes);
+        const hardLimit = Math.max(
+          DEFAULT_FONT_PARSE_LIMITS.maxOutputBytes,
+          config.maxNormalizedBytes ?? 0,
+        );
+        const normalized = await normalizeFont(resolvedFace.bytes, hardLimit);
         const limit = config.maxNormalizedBytes ?? DEFAULT_NORMALIZED_BYTES;
         if (
           normalized.sfnt.length > limit &&
