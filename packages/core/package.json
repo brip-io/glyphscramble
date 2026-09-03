@@ -33,7 +33,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "pnpm run check:version && pnpm run clean && tsc -p tsconfig.json && node scripts/build-worker.mjs",
+    "build": "pnpm run check:version && pnpm run clean && tsc -p tsconfig.json && node scripts/build-browser.mjs && node scripts/build-worker.mjs",
     "generate:version": "node scripts/generate-version.mjs",
     "check:version": "node scripts/generate-version.mjs --check",
     "clean": "rm -rf dist",
