@@ -6,6 +6,8 @@ export default tseslint.config(
     ignores: [
       "**/dist/**",
       "**/node_modules/**",
+      "examples/**/.next/**",
+      "examples/**/.glyphscramble/**",
       "packages/core/src/generated/**",
     ],
   },

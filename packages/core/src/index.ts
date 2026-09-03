@@ -89,6 +89,7 @@ export type {
   FontLicense,
   FontSource,
   GlyphConfig,
+  GlyphConfigInput,
   GlyphEngine,
   GlyphEngineMetrics,
   GlyphLockfile,

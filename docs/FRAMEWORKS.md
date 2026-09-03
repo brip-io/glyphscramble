@@ -8,7 +8,43 @@ The `response-pool` runtime is intentionally stateful. Do not create a new engin
 
 ## React and Next 16
 
-Use `createGlyphPayload` in a Server Component and pass its result to `<GlyphScramble payload={payload} />`. Export `fontRoute` from the generated App Router route. Apply `responseHeaders()` only to an explicitly protected route group; Next Proxy cannot observe downstream context use. Never import the server helper from a file containing `"use client"`.
+Run `glyphscramble init` in an App Router project, prepare the configured font,
+then call the generated process-level helper from an async Server Component:
+
+```tsx
+import { GlyphScramble } from "@brip/glyphscramble-next";
+import { glyphs } from "@/glyphscramble.next";
+
+export default async function PremiumExcerpt() {
+  const payload = await glyphs.scramble("Server-only high-value text.", {
+    font: "body",
+    lang: "en",
+  });
+  return <GlyphScramble payload={payload} />;
+}
+```
+
+The helper calls Next's request-time boundary and React request cache, so all
+protected blocks in one RSC render share one context while different responses
+rotate. The client wrapper refreshes shortly before payload expiry and fails
+closed if the refresh or font load cannot complete. Equivalent cloned payloads
+do not remount the font lifecycle. `fontTimeoutMs` and `errorText` customize
+the shared client guard without exposing plaintext.
+
+The generated filesystem route is
+`app/%5Fglyphscramble/font/[token]/[face]/route.ts` (or under `src/app`).
+Its URL is still `/_glyphscramble/...`; a literal `_glyphscramble` folder is
+private to Next and will not route. The handler exports GET and HEAD on Next's
+default Node runtime. Do not add `runtime` or `dynamic` route constants when
+Cache Components is enabled, and do not import either package's `/server`
+entrypoint from a file containing `"use client"`.
+
+The adapter shares independently bundled page and Route Handler modules through
+one process-global engine. This makes self-hosted, single-process Next work; it
+does not make process-local font variants available across serverless
+functions, restarts, or horizontally scaled instances. Those deployments remain
+unsupported until an external variant provider exists. Next Proxy is neither
+generated nor required and cannot decide cache policy after downstream render.
 
 ## Vue 3 and Nuxt 4
 

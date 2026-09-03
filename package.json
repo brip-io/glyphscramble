@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:next": "playwright test --config playwright.next.config.ts",
     "test:watch": "vitest",
     "typecheck": "pnpm -r build && pnpm -r typecheck",
     "changeset": "changeset",

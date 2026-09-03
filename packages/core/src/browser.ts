@@ -133,6 +133,7 @@ export function assertGlyphPayload(
       "face",
       "fontToken",
       "fontUrl",
+      "expiresAt",
       "coverage",
       "rotation",
       "lang",
@@ -159,6 +160,11 @@ export function assertGlyphPayload(
     max: MAX_FONT_URL_LENGTH,
     pattern: SAFE_FONT_URL,
   });
+  if (
+    !Number.isSafeInteger(payload.expiresAt) ||
+    (payload.expiresAt as number) < 1
+  )
+    throw new TypeError("payload.expiresAt must be a positive Unix timestamp.");
 
   const face = objectAt(payload.face, "payload.face");
   exactKeys(
@@ -408,6 +414,7 @@ export function mountGlyphPayload(
         abort: AbortController;
         key: string;
         entry: FaceRegistryEntry;
+        expiryTimer: ReturnType<typeof setTimeout>;
       }
     | undefined;
   let destroyed = false;
@@ -415,6 +422,7 @@ export function mountGlyphPayload(
   const releaseCurrent = (): void => {
     if (!current) return;
     current.abort.abort();
+    clearTimeout(current.expiryTimer);
     removeFace(element, current.entry, originalStyle);
     releaseFace(document, current.key, current.entry);
     current = undefined;
@@ -428,6 +436,14 @@ export function mountGlyphPayload(
     element.textContent = payload.encodedText;
     if (payload.lang) element.setAttribute("lang", payload.lang);
     else element.removeAttribute("lang");
+    const expiresInMs = payload.expiresAt * 1_000 - Date.now();
+    if (expiresInMs <= 0) {
+      element.textContent =
+        options.errorText ?? "This protected content could not be displayed.";
+      element.dataset.glyphscramble = "error";
+      element.hidden = false;
+      return "error";
+    }
 
     let acquired: ReturnType<typeof acquireFace>;
     try {
@@ -442,7 +458,15 @@ export function mountGlyphPayload(
       return "error";
     }
     const abort = new AbortController();
-    current = { abort, ...acquired };
+    const expiryTimer = setTimeout(() => {
+      if (current?.abort !== abort) return;
+      releaseCurrent();
+      element.textContent =
+        options.errorText ?? "This protected content could not be displayed.";
+      element.dataset.glyphscramble = "error";
+      element.hidden = false;
+    }, expiresInMs);
+    current = { abort, expiryTimer, ...acquired };
     applyFace(element, payload, acquired.entry);
 
     let timer: ReturnType<typeof setTimeout> | undefined;

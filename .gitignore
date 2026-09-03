@@ -8,3 +8,5 @@ test-results/
 *.log
 packages/demo/.next/
 packages/demo/.output/
+examples/next/.glyphscramble/
+examples/next/.next/

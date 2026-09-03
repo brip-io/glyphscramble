@@ -38,6 +38,7 @@ function payload(suffix = "0123456789abcdef") {
     },
     fontToken,
     fontUrl: `/_glyphscramble/font/${fontToken}/body%40regular.woff2`,
+    expiresAt: Math.floor(Date.now() / 1_000) + 60,
     coverage: { identity: suffix.repeat(4), ranges: ["U+0020-007E"] },
     rotation: {
       scope: "response",
