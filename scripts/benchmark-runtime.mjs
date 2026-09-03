@@ -10,12 +10,14 @@ import {
   buildSfnt,
   createGlyphEngine,
   inspectFont,
+  loadPreparedFonts,
   parseSfnt,
   prepareGlyphFonts,
+  ResponsePoolVariantProvider,
 } from "../packages/core/dist/index.js";
 
-const VARIANT_ITERATIONS = 5;
-const FONT_RESPONSE_ITERATIONS = 50;
+const GENERATION_VARIANTS = 5;
+const REQUEST_ITERATIONS = 50;
 const COLD_ITERATIONS = 3;
 const SECRET = "GLYPHSCRAMBLE_BENCHMARK_SECRET";
 
@@ -76,12 +78,12 @@ async function run(label, source, ceilings) {
       accessibilityRiskAcknowledged: true,
       maxNormalizedBytes: 2 * 1024 * 1024,
       runtime: {
-        poolLowWatermark: VARIANT_ITERATIONS,
-        poolHighWatermark: VARIANT_ITERATIONS,
+        poolLowWatermark: GENERATION_VARIANTS,
+        poolHighWatermark: GENERATION_VARIANTS,
         generationConcurrency: 2,
         generationQueueLimit: 16,
         generationTimeoutMs: ceilings.generationP95 * 2,
-        cacheMaxBytes: source.length * VARIANT_ITERATIONS * 4,
+        cacheMaxBytes: source.length * GENERATION_VARIANTS * 4,
       },
     };
     const lock = await prepareGlyphFonts(config, { cwd });
@@ -95,39 +97,59 @@ async function run(label, source, ceilings) {
       const candidate = await createGlyphEngine(config, { cwd });
       coldPool.push(performance.now() - coldStarted);
       generationRuns.push(candidate.metrics().generationMilliseconds);
-      if (index === 0) engine = candidate;
-      else await candidate.close();
+      await candidate.close();
     }
+
+    // Measure request work independently from WOFF2 throughput. This is still
+    // the production pool implementation, filled with already-prepared byte
+    // payloads so a statistically useful request sample does not generate 50
+    // additional compressed fonts.
+    const requestFaces = (await loadPreparedFonts("body", cwd)).map((face) => ({
+      id: `${face.id}@${face.faceId}`,
+      namespace: `${face.id}@${face.faceId}:${face.metadata.identity}`,
+      sfnt: face.sfnt,
+      codepoints: face.metadata.codepoints,
+    }));
+    const requestProvider = new ResponsePoolVariantProvider(
+      requestFaces,
+      {
+        poolLowWatermark: REQUEST_ITERATIONS,
+        poolHighWatermark: REQUEST_ITERATIONS,
+        generationConcurrency: 2,
+        generationQueueLimit: REQUEST_ITERATIONS,
+        generationTimeoutMs: 1_000,
+        cacheMaxBytes: source.length * REQUEST_ITERATIONS * 3,
+      },
+      () => Promise.resolve(new Uint8Array(source)),
+    );
+    engine = await createGlyphEngine(config, {
+      cwd,
+      variantProvider: requestProvider,
+    });
     const acquisition = [];
     const response = [];
-    const fontUrls = [];
     const sample = "High value block. ".repeat(625);
-    for (let index = 0; index < VARIANT_ITERATIONS; index++) {
+    for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
       acquisition.push(performance.now() - acquired);
-      fontUrls.push(payload.fontUrl);
-    }
-    for (let index = 0; index < FONT_RESPONSE_ITERATIONS; index++) {
       const responseStarted = performance.now();
       const font = await engine.fontResponse(
-        new globalThis.Request(
-          `https://benchmark.invalid${fontUrls[index % fontUrls.length]}`,
-        ),
+        new globalThis.Request(`https://benchmark.invalid${payload.fontUrl}`),
       );
       response.push(performance.now() - responseStarted);
       if (!font.ok)
         throw new Error(`${label} font response returned ${font.status}`);
       await font.arrayBuffer();
     }
-    const metrics = engine.metrics();
+    const requestMetrics = engine.metrics();
     const result = {
       label,
       node: process.version,
       normalizedBytes,
       coldPoolMilliseconds: stats(coldPool),
-      generationMilliseconds: metrics.generationMilliseconds,
       generationRuns,
+      preparedPoolFillMilliseconds: requestMetrics.generationMilliseconds,
       acquisitionMilliseconds: stats(acquisition),
       fontResponseMilliseconds: stats(response),
       ceilings,
@@ -136,8 +158,8 @@ async function run(label, source, ceilings) {
         generationRuns.every((run) => run.p95 < ceilings.generationP95) &&
         stats(acquisition).p95 < 10 &&
         stats(response).p95 < 5 &&
-        metrics.poolExhaustions === 0 &&
-        metrics.generationFailures === 0,
+        requestMetrics.poolExhaustions === 0 &&
+        requestMetrics.generationFailures === 0,
     };
     return result;
   } finally {

@@ -91,11 +91,12 @@ watermark; issued variants expire with their tokens.
 and WOFF2 generation. It reports p50/p95/p99 instead of a single encoding p95.
 CI uses the pinned OFL Inter variable face at 122,912 normalized bytes and the
 same real face padded with an inert, incompressible table to exercise the 1 MiB
-resource path. Three cold engine starts, five response acquisitions, and fifty
-prepared-font lookups produce p50/p95/p99 results. The larger lookup sample
-keeps the 5 ms request-path gate meaningful instead of treating the slowest of
-only five shared-runner observations as a percentile. R12 still owns a
-naturally large real-font matrix.
+resource path. Three cold five-variant engine starts measure real WOFF2 worker
+throughput. Fifty response acquisitions and prepared-font lookups then exercise
+the production pool and engine with prebuilt byte payloads, keeping the 5 ms
+and 10 ms request-path gates meaningful instead of treating the slowest of only
+five shared-runner observations as a percentile. R12 still owns a naturally
+large real-font matrix.
 
 For R01, a prepared font response must remain below 5 ms p95 and a complete
 10,000-scalar response acquisition below 10 ms p95 on Node 22 and 24. CI
