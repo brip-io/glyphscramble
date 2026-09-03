@@ -1,6 +1,6 @@
 # [R07] React and Next 16 integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#8](https://github.com/brip-io/glyphscramble/issues/8)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #39](https://github.com/brip-io/glyphscramble/pull/39) · **GitHub issue:** [#8](https://github.com/brip-io/glyphscramble/issues/8)
 > **Blocked by:** R05, R06 · **Blocks:** R12
 
 ## Objective

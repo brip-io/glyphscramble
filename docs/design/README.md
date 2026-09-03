@@ -4,7 +4,7 @@
 
 The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and twenty independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
 
-R01-R06 and R11 are merged and implemented. Issue state and implementation
+R01-R07 and R11 are merged and implemented. Issue state and implementation
 evidence remain canonical in each linked design.
 
 | ID      | Issue / design                                                                        | Size | Priority | GitHub issue                                              |
