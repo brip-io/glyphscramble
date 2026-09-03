@@ -1,6 +1,6 @@
 # [R05] Request-engine lifecycle and abuse boundaries
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress in [PR #23](https://github.com/brip-io/glyphscramble/pull/23) · **GitHub issue:** [#6](https://github.com/brip-io/glyphscramble/issues/6)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #23](https://github.com/brip-io/glyphscramble/pull/23) · **GitHub issue:** [#6](https://github.com/brip-io/glyphscramble/issues/6)
 > **Blocked by:** R01, R04, R11 · **Blocks:** R07-R10, R12
 
 ## Objective
