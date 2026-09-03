@@ -23,6 +23,20 @@ function config(runtime: GlyphConfig["runtime"]): GlyphConfig {
 }
 
 describe("runtime configuration", () => {
+  it("requires a serialization-safe root-relative route prefix", () => {
+    const value = config(undefined);
+    for (const routePrefix of [
+      "https://example.test/font",
+      "/glyph/",
+      "/glyph?mode=test",
+      "/glyph%2fescape",
+      "/glyph\\escape",
+    ])
+      expect(() =>
+        defineGlyphConfig({ ...value, routePrefix } as GlyphConfig),
+      ).toThrow(/routePrefix/);
+  });
+
   it("accepts explicit bounded response-pool limits", () => {
     expect(
       defineGlyphConfig(

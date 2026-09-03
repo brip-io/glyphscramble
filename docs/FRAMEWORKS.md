@@ -2,6 +2,8 @@
 
 All SSR integrations follow the same sequence: create one process-level engine, wait for its one-use variant pool during startup, call `beginResponse()` for each dynamic document, scramble plaintext on the server, render only `GlyphPayload`, route font requests to that same engine's `fontResponse()`, and mark the containing response `private, no-store` only when `ResponseContext.used` is true.
 
+Every client adapter delegates to the same validated `mountGlyphPayload()` lifecycle. The data-only v2 payload contains exact face descriptors and no serialized CSS; duplicate mounts share a face load, reactive updates abort stale work, and unmount releases timers, rules, and registrations. See [Client payload and font lifecycle](CLIENT-RUNTIME.md).
+
 The `response-pool` runtime is intentionally stateful. Do not create a new engine per request or route the font URL to an instance that cannot access the issuing process's variant. Pool exhaustion throws before rendering and must remain a closed failure. A load-balanced deployment needs request affinity or a future external `FontVariantProvider`; it must not regenerate on the font request or silently reuse a mapping across responses.
 
 ## React and Next 16
@@ -18,7 +20,7 @@ Install `createGlyphHandle()` as the server handle. It places the response conte
 
 ## Astro 7
 
-SSR mode uses `createAstroGlyphMiddleware()`. The `.astro` component emits encoded text, the matching `@font-face`, and a load guard. Static mode accepts only marked HTML outside `astro-island` or other hydrated ancestors; protected client islands fail during planning.
+SSR mode uses `createAstroGlyphMiddleware()`. The `.astro` component emits encoded text plus a serialized data-only payload and mounts it through the bundled shared runtime. Static mode accepts only marked HTML outside `astro-island` or other hydrated ancestors; protected client islands fail during planning.
 
 ## Vite and vanilla servers
 

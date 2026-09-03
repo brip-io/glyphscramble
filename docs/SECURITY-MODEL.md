@@ -14,6 +14,8 @@ The approved claim is: **GlyphScramble raises the cost of bulk DOM scraping.**
 
 Each protected response consumes one CSPRNG-seeded font variant from a bounded pre-generation pool. The AES-256-GCM encrypted, versioned, expiring token carries a key ID, random seed, random variant ID, only the prepared faces used by that response context, issuance/expiry times, and explicit `response-pool` mode. Domain-separated active and previous keys support bounded zero-downtime rotation. Encryption prevents callers from minting arbitrary font work and coordinates the text/font pair. It does not make the content secret because the valid font contains a recoverable mapping.
 
+The browser accepts only the data-only v2 payload contract. Runtime validation rejects serialized CSS, unknown fields, oversized values, malformed face descriptors or Unicode text, mismatched coverage, cross-origin/path-confused font URLs, and inconsistent token/face IDs before registering a font. A shared reference-counted registry deduplicates exact face loads and removes generated faces and nonce-scoped rules after the last mount. The only runtime request is the validated same-origin font URL; there is no telemetry or content logging.
+
 The font handler validates method, path encoding, token version/key/lifetime,
 face authorization, and variant availability before provider lookup. Invalid
 requests return controlled 4xx responses. `HEAD` reads only prepared bytes, and

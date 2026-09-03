@@ -1,50 +1,527 @@
 import type { GlyphPayload } from "./types.js";
 
+export const MAX_GLYPH_PAYLOAD_BYTES = 1024 * 1024;
+const MAX_IDENTIFIER_LENGTH = 32;
+const MAX_TOKEN_LENGTH = 8 * 1024;
+const MAX_FONT_URL_LENGTH = 16 * 1024;
+const MAX_COVERAGE_RANGES = 1024;
+const SAFE_IDENTIFIER = /^[a-z][a-z0-9_-]{0,31}$/i;
+const SAFE_FAMILY = /^[a-z][a-z0-9_-]{0,127}$/i;
+const SAFE_FONT_URL = /^\/[a-z0-9._~%/-]+$/i;
+const SAFE_TOKEN = /^[a-z0-9._-]+$/i;
+const SAFE_NONCE = /^[a-z0-9+/_=-]{1,256}$/i;
+const SAFE_COVERAGE_IDENTITY = /^[a-f0-9]{64}$/i;
+const SAFE_UNICODE_RANGE = /^U\+[0-9A-F?]{1,6}(?:-[0-9A-F]{1,6})?$/;
+const SAFE_WEIGHT =
+  /^(?:normal|bold|(?:[1-9]\d{0,2}|1000)(?: (?:[1-9]\d{0,2}|1000))?)$/;
+const SAFE_STYLE =
+  /^(?:normal|italic|oblique(?: -?(?:\d+(?:\.\d+)?|\.\d+)deg(?: -?(?:\d+(?:\.\d+)?|\.\d+)deg)?)?)$/;
+const SAFE_STRETCH =
+  /^(?:normal|ultra-condensed|extra-condensed|condensed|semi-condensed|semi-expanded|expanded|extra-expanded|ultra-expanded|(?:\d+(?:\.\d+)?|\.\d+)%(?: (?:\d+(?:\.\d+)?|\.\d+)%)?)$/;
+const SAFE_LANG = /^(?:[a-z]{2,8}|x-[a-z0-9]{1,8})(?:-[a-z0-9]{1,8})*$/i;
+
 export interface MountOptions {
   timeoutMs?: number;
   errorText?: string;
 }
 
+export type GlyphMountResult = "ready" | "error" | "aborted";
+
+export interface GlyphMountHandle {
+  readonly ready: Promise<GlyphMountResult>;
+  update(payload: unknown): Promise<GlyphMountResult>;
+  destroy(): void;
+}
+
+export interface GlyphCspDirectives {
+  readonly "font-src": readonly string[];
+  readonly "style-src": readonly string[];
+  readonly "style-src-elem": readonly string[];
+  readonly "style-src-attr": readonly string[];
+  readonly "script-src": readonly string[];
+}
+
+interface FaceRegistryEntry {
+  refs: number;
+  face: FontFace;
+  load: Promise<FontFace>;
+  className?: string;
+  style?: HTMLStyleElement;
+}
+
+interface FaceRegistry {
+  nextClass: number;
+  entries: Map<string, FaceRegistryEntry>;
+}
+
+const registries = new WeakMap<Document, FaceRegistry>();
+
+function objectAt(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new TypeError(`${path} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function exactKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+): void {
+  const allowedKeys = new Set(allowed);
+  const extra = Object.keys(value).find((key) => !allowedKeys.has(key));
+  if (extra) throw new TypeError(`${path}.${extra} is not allowed.`);
+}
+
+function stringAt(
+  value: unknown,
+  path: string,
+  options: { min?: number; max: number; pattern?: RegExp },
+): string {
+  if (
+    typeof value !== "string" ||
+    value.length < (options.min ?? 1) ||
+    value.length > options.max ||
+    (options.pattern && !options.pattern.test(value))
+  )
+    throw new TypeError(`${path} is invalid.`);
+  return value;
+}
+
+function stringArrayAt(
+  value: unknown,
+  path: string,
+  pattern: RegExp,
+): readonly string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_COVERAGE_RANGES
+  )
+    throw new TypeError(`${path} is invalid.`);
+  for (const [index, item] of value.entries())
+    stringAt(item, `${path}[${index}]`, { max: 32, pattern });
+  return value as string[];
+}
+
+function isUnicodeScalarString(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(++index);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
+  }
+  return true;
+}
+
 /**
- * Installs the matching face, waits for it, and reveals an aria-hidden block.
- * The element must already contain only payload.encodedText.
+ * Validates a payload after JSON/RSC/HTML serialization and narrows it to the
+ * branded server-produced type. Unknown fields are rejected so old payloads
+ * containing serialized CSS cannot cross this boundary silently.
  */
-export async function revealGlyphPayload(
+export function assertGlyphPayload(
+  value: unknown,
+  options: { maxBytes?: number } = {},
+): asserts value is GlyphPayload {
+  const payload = objectAt(value, "payload");
+  exactKeys(
+    payload,
+    [
+      "version",
+      "encodedText",
+      "font",
+      "face",
+      "fontToken",
+      "fontUrl",
+      "coverage",
+      "rotation",
+      "lang",
+      "cspNonce",
+    ],
+    "payload",
+  );
+  if (payload.version !== 2) throw new TypeError("payload.version must be 2.");
+  const encodedText = stringAt(payload.encodedText, "payload.encodedText", {
+    min: 0,
+    max: options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES,
+  });
+  if (!isUnicodeScalarString(encodedText))
+    throw new TypeError("payload.encodedText must contain Unicode scalars.");
+  const font = stringAt(payload.font, "payload.font", {
+    max: MAX_IDENTIFIER_LENGTH,
+    pattern: SAFE_IDENTIFIER,
+  });
+  const fontToken = stringAt(payload.fontToken, "payload.fontToken", {
+    max: MAX_TOKEN_LENGTH,
+    pattern: SAFE_TOKEN,
+  });
+  const fontUrl = stringAt(payload.fontUrl, "payload.fontUrl", {
+    max: MAX_FONT_URL_LENGTH,
+    pattern: SAFE_FONT_URL,
+  });
+
+  const face = objectAt(payload.face, "payload.face");
+  exactKeys(
+    face,
+    ["id", "family", "weight", "style", "stretch", "unicodeRange"],
+    "payload.face",
+  );
+  const faceId = stringAt(face.id, "payload.face.id", {
+    max: MAX_IDENTIFIER_LENGTH,
+    pattern: SAFE_IDENTIFIER,
+  });
+  const family = stringAt(face.family, "payload.face.family", {
+    max: 128,
+    pattern: SAFE_FAMILY,
+  });
+  stringAt(face.weight, "payload.face.weight", {
+    max: 32,
+    pattern: SAFE_WEIGHT,
+  });
+  stringAt(face.style, "payload.face.style", {
+    max: 64,
+    pattern: SAFE_STYLE,
+  });
+  stringAt(face.stretch, "payload.face.stretch", {
+    max: 64,
+    pattern: SAFE_STRETCH,
+  });
+  stringArrayAt(
+    face.unicodeRange,
+    "payload.face.unicodeRange",
+    SAFE_UNICODE_RANGE,
+  );
+
+  const coverage = objectAt(payload.coverage, "payload.coverage");
+  exactKeys(coverage, ["identity", "ranges"], "payload.coverage");
+  stringAt(coverage.identity, "payload.coverage.identity", {
+    max: 64,
+    pattern: SAFE_COVERAGE_IDENTITY,
+  });
+  stringArrayAt(coverage.ranges, "payload.coverage.ranges", SAFE_UNICODE_RANGE);
+  if (JSON.stringify(face.unicodeRange) !== JSON.stringify(coverage.ranges))
+    throw new TypeError("payload coverage does not match its face descriptor.");
+
+  const rotation = objectAt(payload.rotation, "payload.rotation");
+  exactKeys(
+    rotation,
+    ["scope", "variantMode", "reusableAcrossResponses"],
+    "payload.rotation",
+  );
+  if (
+    rotation.scope !== "response" ||
+    rotation.variantMode !== "response-pool" ||
+    rotation.reusableAcrossResponses !== false
+  )
+    throw new TypeError("payload.rotation is invalid.");
+  if (payload.lang !== undefined)
+    stringAt(payload.lang, "payload.lang", { max: 64, pattern: SAFE_LANG });
+  if (payload.cspNonce !== undefined)
+    stringAt(payload.cspNonce, "payload.cspNonce", {
+      max: 256,
+      pattern: SAFE_NONCE,
+    });
+  if (
+    family !== `GlyphScramble-${font}-${faceId}-${family.slice(-16)}` ||
+    !/^[a-f0-9]{16}$/i.test(family.slice(-16))
+  )
+    throw new TypeError("payload.face.family is inconsistent with its ids.");
+  if (
+    fontUrl.startsWith("//") ||
+    /%(?:2f|5c)/i.test(fontUrl) ||
+    fontUrl.split("/").some((part) => part === "." || part === "..") ||
+    !fontUrl.includes(`/font/${fontToken}/`) ||
+    !fontUrl.endsWith(`/${font}%40${faceId}.woff2`)
+  )
+    throw new TypeError("payload.fontUrl is inconsistent with its token.");
+
+  const maxBytes = options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES;
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+    throw new TypeError("maxBytes must be a positive safe integer.");
+  if (new TextEncoder().encode(JSON.stringify(payload)).byteLength > maxBytes)
+    throw new TypeError(`payload exceeds the ${maxBytes} byte limit.`);
+}
+
+/** CSP sources required by the runtime's same-origin font and bundled script. */
+export function glyphCspDirectives(nonce?: string): GlyphCspDirectives {
+  if (nonce !== undefined)
+    stringAt(nonce, "nonce", { max: 256, pattern: SAFE_NONCE });
+  const styleSources = Object.freeze(
+    nonce ? ["'self'", `'nonce-${nonce}'`] : ["'self'"],
+  );
+  return Object.freeze({
+    "font-src": Object.freeze(["'self'"]),
+    "style-src": styleSources,
+    "style-src-elem": styleSources,
+    "style-src-attr": Object.freeze(nonce ? ["'none'"] : ["'unsafe-inline'"]),
+    "script-src": Object.freeze(["'self'"]),
+  });
+}
+
+function registryFor(document: Document): FaceRegistry {
+  let registry = registries.get(document);
+  if (!registry) {
+    registry = { nextClass: 0, entries: new Map() };
+    registries.set(document, registry);
+  }
+  return registry;
+}
+
+function faceKey(payload: GlyphPayload): string {
+  return JSON.stringify([
+    payload.coverage.identity,
+    payload.face,
+    payload.fontUrl,
+    payload.cspNonce ?? null,
+  ]);
+}
+
+function faceQuery(payload: GlyphPayload): string {
+  return `${payload.face.style} ${payload.face.weight} ${payload.face.stretch} 1em "${payload.face.family}"`;
+}
+
+function representativeText(text: string): string {
+  return [...text].slice(0, 32).join("") || " ";
+}
+
+function createEntry(
+  document: Document,
+  registry: FaceRegistry,
+  payload: GlyphPayload,
+): FaceRegistryEntry {
+  const FontFaceConstructor =
+    document.defaultView?.FontFace ?? globalThis.FontFace;
+  if (!FontFaceConstructor || !document.fonts)
+    throw new Error("GlyphScramble requires FontFace and document.fonts.");
+  const face = new FontFaceConstructor(
+    payload.face.family,
+    `url("${payload.fontUrl}") format("woff2")`,
+    {
+      weight: payload.face.weight,
+      style: payload.face.style,
+      stretch: payload.face.stretch,
+      unicodeRange: payload.face.unicodeRange.join(","),
+      display: "block",
+    },
+  );
+  let style: HTMLStyleElement | undefined;
+  document.fonts.add(face);
+  try {
+    const entry: FaceRegistryEntry = { refs: 0, face, load: face.load() };
+    if (payload.cspNonce) {
+      const className = `glyphscramble-face-${++registry.nextClass}`;
+      style = document.createElement("style");
+      style.nonce = payload.cspNonce;
+      style.textContent = `.${className}{font-family:"${payload.face.family}";font-weight:${payload.face.weight};font-style:${payload.face.style};font-stretch:${payload.face.stretch}}`;
+      document.head.append(style);
+      entry.className = className;
+      entry.style = style;
+    }
+    return entry;
+  } catch (error) {
+    document.fonts.delete(face);
+    style?.remove();
+    throw error;
+  }
+}
+
+function acquireFace(
+  document: Document,
+  payload: GlyphPayload,
+): { key: string; entry: FaceRegistryEntry } {
+  const registry = registryFor(document);
+  const key = faceKey(payload);
+  let entry = registry.entries.get(key);
+  if (!entry) {
+    entry = createEntry(document, registry, payload);
+    registry.entries.set(key, entry);
+  }
+  entry.refs += 1;
+  return { key, entry };
+}
+
+function releaseFace(
+  document: Document,
+  key: string,
+  entry: FaceRegistryEntry,
+): void {
+  const registry = registryFor(document);
+  entry.refs -= 1;
+  if (entry.refs > 0 || registry.entries.get(key) !== entry) return;
+  registry.entries.delete(key);
+  document.fonts.delete(entry.face);
+  entry.style?.remove();
+}
+
+function applyFace(
   element: HTMLElement,
   payload: GlyphPayload,
-  options: MountOptions = {},
-): Promise<void> {
-  element.hidden = true;
-  element.setAttribute("aria-hidden", "true");
-  const style = document.createElement("style");
-  if (payload.cspNonce) style.nonce = payload.cspNonce;
-  style.textContent = payload.css;
-  document.head.append(style);
-  element.style.fontFamily = `"${payload.family}"`;
-  element.style.visibility = "hidden";
-  element.hidden = false;
-  try {
-    await Promise.race([
-      document.fonts.load(
-        `1em "${payload.family}"`,
-        payload.encodedText.slice(0, 32),
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("font timeout")),
-          options.timeoutMs ?? 8_000,
-        ),
-      ),
-    ]);
-    if (!document.fonts.check(`1em "${payload.family}"`))
-      throw new Error("font failed to load");
-    element.style.visibility = "visible";
-    element.dataset.glyphscramble = "ready";
-  } catch {
-    element.textContent =
-      options.errorText ?? "This protected content could not be displayed.";
-    element.style.fontFamily = "inherit";
-    element.style.visibility = "visible";
-    element.dataset.glyphscramble = "error";
+  entry: FaceRegistryEntry,
+): void {
+  if (entry.className) {
+    element.classList.add(entry.className);
+    return;
   }
+  element.style.fontFamily = `"${payload.face.family}"`;
+  element.style.fontWeight = payload.face.weight;
+  element.style.fontStyle = payload.face.style;
+  element.style.fontStretch = payload.face.stretch;
+}
+
+function removeFace(
+  element: HTMLElement,
+  entry: FaceRegistryEntry | undefined,
+  originalStyle: Pick<
+    CSSStyleDeclaration,
+    "fontFamily" | "fontWeight" | "fontStyle" | "fontStretch"
+  >,
+): void {
+  if (entry?.className) element.classList.remove(entry.className);
+  element.style.fontFamily = originalStyle.fontFamily;
+  element.style.fontWeight = originalStyle.fontWeight;
+  element.style.fontStyle = originalStyle.fontStyle;
+  element.style.fontStretch = originalStyle.fontStretch;
+}
+
+/**
+ * Mounts a serialized payload, reveals only after its exact face loads, and
+ * returns an update/destroy lifecycle used by every framework adapter.
+ */
+export function mountGlyphPayload(
+  element: HTMLElement,
+  initialPayload: unknown,
+  options: MountOptions = {},
+): GlyphMountHandle {
+  const document = element.ownerDocument;
+  const timeoutMs = options.timeoutMs ?? 8_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)
+    throw new TypeError("timeoutMs must be a positive safe integer.");
+  const originalStyle = {
+    fontFamily: element.style.fontFamily,
+    fontWeight: element.style.fontWeight,
+    fontStyle: element.style.fontStyle,
+    fontStretch: element.style.fontStretch,
+  };
+  const originalLang = element.getAttribute("lang");
+  let current:
+    | {
+        abort: AbortController;
+        key: string;
+        entry: FaceRegistryEntry;
+      }
+    | undefined;
+  let destroyed = false;
+
+  const releaseCurrent = (): void => {
+    if (!current) return;
+    current.abort.abort();
+    removeFace(element, current.entry, originalStyle);
+    releaseFace(document, current.key, current.entry);
+    current = undefined;
+  };
+
+  const run = async (payload: GlyphPayload): Promise<GlyphMountResult> => {
+    releaseCurrent();
+    element.hidden = true;
+    element.setAttribute("aria-hidden", "true");
+    element.dataset.glyphscramble = "loading";
+    element.textContent = payload.encodedText;
+    if (payload.lang) element.setAttribute("lang", payload.lang);
+    else element.removeAttribute("lang");
+
+    let acquired: ReturnType<typeof acquireFace>;
+    try {
+      acquired = acquireFace(document, payload);
+    } catch {
+      if (!destroyed) {
+        element.textContent =
+          options.errorText ?? "This protected content could not be displayed.";
+        element.dataset.glyphscramble = "error";
+        element.hidden = false;
+      }
+      return "error";
+    }
+    const abort = new AbortController();
+    current = { abort, ...acquired };
+    applyFace(element, payload, acquired.entry);
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("GlyphScramble font load timed out.")),
+          timeoutMs,
+        );
+      });
+      const aborted = new Promise<never>((_, reject) => {
+        onAbort = () => reject(new Error("GlyphScramble mount aborted."));
+        abort.signal.addEventListener("abort", onAbort, { once: true });
+      });
+      const loaded = await Promise.race([
+        Promise.all([
+          acquired.entry.load,
+          document.fonts.load(
+            faceQuery(payload),
+            representativeText(payload.encodedText),
+          ),
+        ]),
+        timeout,
+        aborted,
+      ]);
+      if (
+        current?.abort !== abort ||
+        abort.signal.aborted ||
+        loaded[0] !== acquired.entry.face ||
+        !loaded[1].includes(acquired.entry.face) ||
+        !document.fonts.check(
+          faceQuery(payload),
+          representativeText(payload.encodedText),
+        ) ||
+        (typeof document.defaultView?.getComputedStyle === "function" &&
+          !document.defaultView
+            .getComputedStyle(element)
+            .fontFamily.includes(payload.face.family))
+      )
+        throw new Error("GlyphScramble exact font face did not load.");
+      element.dataset.glyphscramble = "ready";
+      element.hidden = false;
+      return "ready";
+    } catch {
+      if (destroyed || abort.signal.aborted || current?.abort !== abort)
+        return "aborted";
+      removeFace(element, acquired.entry, originalStyle);
+      releaseFace(document, acquired.key, acquired.entry);
+      current = undefined;
+      element.textContent =
+        options.errorText ?? "This protected content could not be displayed.";
+      element.dataset.glyphscramble = "error";
+      element.hidden = false;
+      return "error";
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      if (onAbort) abort.signal.removeEventListener("abort", onAbort);
+    }
+  };
+
+  const update = (value: unknown): Promise<GlyphMountResult> => {
+    if (destroyed) return Promise.resolve("aborted");
+    assertGlyphPayload(value);
+    return run(value);
+  };
+
+  const ready = update(initialPayload);
+  return {
+    ready,
+    update,
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      releaseCurrent();
+      delete element.dataset.glyphscramble;
+      element.hidden = true;
+      if (originalLang === null) element.removeAttribute("lang");
+      else element.setAttribute("lang", originalLang);
+    },
+  };
 }

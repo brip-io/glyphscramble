@@ -84,22 +84,36 @@ export interface GlyphConfig {
 
 declare const glyphPayloadBrand: unique symbol;
 
+export interface GlyphPayloadFace {
+  readonly id: string;
+  readonly family: string;
+  readonly weight: string;
+  readonly style: string;
+  readonly stretch: string;
+  readonly unicodeRange: readonly string[];
+}
+
+export interface GlyphPayloadCoverage {
+  /** Stable identity of the prepared face descriptors and allowed coverage. */
+  readonly identity: string;
+  readonly ranges: readonly string[];
+}
+
 export interface GlyphPayload {
   readonly [glyphPayloadBrand]: true;
-  readonly version: 1;
+  readonly version: 2;
   readonly encodedText: string;
   readonly font: string;
-  readonly face: string;
+  readonly face: GlyphPayloadFace;
   readonly fontToken: string;
-  readonly family: string;
   readonly fontUrl: string;
-  readonly coverage: readonly string[];
-  readonly css: string;
+  readonly coverage: GlyphPayloadCoverage;
   readonly rotation: {
     readonly scope: "response";
     readonly variantMode: "response-pool";
     readonly reusableAcrossResponses: false;
   };
+  readonly lang?: string;
   readonly cspNonce?: string;
 }
 

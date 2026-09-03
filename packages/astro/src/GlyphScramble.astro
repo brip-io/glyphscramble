@@ -3,12 +3,35 @@ import type { GlyphPayload } from "@brip/glyphscramble";
 const { payload } = Astro.props as { payload: GlyphPayload };
 ---
 
-<style is:inline nonce={payload.cspNonce} set:html={payload.css}></style>
-<span hidden aria-hidden="true" data-glyphscramble-payload data-family={payload.family}>{payload.encodedText}</span>
-<script is:inline>
-  for (const node of document.querySelectorAll("[data-glyphscramble-payload]")) {
-    const family = node.getAttribute("data-family");
-    node.style.fontFamily = `"${family}"`;
-    document.fonts.load(`1em "${family}"`, node.textContent.slice(0, 32)).then(() => { node.hidden = false; });
+<span
+  hidden
+  aria-hidden="true"
+  lang={payload.lang}
+  data-glyphscramble-mount
+  data-glyphscramble-payload={JSON.stringify(payload)}
+>{payload.encodedText}</span>
+<script>
+  import {
+    mountGlyphPayload,
+    type GlyphMountHandle,
+  } from "@brip/glyphscramble/runtime";
+
+  const handles = new Map<HTMLElement, GlyphMountHandle>();
+  function mountAll() {
+    for (const node of document.querySelectorAll<HTMLElement>(
+      "[data-glyphscramble-mount]",
+    )) {
+      if (handles.has(node)) continue;
+      const serialized = node.dataset.glyphscramblePayload;
+      if (!serialized) continue;
+      handles.set(node, mountGlyphPayload(node, JSON.parse(serialized)));
+    }
   }
+
+  document.addEventListener("astro:before-swap", () => {
+    for (const handle of handles.values()) handle.destroy();
+    handles.clear();
+  });
+  document.addEventListener("astro:page-load", mountAll);
+  mountAll();
 </script>
