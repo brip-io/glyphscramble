@@ -1,13 +1,18 @@
+import { createRequire } from "node:module";
 import { Worker } from "node:worker_threads";
 
-let workerSourcePromise: Promise<string> | undefined;
-
-function loadWorkerSource(): Promise<string> {
-  workerSourcePromise ??= import("./woff2-worker-source.js").then(
-    ({ default: source }) => source,
-  );
-  return workerSourcePromise;
-}
+// Resolve from the deployed dependency graph rather than relative to this
+// module: Astro and Next may relocate the compiled server chunk. Reflect keeps
+// framework compilers from replacing require.resolve() with a numeric module
+// id, which is not a filesystem location accepted by worker_threads.
+const requireFromBundle = createRequire(import.meta.url);
+const resolveFromBundle = Reflect.get(
+  requireFromBundle,
+  "resolve",
+) as NodeJS.RequireResolve;
+const WORKER_LOCATION = Reflect.apply(resolveFromBundle, requireFromBundle, [
+  "@brip/glyphscramble/woff2-worker",
+]) as string;
 
 function abortError(): Error {
   const error = new Error("WOFF2 generation was cancelled.");
@@ -16,19 +21,13 @@ function abortError(): Error {
 }
 
 /** Run the CPU-heavy WOFF2 WASM encoder outside the server event loop. */
-export async function compressWoff2InWorker(
+export function compressWoff2InWorker(
   input: Uint8Array,
   signal: AbortSignal,
 ): Promise<Uint8Array> {
-  if (signal.aborted) throw abortError();
+  if (signal.aborted) return Promise.reject(abortError());
 
-  const workerSource = await loadWorkerSource();
-  if (signal.aborted) throw abortError();
-
-  // The payload is generated as one self-contained CommonJS program. Using an
-  // evaluated worker avoids framework-specific URL/asset rewriting while the
-  // lazy import keeps the ~1 MB encoder payload out of startup evaluation.
-  const worker = new Worker(workerSource, { eval: true });
+  const worker = new Worker(WORKER_LOCATION);
   const transferable = input.slice().buffer;
 
   return new Promise<Uint8Array>((resolve, reject) => {
