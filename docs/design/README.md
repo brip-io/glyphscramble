@@ -2,7 +2,7 @@
 
 ## Active release-readiness track
 
-The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and fourteen independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
+The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and fifteen independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
 
 R01-R06 and R11 are merged and implemented. Issue state and implementation
 evidence remain canonical in each linked design.
@@ -24,6 +24,7 @@ evidence remain canonical in each linked design.
 | **R12** | [Cross-browser qualification and release gates](R12-qualification-release.md)         |    M |       P0 | [#13](https://github.com/brip-io/glyphscramble/issues/13) |
 | **R13** | [Developer documentation website](R13-documentation-website.md)                       |    M |       P1 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
 | **R14** | [Raw-agent and human-rendering conceptual demo](R14-agent-human-demo.md)              |    M |       P1 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
+| **R15** | [Developer experience and distribution](R15-developer-experience-distribution.md)     |    M |       P1 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
 
 ```text
 R04 ─▶ R11 ─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
@@ -35,6 +36,7 @@ R06 ─┬────────────────▶ adapters ├─▶
      └────────────────────────▶ R14 ──────┘
 R02 ───▶ R03
 R03/R05 ───────────────────────▶ R14
+R07-R10 ───────────────────────▶ R15 ─▶ R13/R12
 ```
 
 See [`R00 issue filing`](R00-issue-filing.md) for the GitHub metadata and exact commands to run after `gh` authentication is restored.
