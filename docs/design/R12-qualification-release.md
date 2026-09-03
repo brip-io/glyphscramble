@@ -1,6 +1,6 @@
 # [R12] Cross-browser qualification and release gates
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#13](https://github.com/brip-io/glyphscramble/issues/13)
 > **Blocked by:** R01-R11 · **Blocks:** public beta
 
 ## Objective
