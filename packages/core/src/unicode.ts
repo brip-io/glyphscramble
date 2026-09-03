@@ -2,26 +2,24 @@ import { createHmac } from "node:crypto";
 import {
   unicodePropertyKeys,
   unicodePropertyRanges,
+  unicodeStructuralRanges,
 } from "./generated/unicode17.js";
 
 export const UNICODE_VERSION = "17.0.0" as const;
 
-const STRUCTURAL = /[\p{Z}\p{Cc}\p{Cf}\p{Mc}\p{Me}]/u;
-const MARK = /\p{M}/u;
-
 /** Characters whose independent substitution can alter segmentation, ordering, or shaping. */
 export function isStructuralCodePoint(cp: number): boolean {
-  const value = String.fromCodePoint(cp);
-  return (
-    STRUCTURAL.test(value) ||
-    MARK.test(value) ||
-    cp === 0x200c ||
-    cp === 0x200d ||
-    (cp >= 0xfe00 && cp <= 0xfe0f) ||
-    (cp >= 0xe0100 && cp <= 0xe01ef) ||
-    (cp >= 0x202a && cp <= 0x202e) ||
-    (cp >= 0x2066 && cp <= 0x2069)
-  );
+  if (!Number.isInteger(cp) || cp < 0 || cp > 0x10ffff) return false;
+  let low = 0;
+  let high = unicodeStructuralRanges.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    const [start, end] = unicodeStructuralRanges[middle]!;
+    if (cp < start) high = middle - 1;
+    else if (cp > end) low = middle + 1;
+    else return true;
+  }
+  return false;
 }
 
 /** Exact Unicode 17 property key generated from the pinned UCD. */

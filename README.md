@@ -74,6 +74,8 @@ Coverage limits the codepoints eligible for permutation and can satisfy the norm
 
 The license declaration is an acknowledgement, not legal advice. SPDX syntax is validated, but GlyphScramble does not decide whether modification or redistribution is permitted. Original and generated fonts retain their own license and notices; GlyphScramble does not relicense them.
 
+See [Font sources and parser limits](docs/FONT-SOURCES.md) for supported containers, remote-network policy, default resource ceilings, and the large-font override.
+
 ## Static websites
 
 Static mode rotates once per build and works with Astro static output, Vite, or any folder of HTML. Mark only the block to protect:

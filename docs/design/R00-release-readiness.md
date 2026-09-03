@@ -60,7 +60,7 @@ Represent real faces and CSS descriptors, implement coverage semantics, and emit
 
 Harden untrusted font/CSS parsing, pin Unicode generation inputs, and qualify cmap and shaping invariants with official and real fixtures.
 
-**Exit criterion:** malformed inputs fail within bounded resources and real format 4/12/14 fonts pass checksum, OTS, Unicode, and HarfBuzz assertions.
+**Exit criterion:** malformed inputs fail within bounded resources, pinned Unicode data reproduces byte-for-byte, deterministic `cmap` selection is verified, and the real variable-font smoke fixture passes checksum plus available tool assertions. R12 owns the complete format/script/browser release matrix.
 
 ### Release B — Correct runtime and delivery contracts
 
@@ -113,10 +113,10 @@ Exercise the complete real-font, script, browser, leakage, performance, packagin
 ## Dependency order
 
 ```text
-R04 ─┬─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
-     │                ├─▶ R08 ─┤
-R11 ─┘                ├─▶ R09 ─┤
-                      └─▶ R10 ─┤
+R04 ─▶ R11 ─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
+                           ├─▶ R08 ─┤
+                           ├─▶ R09 ─┤
+                           └─▶ R10 ─┤
 R06 ─┬────────────────▶ adapters ├─▶ R12
      └─▶ R03 ────────────────▶ R10
 R02 ───▶ R03
@@ -124,7 +124,7 @@ R02 ───▶ R03
 
 Hard orderings:
 
-- R04 and R11 precede R01 because optimized generation must consume the final face model and trusted binary representation.
+- R04 precedes R11 because hardening consumes the final prepared-family/face model; R11 then precedes R01 so optimized generation is built on the validated binary representation.
 - R01 precedes R05 because cache and token policy must wrap the chosen generation architecture, not fossilize the current slow path.
 - R05 and R06 precede server/UI adapters so every framework shares one lifecycle contract.
 - R02, R04, and R06 precede R03 because static delivery consumes the safe transformer, final face metadata, and shared loader.

@@ -3,6 +3,7 @@ import spdxParse from "spdx-expression-parse";
 import { parseCoverage } from "./coverage.js";
 
 const HTTPS = /^https:\/\//i;
+const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
 
 export function defineGlyphConfig<const T extends GlyphConfig>(config: T): T {
   validateGlyphConfig(config);
@@ -27,6 +28,29 @@ export function validateGlyphConfig(config: GlyphConfig): void {
   if (!config.routePrefix.startsWith("/") || config.routePrefix.endsWith("/")) {
     throw new Error("routePrefix must begin with, and not end with, '/'.");
   }
+  if (
+    config.maxNormalizedBytes !== undefined &&
+    (!Number.isSafeInteger(config.maxNormalizedBytes) ||
+      config.maxNormalizedBytes < 1 ||
+      config.maxNormalizedBytes > MAX_NORMALIZED_BYTES)
+  )
+    throw new Error(
+      `maxNormalizedBytes must be a positive integer no greater than ${MAX_NORMALIZED_BYTES}.`,
+    );
+  for (const [name, value] of Object.entries({
+    timeoutMs: config.remote?.timeoutMs,
+    totalTimeoutMs: config.remote?.totalTimeoutMs,
+    maxBytes: config.remote?.maxBytes,
+  })) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
+      throw new Error(`remote.${name} must be a positive integer.`);
+  }
+  const maxRedirects = config.remote?.maxRedirects;
+  if (
+    maxRedirects !== undefined &&
+    (!Number.isSafeInteger(maxRedirects) || maxRedirects < 0)
+  )
+    throw new Error("remote.maxRedirects must be a non-negative integer.");
   const entries = Object.entries(config.fonts);
   if (entries.length === 0)
     throw new Error("At least one font must be configured.");

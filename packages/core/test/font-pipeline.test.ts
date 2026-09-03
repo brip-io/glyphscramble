@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { checksum } from "../src/binary.js";
 import { defineGlyphConfig } from "../src/config.js";
 import {
   inspectFont,
@@ -44,6 +45,14 @@ function woffFont(input: Uint8Array): Uint8Array {
     view.setUint32(entry + 4, offset);
     view.setUint32(entry + 8, bytes.length);
     view.setUint32(entry + 12, bytes.length);
+    const checksumBytes = bytes.slice();
+    if (name === "head")
+      new DataView(
+        checksumBytes.buffer,
+        checksumBytes.byteOffset,
+        checksumBytes.byteLength,
+      ).setUint32(8, 0);
+    view.setUint32(entry + 16, checksum(checksumBytes));
     output.set(bytes, offset);
     offset += align4(bytes.length);
   });
@@ -336,7 +345,10 @@ describe("font-face preparation", () => {
       unsupported: "error",
       accessibilityRiskAcknowledged: true,
     });
-    const fetcher = (async () => new Response(css)) as typeof fetch;
+    const fetcher = (async () =>
+      new Response(css, {
+        headers: { "content-type": "text/css" },
+      })) as typeof fetch;
     await expect(prepareGlyphFonts(config, { cwd, fetcher })).rejects.toThrow(
       /multiple @font-face candidates/i,
     );
@@ -416,7 +428,9 @@ describe("font-face preparation", () => {
           status: 302,
           headers: { location: "https://cdn.example.test/body.ttf" },
         });
-      return new Response(syntheticFont());
+      return new Response(syntheticFont(), {
+        headers: { "content-type": "font/ttf" },
+      });
     }) as typeof fetch;
     const lock = await prepareGlyphFonts(config, { cwd, fetcher });
     expect(lock.fonts.body?.sourceUrl).toBe(

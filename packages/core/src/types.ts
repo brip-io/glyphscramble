@@ -46,11 +46,15 @@ export interface GlyphConfig {
   routePrefix: `/${string}`;
   unsupported: "error";
   accessibilityRiskAcknowledged: true;
+  /** Publisher policy threshold, capped by the 16 MiB parser ceiling in 0.1. */
   maxNormalizedBytes?: number;
   remote?: {
     timeoutMs?: number;
+    totalTimeoutMs?: number;
     maxBytes?: number;
     maxRedirects?: number;
+    /** Explicit opt-out for controlled build networks; false by default. */
+    allowPrivateHosts?: boolean;
   };
 }
 
