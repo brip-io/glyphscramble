@@ -6,6 +6,7 @@ import { loadPreparedFont, toWoff2 } from "./font-pipeline.js";
 import { parseSfnt, remapCmap } from "./sfnt.js";
 import { createPermutation, encodeText, type Permutation } from "./unicode.js";
 import type { GlyphConfig } from "./types.js";
+import type { FontFaceDescriptors } from "./types.js";
 
 interface HtmlAttribute {
   name: string;
@@ -27,6 +28,7 @@ interface StaticFont {
   permutation: Permutation;
   file: string;
   woff2: Uint8Array;
+  descriptors: FontFaceDescriptors;
 }
 
 export interface StaticSiteOptions {
@@ -151,7 +153,14 @@ export async function buildStaticSite(
     const woff2 = await toWoff2(
       remapCmap(parseSfnt(prepared.sfnt), permutation.decode),
     );
-    staticFonts.set(id, { id, family, permutation, file, woff2 });
+    staticFonts.set(id, {
+      id,
+      family,
+      permutation,
+      file,
+      woff2,
+      descriptors: prepared.metadata.descriptors,
+    });
   }
 
   let protectedBlocks = 0;
@@ -181,7 +190,7 @@ export async function buildStaticSite(
   const css = [...staticFonts.values()]
     .map(
       (font) =>
-        `@font-face{font-family:"${font.family}";src:url("./${font.file}") format("woff2");font-display:block}\n` +
+        `@font-face{font-family:"${font.family}";src:url("./${font.file}") format("woff2");font-weight:${font.descriptors.weight};font-style:${font.descriptors.style};font-stretch:${font.descriptors.stretch};unicode-range:${font.descriptors.unicodeRange.join(",")};font-display:block}\n` +
         `[data-glyphscramble-font="${font.id}"]{font-family:"${font.family}";visibility:hidden}`,
     )
     .join("\n");
@@ -190,6 +199,13 @@ export async function buildStaticSite(
   await writeFile(join(assetDir, "static.js"), loader);
   for (const font of staticFonts.values())
     await writeFile(join(assetDir, font.file), font.woff2);
+  await cp(
+    resolve(cwd, ".glyphscramble/licenses"),
+    join(assetDir, "licenses"),
+    {
+      recursive: true,
+    },
+  );
 
   return {
     htmlFiles: pages.length,

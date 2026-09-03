@@ -1,6 +1,6 @@
 # [R04] Font-face resolution, coverage, and licensing
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** pending
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** pending
 > **Blocks:** R01, R03, R07-R12
 
 ## Objective
@@ -72,3 +72,9 @@ Preparation writes a temporary artifact directory, verifies every digest and not
 ## Exit criteria
 
 The documented multi-weight Google Fonts example and local/direct sources prepare reproducibly into correctly described, coverage-bounded faces with verifiable digests and emitted license notices.
+
+## Implementation record
+
+Implemented on `codex/r04-font-face-pipeline`. Lockfile v2 represents logical families and named faces, uses structured CSS parsing and explicit selectors, records raw/normalized/descriptor identities, enforces runtime coverage, validates SPDX expressions, publishes transactionally, and carries notice bytes into prepared and static artifacts. Dynamic and static `@font-face` rules reproduce the effective face descriptors.
+
+Unit fixtures cover TTF, OTF, WOFF, WOFF2, redirected HTTPS sources, multi-face/subset CSS, ambiguity, invalid licenses and coverage, reproducibility, rollback, v1 migration diagnostics, named runtime faces, and static notice propagation. Real-font OTS, shaping, and cross-browser qualification remain owned by R11 and R12.

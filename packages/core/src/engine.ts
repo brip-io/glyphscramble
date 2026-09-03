@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { parseSfnt, remapCmap } from "./sfnt.js";
 import {
-  loadPreparedFont,
+  loadPreparedFonts,
   toWoff2,
   type PreparedFont,
 } from "./font-pipeline.js";
@@ -19,6 +19,19 @@ import type {
 interface RuntimeFont extends PreparedFont {
   codepoints: readonly number[];
   coverage: readonly string[];
+}
+
+interface RuntimeFamily {
+  defaultFace: string;
+  faces: Map<string, RuntimeFont>;
+}
+
+function runtimeId(font: Pick<PreparedFont, "id" | "faceId">): string {
+  return `${font.id}@${font.faceId}`;
+}
+
+function runtimeNamespace(font: RuntimeFont): string {
+  return `${runtimeId(font)}:${font.metadata.identity}`;
 }
 
 function secretFor(config: GlyphConfig): string {
@@ -47,16 +60,19 @@ function payload(
 ): GlyphPayload {
   const short = createHash("sha256")
     .update(token)
-    .update(font.id)
+    .update(runtimeNamespace(font))
     .digest("hex")
     .slice(0, 16);
-  const family = `GlyphScramble-${font.id}-${short}`;
-  const fontUrl = `${config.routePrefix}/font/${encodeURIComponent(token)}/${encodeURIComponent(font.id)}.woff2`;
-  const css = `@font-face{font-family:"${escapeCss(family)}";src:url("${escapeCss(fontUrl)}") format("woff2");font-display:block}`;
+  const family = `GlyphScramble-${font.id}-${font.faceId}-${short}`;
+  const fileId = runtimeId(font);
+  const fontUrl = `${config.routePrefix}/font/${encodeURIComponent(token)}/${encodeURIComponent(fileId)}.woff2`;
+  const descriptors = font.metadata.descriptors;
+  const css = `@font-face{font-family:"${escapeCss(family)}";src:url("${escapeCss(fontUrl)}") format("woff2");font-weight:${escapeCss(descriptors.weight)};font-style:${escapeCss(descriptors.style)};font-stretch:${escapeCss(descriptors.stretch)};unicode-range:${descriptors.unicodeRange.join(",")};font-display:block}`;
   return {
     version: 1,
     encodedText: encodeText(text, permutation),
     font: font.id,
+    face: font.faceId,
     fontToken: token,
     family,
     fontUrl,
@@ -95,16 +111,26 @@ export async function createGlyphEngine(
   validateGlyphConfig(config);
   const secret = secretFor(config);
   const fonts = new Map<string, RuntimeFont>();
+  const families = new Map<string, RuntimeFamily>();
   for (const id of Object.keys(config.fonts)) {
-    const prepared = await loadPreparedFont(id, options.cwd);
-    const locked = prepared.metadata as typeof prepared.metadata & {
-      coverage?: readonly string[];
-    };
-    fonts.set(id, {
-      ...prepared,
-      codepoints: prepared.metadata.codepoints,
-      coverage: locked.coverage ?? [],
-    });
+    const preparedFaces = await loadPreparedFonts(id, options.cwd);
+    const runtimeFaces = new Map<string, RuntimeFont>();
+    for (const prepared of preparedFaces) {
+      const runtimeFont = {
+        ...prepared,
+        codepoints: prepared.metadata.codepoints,
+        coverage: prepared.metadata.coverage,
+      };
+      runtimeFaces.set(prepared.faceId, runtimeFont);
+      fonts.set(runtimeId(prepared), runtimeFont);
+    }
+    const configuredDefault = config.fonts[id]!.defaultFace;
+    const defaultFace =
+      configuredDefault ??
+      preparedFaces.find((item) => item.faceId === "default")?.faceId ??
+      preparedFaces[0]?.faceId;
+    if (!defaultFace) throw new Error(`Font ${id} has no prepared faces.`);
+    families.set(id, { defaultFace, faces: runtimeFaces });
   }
   const cache = new MemoryFontCache(options.cacheEntries);
 
@@ -115,19 +141,26 @@ export async function createGlyphEngine(
       return {
         token: issued.token,
         scramble(text: string, scrambleOptions: ScrambleOptions): GlyphPayload {
-          const font = fonts.get(scrambleOptions.font);
-          if (!font)
+          const family = families.get(scrambleOptions.font);
+          if (!family)
             throw new Error(
               `Unknown GlyphScramble font: ${scrambleOptions.font}`,
             );
-          let permutation = permutations.get(font.id);
+          const faceId = scrambleOptions.face ?? family.defaultFace;
+          const font = family.faces.get(faceId);
+          if (!font)
+            throw new Error(
+              `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
+            );
+          const namespace = runtimeNamespace(font);
+          let permutation = permutations.get(namespace);
           if (!permutation) {
             permutation = createPermutation(
               font.codepoints,
               issued.seed,
-              font.id,
+              namespace,
             );
-            permutations.set(font.id, permutation);
+            permutations.set(namespace, permutation);
           }
           return payload(
             text,
@@ -175,7 +208,11 @@ export async function createGlyphEngine(
       const cacheKey = `${token}:${id}`;
       let output = cache.get(cacheKey);
       if (!output) {
-        const permutation = createPermutation(font.codepoints, claims.seed, id);
+        const permutation = createPermutation(
+          font.codepoints,
+          claims.seed,
+          runtimeNamespace(font),
+        );
         output = await toWoff2(
           remapCmap(parseSfnt(font.sfnt), permutation.decode),
         );
