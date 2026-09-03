@@ -135,12 +135,25 @@ async function run(label, source, ceilings) {
     const acquisition = [];
     const response = [];
     const payloads = [];
+    const warmupPayloads = [];
     const sample = "High value block. "
       .repeat(Math.ceil(10_000 / "High value block. ".length))
       .slice(0, 10_000);
     for (let index = 0; index < REQUEST_WARMUP_ITERATIONS; index++)
-      engine.beginResponse().scramble(sample, { font: "body" });
+      warmupPayloads.push(
+        engine.beginResponse().scramble(sample, { font: "body" }),
+      );
     await setImmediate();
+    for (const payload of warmupPayloads) {
+      const font = await engine.fontResponse(
+        new globalThis.Request(`https://benchmark.invalid${payload.fontUrl}`),
+      );
+      if (!font.ok)
+        throw new Error(
+          `${label} warmup font response returned ${font.status}`,
+        );
+      await font.arrayBuffer();
+    }
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
@@ -153,6 +166,7 @@ async function run(label, source, ceilings) {
     // phase, otherwise scheduler jitter is charged to whichever request happens
     // to yield next rather than to the pool-generation metric that owns it.
     await setImmediate();
+    const fontResponses = [];
     for (const payload of payloads) {
       const responseStarted = performance.now();
       const font = await engine.fontResponse(
@@ -161,6 +175,14 @@ async function run(label, source, ceilings) {
       response.push(performance.now() - responseStarted);
       if (!font.ok)
         throw new Error(`${label} font response returned ${font.status}`);
+      fontResponses.push(font);
+    }
+
+    // Drain bodies only after all response-construction samples are captured.
+    // A one-megabyte arrayBuffer allocation may trigger GC; consuming inside
+    // the timed loop would charge that previous body's GC pause to the next
+    // token lookup even though body consumption itself is outside the metric.
+    for (const font of fontResponses) {
       await font.arrayBuffer();
     }
     const requestMetrics = engine.metrics();

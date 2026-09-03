@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -14,7 +15,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
 import { StaticBuildPlanner } from "../src/static-plan.js";
-import { buildStaticSite } from "../src/static-site.js";
+import {
+  buildStaticSite,
+  staticGlyphCspDirectives,
+  verifyStaticOutput,
+} from "../src/static-output.js";
 import { syntheticFont } from "./fixture.js";
 
 const roots: string[] = [];
@@ -72,6 +77,15 @@ async function treeBytes(root: string): Promise<Record<string, string>> {
 }
 
 describe("static build planner and publisher", () => {
+  it("provides the external-only strict CSP contract", () => {
+    expect(staticGlyphCspDirectives()).toEqual({
+      "default-src": ["'none'"],
+      "script-src": ["'self'"],
+      "style-src": ["'self'"],
+      "font-src": ["'self'"],
+    });
+  });
+
   it("publishes idempotently from source and preserves unmarked bytes", async () => {
     const { cwd, config } = await fixture();
     await mkdir(join(cwd, "source/assets"), { recursive: true });
@@ -116,9 +130,10 @@ describe("static build planner and publisher", () => {
     expect(protectedHtml).toContain("Indexable copy");
     for (const artifact of [
       "index.html",
-      "glyphscramble-static-manifest.json",
-      "_glyphscramble/static.css",
-      "_glyphscramble/static.js",
+      first.manifestFile,
+      ...first.manifest.assets
+        .filter((item) => item.kind === "style" || item.kind === "script")
+        .map((item) => item.path),
     ])
       expect(
         await readFile(join(cwd, "published", artifact), "utf8"),
@@ -128,11 +143,22 @@ describe("static build planner and publisher", () => {
     expect(JSON.stringify(first.manifest)).not.toContain("Secret Value");
     expect(JSON.stringify(first.manifest)).not.toContain("stable-static-seed");
     expect(first.manifest).toMatchObject({
-      version: 1,
-      algorithm: "glyphscramble-static-v1",
+      version: 2,
+      algorithm: "glyphscramble-static-v2",
+      publicBasePath: "/",
       fonts: ["body"],
       transformedFiles: ["index.html"],
     });
+    expect(protectedHtml).toContain('aria-hidden="true"');
+    expect(protectedHtml).toContain('hidden=""');
+    expect(protectedHtml).toContain('role="status"');
+    expect(protectedHtml).toContain(first.manifest.buildId);
+    expect(await verifyStaticOutput(join(cwd, "published"))).toEqual([
+      expect.objectContaining({
+        severity: "info",
+        code: "STATIC-OUTPUT-OK",
+      }),
+    ]);
     expect(first.manifest.sourceHtml).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -142,6 +168,125 @@ describe("static build planner and publisher", () => {
         }),
       ]),
     );
+  });
+
+  it("emits content-addressed assets for root, subpath, and nested routes", async () => {
+    const { cwd, config } = await fixture();
+    await mkdir(join(cwd, "source/nested"), { recursive: true });
+    await writeFile(
+      join(cwd, "source/nested/page.html"),
+      '<html><head></head><body><article data-glyphscramble-font="body">Secret</article></body></html>',
+    );
+    const result = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "published",
+      seed: "subpath-seed",
+      publicBasePath: "/docs/",
+      fontLoadTimeoutMs: 250,
+    });
+    const html = await readFile(
+      join(cwd, "published/nested/page.html"),
+      "utf8",
+    );
+    expect(result.manifest.publicBasePath).toBe("/docs");
+    expect(result.manifest.fontLoadTimeoutMs).toBe(250);
+    expect(html).toContain(`/docs/${result.manifest.assetDirectory}/static.`);
+    expect(html).toContain(`/docs/${result.manifestFile}`);
+    for (const asset of result.manifest.assets) {
+      expect(await readFile(join(cwd, "published", asset.path))).toHaveLength(
+        asset.bytes,
+      );
+      if (asset.kind !== "license") expect(asset.path).toContain(asset.sha256);
+    }
+    expect(result.manifestFile).toMatch(
+      /glyphscramble-static-manifest\.[a-f0-9]{64}\.json$/,
+    );
+  });
+
+  it("changes the build, font identity, and asset graph when the seed rotates", async () => {
+    const { cwd, config } = await fixture();
+    await mkdir(join(cwd, "source"));
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><head></head><body><p data-glyphscramble-font="body">Secret</p></body></html>',
+    );
+    const first = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "first",
+      seed: "first-seed",
+    });
+    const second = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "second",
+      seed: "second-seed",
+    });
+    expect(second.manifest.buildId).not.toBe(first.manifest.buildId);
+    expect(second.manifest.fontIdentities.body).not.toBe(
+      first.manifest.fontIdentities.body,
+    );
+    expect(
+      second.manifest.assets.find((asset) => asset.kind === "font")?.path,
+    ).not.toBe(
+      first.manifest.assets.find((asset) => asset.kind === "font")?.path,
+    );
+  });
+
+  it("doctor rejects tampered assets and mixed build manifests", async () => {
+    const { cwd, config } = await fixture();
+    await mkdir(join(cwd, "source"));
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><head></head><body><p data-glyphscramble-font="body">Secret</p></body></html>',
+    );
+    const first = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "first",
+      seed: "first-seed",
+    });
+    const second = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "second",
+      seed: "second-seed",
+    });
+    const css = first.manifest.assets.find((asset) => asset.kind === "style")!;
+    await writeFile(join(cwd, "first", css.path), "tampered");
+    expect(await verifyStaticOutput(join(cwd, "first"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "STATIC-ASSET-HASH" }),
+      ]),
+    );
+
+    const manifestPath = join(cwd, "first", first.manifestFile);
+    const alteredManifest = {
+      ...first.manifest,
+      fontLoadTimeoutMs: first.manifest.fontLoadTimeoutMs + 1,
+    };
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify(alteredManifest, null, 2)}\n`,
+    );
+    expect(await verifyStaticOutput(join(cwd, "first"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "STATIC-MANIFEST-HASH" }),
+        expect.objectContaining({ code: "STATIC-BUILD-ID" }),
+      ]),
+    );
+
+    await mkdir(join(cwd, "first", second.manifest.assetDirectory), {
+      recursive: true,
+    });
+    await copyFile(
+      join(cwd, "second", second.manifestFile),
+      join(cwd, "first", second.manifestFile),
+    );
+    expect(await verifyStaticOutput(join(cwd, "first"))).toEqual([
+      expect.objectContaining({ code: "STATIC-MIXED-BUILD" }),
+    ]);
   });
 
   it("leaves the previous publication untouched when transformation fails", async () => {

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
 import { createGlyphEngine, responseHeadersForContext } from "../src/engine.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
-import { buildStaticSite } from "../src/static-site.js";
+import { buildStaticSite } from "../src/static-output.js";
 import { syntheticFont } from "./fixture.js";
 
 const oldSecret = process.env.GLYPHSCRAMBLE_SECRET;
@@ -241,13 +241,16 @@ describe("request engine", () => {
     expect(result.protectedBlocks).toBe(1);
     expect(html).not.toContain("Secret Value");
     expect(html).toContain("Indexable copy");
-    expect(html).toContain("/_glyphscramble/static.css");
-    expect(
-      await readFile(
-        join(cwd, "protected/_glyphscramble/licenses/body.LICENSE.txt"),
-        "utf8",
-      ),
-    ).toBe("fixture license");
+    expect(html).toContain(
+      `/_glyphscramble/${result.manifest.buildId}/static.`,
+    );
+    const notice = result.manifest.assets.find(
+      (asset) => asset.kind === "license",
+    );
+    expect(notice).toBeDefined();
+    expect(await readFile(join(cwd, "protected", notice!.path), "utf8")).toBe(
+      "fixture license",
+    );
   });
 
   it("selects named faces and emits their validated descriptors", async () => {

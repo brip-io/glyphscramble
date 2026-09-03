@@ -53,6 +53,41 @@ describe("runtime configuration", () => {
     ).toBeDefined();
   });
 
+  it("validates static base paths and fail-closed timeouts", () => {
+    const value = config(undefined);
+    expect(
+      defineGlyphConfig({
+        ...value,
+        static: {
+          publicBasePath: "/docs/",
+          fontLoadTimeoutMs: 5_000,
+          fontFailure: "generic-error",
+        },
+      }),
+    ).toBeDefined();
+    for (const publicBasePath of [
+      "https://example.test/docs",
+      "//cdn.example.test/docs",
+      "/docs/../private",
+      "/docs?build=1",
+      "/docs%2fprivate",
+      "/docs//nested",
+      "/docs with spaces",
+    ])
+      expect(() =>
+        defineGlyphConfig({
+          ...value,
+          static: { publicBasePath } as GlyphConfig["static"],
+        }),
+      ).toThrow(/publicBasePath/);
+    expect(() =>
+      defineGlyphConfig({
+        ...value,
+        static: { fontLoadTimeoutMs: 0 },
+      }),
+    ).toThrow(/fontLoadTimeoutMs/);
+  });
+
   it("rejects inverted, zero, and excessive bounds", () => {
     expect(() =>
       defineGlyphConfig(config({ poolLowWatermark: 5, poolHighWatermark: 4 })),

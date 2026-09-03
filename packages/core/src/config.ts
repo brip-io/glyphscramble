@@ -6,6 +6,7 @@ const HTTPS = /^https:\/\//i;
 const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
 const MAX_RUNTIME_CACHE_BYTES = 1024 * 1024 * 1024;
 const MAX_TOKEN_TTL_SECONDS = 86_400;
+const MAX_STATIC_FONT_TIMEOUT_MS = 60_000;
 const TOKEN_KEY_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
 
 export function defineGlyphConfig<const T extends GlyphConfig>(config: T): T {
@@ -117,6 +118,34 @@ export function validateGlyphConfig(config: GlyphConfig): void {
     throw new Error(
       "runtime.variantMode must be response-pool; reusable window rotation is not supported.",
     );
+  const publicBasePath = config.static?.publicBasePath;
+  if (publicBasePath !== undefined) {
+    if (
+      !/^\/(?:[a-z0-9._~%-]+(?:\/[a-z0-9._~%-]+)*)?\/?$/i.test(
+        publicBasePath,
+      ) ||
+      /%(?:2f|5c)/i.test(publicBasePath) ||
+      publicBasePath.split("/").some((part) => part === "." || part === "..")
+    )
+      throw new Error(
+        "static.publicBasePath must be a root-relative URL path without a query, fragment, dot segment, or encoded separator.",
+      );
+  }
+  const staticTimeout = config.static?.fontLoadTimeoutMs;
+  if (
+    staticTimeout !== undefined &&
+    (!Number.isSafeInteger(staticTimeout) ||
+      staticTimeout < 1 ||
+      staticTimeout > MAX_STATIC_FONT_TIMEOUT_MS)
+  )
+    throw new Error(
+      `static.fontLoadTimeoutMs must be a positive integer no greater than ${MAX_STATIC_FONT_TIMEOUT_MS}.`,
+    );
+  if (
+    config.static?.fontFailure !== undefined &&
+    config.static.fontFailure !== "generic-error"
+  )
+    throw new Error("static.fontFailure must be generic-error.");
   const entries = Object.entries(config.fonts);
   if (entries.length === 0)
     throw new Error("At least one font must be configured.");
