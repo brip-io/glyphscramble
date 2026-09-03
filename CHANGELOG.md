@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replace serialized payload CSS with a validated data-only contract and one reference-counted client lifecycle so exact font loads, reactive updates, CSP nonces, failures, and unmount cleanup behave consistently across framework adapters; precompute stable Unicode property groups so response rotation does not repeatedly classify the same face.
 - Bind encrypted tokens to validated lifetimes, rotating key IDs, prepared variants, and only the faces used by a response; malformed and unauthorized font requests now fail cheaply while unprotected framework responses retain their cache policy.
 - Compile static protection through a validated fresh-tree plan and transactional publish so unsafe, hydrated, stale-output, and unmappable content fails without changing the source or prior deployment.
 - Move response-specific WOFF2 generation into a bounded one-use worker pool so protected requests perform only token validation and lookup, while overload, expiry, restart, and capacity failures remain closed and observable without content telemetry.

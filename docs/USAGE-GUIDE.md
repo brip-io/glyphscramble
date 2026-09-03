@@ -98,4 +98,6 @@ This means the protected block is not WCAG-conformant. Limit it to opted-in, non
 
 ## Failure behavior
 
-Protected elements stay hidden until `document.fonts` confirms the generated face. A timeout, CSP/CORS/font error, process restart, wrong-instance route, or exhausted variant pool produces a visible generic error, never plaintext. Monitor the engine's content-free counters and timings in your own application without sending content or mapping data to BRIP.
+Protected elements stay hidden until the shared runtime confirms that the exact generated face loaded and was applied. Duplicate blocks share a reference-counted registration; updates and unmounts abort stale work and release timers, rules, and faces. A timeout, CSP/font error, process restart, wrong-instance route, or exhausted variant pool produces a visible generic error, never plaintext. Monitor the engine's content-free counters and timings in your own application without sending content or mapping data to BRIP.
+
+The v2 wire payload is data-only and capped at 1 MiB. It contains no CSS and is validated after serialization before the browser uses it. Generated font URLs are root-relative and same-origin. See [Client payload and font lifecycle](CLIENT-RUNTIME.md) for the vanilla API and strict-CSP configuration. Prefer a per-response nonce (`style-src` with that nonce and `style-src-attr 'none'`); the no-nonce fallback needs `style-src-attr 'unsafe-inline'`.

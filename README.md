@@ -164,7 +164,7 @@ Static mode has excellent CDN behavior but weaker resistance: every visitor and 
 | Flash/failure          | Hidden until `document.fonts` confirms the face; visible error on failure | Same                                                                     | Do not protect content required to navigate, submit a form, or recover from failure         |
 | Advanced extraction    | Recoverable with browser/OCR/font analysis                                | Easier because mapping is reused                                         | Treat as cost-raising friction, never confidentiality                                       |
 
-Read [Choosing what to protect](docs/USAGE-GUIDE.md) before integration and [the threat model](docs/SECURITY-MODEL.md) before making any product claim.
+Read [Choosing what to protect](docs/USAGE-GUIDE.md) before integration, [the client payload and CSP contract](docs/CLIENT-RUNTIME.md) before wiring a framework, and [the threat model](docs/SECURITY-MODEL.md) before making any product claim.
 
 ## CLI
 
@@ -179,7 +179,7 @@ glyphscramble static      post-process a static build
 
 ## Packages
 
-Core, React, Next, Vue, Nuxt, Svelte, SvelteKit, Astro, and Vite packages share one `GlyphPayload` wire contract. See [Framework integration](docs/FRAMEWORKS.md).
+Core, React, Next, Vue, Nuxt, Svelte, SvelteKit, Astro, and Vite packages share one validated, data-only `GlyphPayload` wire contract and font lifecycle. See [Framework integration](docs/FRAMEWORKS.md).
 
 ## When blocking becomes licensing
 

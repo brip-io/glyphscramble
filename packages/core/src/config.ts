@@ -51,8 +51,15 @@ export function validateGlyphConfig(config: GlyphConfig): void {
       throw new Error(`Duplicate GlyphScramble token key id: ${key.id}`);
     keyIds.add(key.id);
   }
-  if (!config.routePrefix.startsWith("/") || config.routePrefix.endsWith("/")) {
-    throw new Error("routePrefix must begin with, and not end with, '/'.");
+  if (!/^\/[a-z0-9._~%/-]*[a-z0-9._~%-]$/i.test(config.routePrefix)) {
+    throw new Error(
+      "routePrefix must be a root-relative URL path with no trailing slash, query, fragment, or encoded path separator.",
+    );
+  }
+  if (/%(?:2f|5c)/i.test(config.routePrefix)) {
+    throw new Error(
+      "routePrefix must not contain an encoded slash or backslash.",
+    );
   }
   if (
     config.maxNormalizedBytes !== undefined &&
@@ -114,7 +121,7 @@ export function validateGlyphConfig(config: GlyphConfig): void {
   if (entries.length === 0)
     throw new Error("At least one font must be configured.");
   for (const [id, font] of entries) {
-    if (!/^[a-z][a-z0-9_-]*$/i.test(id))
+    if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(id))
       throw new Error(`Invalid font id: ${id}`);
     if (!font.license.spdx || !font.license.file) {
       throw new Error(
@@ -129,7 +136,7 @@ export function validateGlyphConfig(config: GlyphConfig): void {
     if (font.coverage) parseCoverage(font.coverage);
     const faces = Object.entries(font.faces ?? {});
     for (const [faceId, selector] of faces) {
-      if (!/^[a-z][a-z0-9_-]*$/i.test(faceId))
+      if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(faceId))
         throw new Error(`Invalid face id ${faceId} for font ${id}.`);
       if (selector.coverage) parseCoverage(selector.coverage);
     }

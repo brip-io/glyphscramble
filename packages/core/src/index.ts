@@ -86,6 +86,8 @@ export type {
   GlyphEngineMetrics,
   GlyphLockfile,
   GlyphPayload,
+  GlyphPayloadCoverage,
+  GlyphPayloadFace,
   PreparedFontFamilyMetadata,
   ResponseContext,
   ResponseUsage,

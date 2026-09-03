@@ -6,7 +6,13 @@ import {
   type TokenKey,
   type TokenKeyRing,
 } from "./token.js";
-import { createPermutation, encodeText, type Permutation } from "./unicode.js";
+import {
+  createPermutationFromPlan,
+  createPermutationPlan,
+  encodeText,
+  type Permutation,
+  type PermutationPlan,
+} from "./unicode.js";
 import { validateGlyphConfig } from "./config.js";
 import {
   ResponsePoolVariantProvider,
@@ -25,6 +31,7 @@ import type {
 interface RuntimeFont extends PreparedFont {
   codepoints: readonly number[];
   coverage: readonly string[];
+  permutationPlan: PermutationPlan;
 }
 
 interface RuntimeFamily {
@@ -63,13 +70,6 @@ function tokenKeyRing(config: GlyphConfig): TokenKeyRing {
   };
 }
 
-function escapeCss(value: string): string {
-  return value.replace(
-    /["'\\\n\r]/g,
-    (character) => `\\${character.codePointAt(0)!.toString(16)} `,
-  );
-}
-
 function payload(
   encodedText: string,
   font: RuntimeFont,
@@ -86,22 +86,30 @@ function payload(
   const fileId = runtimeId(font);
   const fontUrl = `${config.routePrefix}/font/${encodeURIComponent(token)}/${encodeURIComponent(fileId)}.woff2`;
   const descriptors = font.metadata.descriptors;
-  const css = `@font-face{font-family:"${escapeCss(family)}";src:url("${escapeCss(fontUrl)}") format("woff2");font-weight:${escapeCss(descriptors.weight)};font-style:${escapeCss(descriptors.style)};font-stretch:${escapeCss(descriptors.stretch)};unicode-range:${descriptors.unicodeRange.join(",")};font-display:block}`;
   return {
-    version: 1,
+    version: 2,
     encodedText,
     font: font.id,
-    face: font.faceId,
+    face: {
+      id: font.faceId,
+      family,
+      weight: descriptors.weight,
+      style: descriptors.style,
+      stretch: descriptors.stretch,
+      unicodeRange: descriptors.unicodeRange,
+    },
     fontToken: token,
-    family,
     fontUrl,
-    coverage: font.coverage,
-    css,
+    coverage: {
+      identity: font.metadata.identity,
+      ranges: font.coverage,
+    },
     rotation: {
       scope: "response",
       variantMode: "response-pool",
       reusableAcrossResponses: false,
     },
+    ...(options.lang ? { lang: options.lang } : {}),
     ...(options.cspNonce ? { cspNonce: options.cspNonce } : {}),
   } as GlyphPayload;
 }
@@ -127,6 +135,7 @@ export async function createGlyphEngine(
         ...prepared,
         codepoints: prepared.metadata.codepoints,
         coverage: prepared.metadata.coverage,
+        permutationPlan: createPermutationPlan(prepared.metadata.codepoints),
       };
       runtimeFaces.set(prepared.faceId, runtimeFont);
       fonts.set(runtimeId(prepared), runtimeFont);
@@ -227,8 +236,8 @@ export async function createGlyphEngine(
           const namespace = runtimeNamespace(font);
           let permutation = permutations.get(namespace);
           if (!permutation) {
-            permutation = createPermutation(
-              font.codepoints,
+            permutation = createPermutationFromPlan(
+              font.permutationPlan,
               responseLease.seed,
               namespace,
             );

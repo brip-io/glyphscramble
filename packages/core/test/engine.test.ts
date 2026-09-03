@@ -95,7 +95,7 @@ describe("request engine", () => {
     expect(one.encodedText).not.toBe("Secret Value");
     expect(one.encodedText).not.toBe(two.encodedText);
     expect(one.fontToken).not.toBe(two.fontToken);
-    expect(one.face).toBe("default");
+    expect(one.face.id).toBe("default");
     expect(one.rotation).toEqual({
       scope: "response",
       variantMode: "response-pool",
@@ -250,7 +250,7 @@ describe("request engine", () => {
     ).toBe("fixture license");
   });
 
-  it("selects named faces and reproduces their CSS descriptors", async () => {
+  it("selects named faces and emits their validated descriptors", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-faces-"));
     await mkdir(join(cwd, "licenses"));
     await writeFile(join(cwd, "licenses/OFL.txt"), "fixture license");
@@ -295,7 +295,7 @@ describe("request engine", () => {
       "test secret with more than thirty two characters";
     const engine = await createGlyphEngine(config, { cwd });
     const context = engine.beginResponse();
-    const regular = context.scramble("Secret", { font: "body" });
+    const regular = context.scramble("Secret", { font: "body", lang: "en" });
     const missesBeforeUnauthorized = engine.metrics().fontMisses;
     expect(
       await engine.fontResponse(
@@ -306,11 +306,21 @@ describe("request engine", () => {
     ).toMatchObject({ status: 403 });
     expect(engine.metrics().fontMisses).toBe(missesBeforeUnauthorized);
     const bold = context.scramble("Secret", { font: "body", face: "bold" });
-    expect(regular.face).toBe("regular");
-    expect(regular.css).toContain("font-weight:400");
-    expect(bold.face).toBe("bold");
-    expect(bold.css).toContain("font-weight:700");
-    expect(bold.css).toContain("font-style:italic");
+    expect(regular.version).toBe(2);
+    expect(regular.face).toMatchObject({
+      id: "regular",
+      weight: "400",
+      style: "normal",
+    });
+    expect(regular.lang).toBe("en");
+    expect(regular.coverage.ranges).toEqual(regular.face.unicodeRange);
+    expect("css" in regular).toBe(false);
+    expect("family" in regular).toBe(false);
+    expect(bold.face).toMatchObject({
+      id: "bold",
+      weight: "700",
+      style: "italic",
+    });
     expect(bold.fontUrl).not.toBe(regular.fontUrl);
     expect(
       await engine.fontResponse(
