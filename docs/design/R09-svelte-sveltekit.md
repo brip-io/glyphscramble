@@ -35,6 +35,8 @@ The `.svelte` component is shipped from source but excluded from TypeScript/Svel
 7. SSR HTML, serialized `load` data, hydration state, client bundles, and error pages MUST be included in leakage tests.
 8. `init` MUST detect existing hooks and generate a composable helper/import instruction rather than silently doing nothing.
 9. A real SvelteKit 2 fixture MUST build and run in CI.
+10. Deferred/streamed `load` fixtures MUST prove protected bytes cannot render after cache headers were derived; unsupported lifecycle shapes MUST require route-scoped protection.
+11. Component timeout and localized generic-error options MUST match the shared R18 contract.
 
 ## Design
 
@@ -56,6 +58,7 @@ The component owns an R06 mount handle in an effect and destroys it whenever the
 - SSR and client navigation E2E with rapid payload replacement.
 - Existing-hook composition and order tests.
 - Protected/unprotected cache assertions.
+- A deferred/streamed load assertion that detects header finalization before protected rendering.
 - Leakage scans across HTML, serialized load data, JS, and errors.
 - Font timeout, 404, expiry, and component teardown tests.
 

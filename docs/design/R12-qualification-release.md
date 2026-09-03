@@ -1,7 +1,7 @@
 # [R12] Cross-browser qualification and release gates
 
 > **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#13](https://github.com/brip-io/glyphscramble/issues/13)
-> **Blocked by:** R01-R11, R13-R15 · **Blocks:** public beta
+> **Blocked by:** R01-R11, R13-R20 · **Blocks:** public beta
 
 ## Objective
 
@@ -40,6 +40,8 @@ The current unit suite contains ten tests and the Playwright test only asserts t
 12. Documentation claims and version/status labels MUST be generated or checked against the qualification manifest.
 13. The R13 site and R14 demo MUST pass link, example, claim, agent-readable-output, accessibility, browser, CSP, no-JS, and performance gates against packed release candidates.
 14. R15 onboarding and distribution evidence MUST prove clean package-manager installs, correct npm dist-tags, OIDC provenance, immutable source evidence, SBOM/checksums, and version-pinned loader CDN parity.
+15. CI MUST run generated-Unicode checks, dependency audit/review, secret scanning, and superseded-run concurrency; release qualification MUST include browser and benchmark gates rather than relying on `pnpm check` alone.
+16. Action runtime deprecations and third-party pin updates MUST be surfaced by a scheduled maintenance check instead of appearing first during release.
 
 ## Design
 
