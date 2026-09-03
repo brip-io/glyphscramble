@@ -1,7 +1,7 @@
 # [R12] Cross-browser qualification and release gates
 
 > **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#13](https://github.com/brip-io/glyphscramble/issues/13)
-> **Blocked by:** R01-R11 · **Blocks:** public beta
+> **Blocked by:** R01-R11, R13, R14 · **Blocks:** public beta
 
 ## Objective
 
@@ -38,6 +38,7 @@ The current unit suite contains ten tests and the Playwright test only asserts t
 10. GitHub Actions MUST pin third-party actions by commit SHA and apply least-privilege permissions.
 11. Publishing MUST require a protected release environment with recorded counsel/IP approval and an explicit checklist artifact.
 12. Documentation claims and version/status labels MUST be generated or checked against the qualification manifest.
+13. The R13 site and R14 demo MUST pass link, example, claim, agent-readable-output, accessibility, browser, CSP, no-JS, and performance gates against packed release candidates.
 
 ## Design
 
@@ -53,12 +54,13 @@ Release runs only from an exact signed tag after the qualification workflow for 
 - CLI doctor/inspect/benchmark validation
 - `.github/workflows/ci.yml` and `release.yml`
 - dependency/release policies and public documentation
+- R13 documentation-site and R14 demo qualification artifacts
 
 ## Testing strategy
 
 This issue is the testing strategy for the release. It adds meta-tests that fail when a declared peer/browser/script lacks a corresponding fixture or when a package/claim is absent from the qualification manifest.
 
-The current false token-tamper test is replaced with mutations inside the encoded token while retaining a valid route filename. Browser tests load the actual engine-generated WOFF2 and compare screenshot, DOM bytes, accessibility tree, and network/cache behavior.
+The current false token-tamper test is replaced with mutations inside the encoded token while retaining a valid route filename. Browser tests load the actual engine-generated WOFF2 and compare screenshot, DOM bytes, accessibility tree, and network/cache behavior. The same release candidate builds the public docs examples and R14 fixtures so a green site cannot describe or demonstrate a different package than the one being published.
 
 ## Risks
 
@@ -67,4 +69,4 @@ The current false token-tamper test is replaced with mutations inside the encode
 
 ## Exit criteria
 
-One commit passes the complete manifest on Node 22/24 and three browsers using packed packages, all technical and counsel gates are recorded, and the release workflow demonstrably refuses an unqualified or unapproved tag.
+One commit passes the complete manifest on Node 22/24 and three browsers using packed packages; the R13 site and R14 demo pass their claim, content, accessibility, browser, and performance gates; all technical and counsel gates are recorded; and the release workflow demonstrably refuses an unqualified or unapproved tag.
