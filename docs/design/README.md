@@ -2,7 +2,7 @@
 
 ## Active release-readiness track
 
-The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and fifteen independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
+The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and twenty independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
 
 R01-R06 and R11 are merged and implemented. Issue state and implementation
 evidence remain canonical in each linked design.
@@ -25,6 +25,11 @@ evidence remain canonical in each linked design.
 | **R13** | [Developer documentation website](R13-documentation-website.md)                       |    M |       P1 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
 | **R14** | [Raw-agent and human-rendering conceptual demo](R14-agent-human-demo.md)              |    M |       P1 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
 | **R15** | [Developer experience and distribution](R15-developer-experience-distribution.md)     |    M |       P1 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
+| **R16** | [Permutation and request-path efficiency](R16-permutation-request-path.md)            |    M |       P0 | [#33](https://github.com/brip-io/glyphscramble/issues/33) |
+| **R17** | [Runtime capacity, lifecycle, and observability](R17-runtime-capacity-lifecycle.md)   |    M |       P0 | [#34](https://github.com/brip-io/glyphscramble/issues/34) |
+| **R18** | [Multi-face payload and client efficiency](R18-multiface-payload-efficiency.md)       |    M |       P1 | [#35](https://github.com/brip-io/glyphscramble/issues/35) |
+| **R19** | [Static compiler scale and diagnostics](R19-static-scale-diagnostics.md)              |    M |       P1 | [#36](https://github.com/brip-io/glyphscramble/issues/36) |
+| **R20** | [Core contract and operator hardening](R20-core-operator-hardening.md)                |    M |       P1 | [#37](https://github.com/brip-io/glyphscramble/issues/37) |
 
 ```text
 R04 ─▶ R11 ─▶ R01 ─▶ R05 ─┬─▶ R07 ─┐
@@ -37,9 +42,15 @@ R06 ─┬────────────────▶ adapters ├─▶
 R02 ───▶ R03
 R03/R05 ───────────────────────▶ R14
 R07-R10 ───────────────────────▶ R15 ─▶ R13/R12
+R11 ─▶ R16 ─▶ R17 ────────────────▶ R12
+R06/R16 ─▶ R18 ───────────────────▶ R12
+R02/R03 ─▶ R19 ───────────────────▶ R12
+R04-R06/R11 ─▶ R20 ───────────────▶ R12
 ```
 
 See [`R00 issue filing`](R00-issue-filing.md) for the GitHub metadata and exact commands to run after `gh` authentication is restored.
+
+The complete disposition of the 2026-09-03 repository review is recorded in [`R00 review triage`](R00-review-triage-2026-09-03.md); every numbered finding is fixed, assigned to an open designed issue, or rejected with evidence.
 
 ## Initial scaffold milestones
 
