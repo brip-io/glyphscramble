@@ -1,6 +1,6 @@
 import {
   createGlyphEngine,
-  protectedResponseHeaders,
+  responseHeadersForContext,
   type GlyphConfig,
   type ResponseContext,
 } from "@brip/glyphscramble";
@@ -22,12 +22,13 @@ export async function createAstroGlyphMiddleware(
   ): Promise<Response> => {
     if (context.url.pathname.startsWith(`${config.routePrefix}/font/`))
       return engine.fontResponse(context.request);
-    context.locals.glyphscramble = engine.beginResponse();
+    const responseContext = engine.beginResponse();
+    context.locals.glyphscramble = responseContext;
     const response = await next();
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: protectedResponseHeaders(response.headers),
+      headers: responseHeadersForContext(responseContext, response.headers),
     });
   };
 }

@@ -1,6 +1,6 @@
 import {
   createGlyphEngine,
-  protectedResponseHeaders,
+  responseHeadersForContext,
   type GlyphConfig,
   type ResponseContext,
 } from "@brip/glyphscramble";
@@ -29,12 +29,13 @@ export async function createNuxtGlyphs(
         )
       )
         return engine.fontResponse(event.request);
-      event.context.glyphscramble = engine.beginResponse();
+      const responseContext = engine.beginResponse();
+      event.context.glyphscramble = responseContext;
       const response = await next();
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
-        headers: protectedResponseHeaders(response.headers),
+        headers: responseHeadersForContext(responseContext, response.headers),
       });
     },
   } as const;

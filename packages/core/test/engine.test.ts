@@ -3,15 +3,19 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
-import { createGlyphEngine } from "../src/engine.js";
+import { createGlyphEngine, responseHeadersForContext } from "../src/engine.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
 import { buildStaticSite } from "../src/static-site.js";
 import { syntheticFont } from "./fixture.js";
 
 const oldSecret = process.env.GLYPHSCRAMBLE_SECRET;
+const oldPreviousSecret = process.env.GLYPHSCRAMBLE_SECRET_PREVIOUS;
 afterEach(() => {
   if (oldSecret === undefined) delete process.env.GLYPHSCRAMBLE_SECRET;
   else process.env.GLYPHSCRAMBLE_SECRET = oldSecret;
+  if (oldPreviousSecret === undefined)
+    delete process.env.GLYPHSCRAMBLE_SECRET_PREVIOUS;
+  else process.env.GLYPHSCRAMBLE_SECRET_PREVIOUS = oldPreviousSecret;
 });
 
 async function fixture() {
@@ -47,6 +51,26 @@ describe("request engine", () => {
     await expect(createGlyphEngine(config, { cwd })).rejects.toThrow(
       /at least 32/,
     );
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    delete process.env.GLYPHSCRAMBLE_SECRET_PREVIOUS;
+    await expect(
+      createGlyphEngine(
+        {
+          ...config,
+          rotation: {
+            ...config.rotation,
+            previousKeys: [
+              {
+                id: "previous",
+                secretEnv: "GLYPHSCRAMBLE_SECRET_PREVIOUS",
+              },
+            ],
+          },
+        },
+        { cwd },
+      ),
+    ).rejects.toThrow(/Missing GLYPHSCRAMBLE_SECRET_PREVIOUS/);
   });
 
   it("rotates responses and serves a private matching font", async () => {
@@ -96,6 +120,75 @@ describe("request engine", () => {
       fontHits: 2,
     });
     expect(engine.metrics().generations).toBe(generationsBeforeRequests);
+    await engine.close();
+  });
+
+  it("tracks actual use and preserves cache headers for unprotected responses", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    const engine = await createGlyphEngine(config, { cwd });
+    const context = engine.beginResponse();
+    expect(context.used).toBe(false);
+    expect(context.usage()).toEqual({ used: false, authorizedFaces: [] });
+    expect(
+      responseHeadersForContext(context, {
+        "cache-control": "public, max-age=3600",
+      }).get("cache-control"),
+    ).toBe("public, max-age=3600");
+
+    context.scramble("Secret", { font: "body" });
+    expect(context.used).toBe(true);
+    expect(context.usage()).toMatchObject({
+      used: true,
+      authorizedFaces: ["body@default"],
+      variantId: expect.any(String),
+    });
+    const protectedHeaders = responseHeadersForContext(context, {
+      "cache-control": "public, max-age=3600",
+    });
+    expect(protectedHeaders.get("cache-control")).toBe("private, no-store");
+    expect(protectedHeaders.get("x-glyphscramble")).toBe("response-rotated");
+    await engine.close();
+  });
+
+  it("returns controlled method/path errors and serves HEAD from prepared bytes", async () => {
+    const { cwd, config } = await fixture();
+    process.env.GLYPHSCRAMBLE_SECRET =
+      "test secret with more than thirty two characters";
+    let now = 1_000_000;
+    const engine = await createGlyphEngine(config, { cwd, now: () => now });
+    const value = engine.beginResponse().scramble("Secret", { font: "body" });
+    expect(
+      await engine.fontResponse(
+        new Request(`https://example.test${value.fontUrl}`, { method: "POST" }),
+      ),
+    ).toMatchObject({ status: 405 });
+    expect(
+      await engine.fontResponse(
+        new Request(
+          "https://example.test/_glyphscramble/font/%E0%A4%A/body%40default.woff2",
+        ),
+      ),
+    ).toMatchObject({ status: 400 });
+
+    const generations = engine.metrics().generations;
+    const head = await engine.fontResponse(
+      new Request(`https://example.test${value.fontUrl}`, { method: "HEAD" }),
+    );
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-length")).toMatch(/^[1-9]\d*$/);
+    expect(head.headers.get("cache-control")).toBe(
+      "private, max-age=600, immutable",
+    );
+    expect(await head.text()).toBe("");
+    expect(engine.metrics().generations).toBe(generations);
+    now += 600_000;
+    expect(
+      await engine.fontResponse(
+        new Request(`https://example.test${value.fontUrl}`),
+      ),
+    ).toMatchObject({ status: 401 });
     await engine.close();
   });
 
@@ -203,6 +296,15 @@ describe("request engine", () => {
     const engine = await createGlyphEngine(config, { cwd });
     const context = engine.beginResponse();
     const regular = context.scramble("Secret", { font: "body" });
+    const missesBeforeUnauthorized = engine.metrics().fontMisses;
+    expect(
+      await engine.fontResponse(
+        new Request(
+          `https://example.test${regular.fontUrl.replace("body%40regular.woff2", "body%40bold.woff2")}`,
+        ),
+      ),
+    ).toMatchObject({ status: 403 });
+    expect(engine.metrics().fontMisses).toBe(missesBeforeUnauthorized);
     const bold = context.scramble("Secret", { font: "body", face: "bold" });
     expect(regular.face).toBe("regular");
     expect(regular.css).toContain("font-weight:400");

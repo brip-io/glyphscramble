@@ -76,7 +76,17 @@ plaintext.
 
 ## Caching
 
-Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. The matching font is private and immutable for the remaining token lifetime. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
+Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. `ResponseContext.used` remains false until `scramble()` succeeds, so post-render middleware preserves an unprotected response's original cache policy. The matching font is private and immutable only for its remaining token lifetime; `max-age` shrinks on every request. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
+
+## Runtime secrets and rotation
+
+Generate production secrets with `openssl rand -base64 48`; do not commit them.
+`rotation.keyId` identifies the active key and `secretEnv` names its environment
+variable. During rotation, change both and put the old ID/environment name in
+`previousKeys` for at least `tokenTtlSeconds`. At most three previous keys are
+accepted. GlyphScramble derives a separate AES key for each ID and refuses
+startup if any configured secret is missing or shorter than 32 characters.
+Token lifetimes cannot exceed 24 hours.
 
 Static mode is the opposite trade: output can be cached globally, but the mapping is reused until the next build. Rotate by rebuilding and deploy each output tree as one unit. Byte-derived immutable asset names and mixed-build deployment verification remain R03 release gates, so do not apply indefinite caching to the current beta asset names or mix pages and assets from different builds.
 

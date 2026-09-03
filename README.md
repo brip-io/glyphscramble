@@ -60,7 +60,11 @@ export default defineGlyphConfig({
   },
   rotation: {
     scope: "response",
+    keyId: "2026-09",
     secretEnv: "GLYPHSCRAMBLE_SECRET",
+    previousKeys: [
+      { id: "2026-08", secretEnv: "GLYPHSCRAMBLE_SECRET_PREVIOUS" },
+    ],
     tokenTtlSeconds: 600,
   },
   runtime: {
@@ -86,6 +90,18 @@ it throws before plaintext is emitted. A process restart invalidates live font
 tokens, so keep HTML and its font route on the same stateful engine instance and
 size the cache for generated font bytes × responses within the token TTL. There
 is no implicit time-window fallback.
+
+Generate production secrets with `openssl rand -base64 48`. To rotate without
+invalidating live documents, deploy a new `keyId` and current secret while
+retaining the prior ID/environment variable in `previousKeys` for at least the
+token TTL. At most three previous keys are accepted; every configured secret is
+required at startup and must contain at least 32 characters.
+
+`ResponseContext.used` and `usage()` report whether rendering emitted a payload
+and which prepared faces it authorized. Astro, Nuxt, and SvelteKit preserve an
+ordinary response's cache policy and apply `private, no-store` only when used.
+Next remains an explicitly route-scoped contract until R07 because Proxy cannot
+observe downstream rendering.
 
 CSS sources that contain more than one `@font-face` require explicit named selectors, so a remote stylesheet cannot silently change which weight, style, stretch, or Unicode subset is used. Select a non-default face with `{ font: "body", face: "bold" }`.
 

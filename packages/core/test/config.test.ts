@@ -55,4 +55,36 @@ describe("runtime configuration", () => {
       ),
     ).toThrow(/response-pool/);
   });
+
+  it("validates bounded token rotation metadata", () => {
+    const value = config(undefined);
+    expect(
+      defineGlyphConfig({
+        ...value,
+        rotation: {
+          ...value.rotation,
+          keyId: "2026-09",
+          previousKeys: [
+            { id: "2026-08", secretEnv: "GLYPHSCRAMBLE_SECRET_PREVIOUS" },
+          ],
+        },
+      }),
+    ).toBeDefined();
+    expect(() =>
+      defineGlyphConfig({
+        ...value,
+        rotation: { ...value.rotation, tokenTtlSeconds: 86_401 },
+      }),
+    ).toThrow(/no greater/);
+    expect(() =>
+      defineGlyphConfig({
+        ...value,
+        rotation: {
+          ...value.rotation,
+          keyId: "duplicate",
+          previousKeys: [{ id: "duplicate", secretEnv: "GLYPHSCRAMBLE_OLD" }],
+        },
+      }),
+    ).toThrow(/Duplicate/);
+  });
 });

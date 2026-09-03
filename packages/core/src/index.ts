@@ -1,5 +1,9 @@
 export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
-export { createGlyphEngine, protectedResponseHeaders } from "./engine.js";
+export {
+  createGlyphEngine,
+  protectedResponseHeaders,
+  responseHeadersForContext,
+} from "./engine.js";
 export {
   DEFAULT_VARIANT_RUNTIME,
   ResponsePoolVariantProvider,
@@ -84,5 +88,6 @@ export type {
   GlyphPayload,
   PreparedFontFamilyMetadata,
   ResponseContext,
+  ResponseUsage,
   ScrambleOptions,
 } from "./types.js";
