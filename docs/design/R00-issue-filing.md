@@ -32,7 +32,7 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 
 The milestone uses the repository labels `design`, `parent`, `priority:P0`, `priority:P1`, `size:M`, and `size:L`. R00 carries `parent`; every issue carries `design`, exactly one priority, exactly one size, and the beta-readiness milestone.
 
-R01-R07 and R11 are implemented on `main`. R08-R10 are the remaining
+R01-R07, R10, and R11 are implemented on `main`. R08-R09 are the remaining
 framework adapters; R15 follows their final contracts and precedes public
 documentation/release qualification.
 
