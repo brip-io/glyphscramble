@@ -3,7 +3,7 @@ import { compress } from "woff2-encoder";
 
 if (!parentPort) throw new Error("WOFF2 worker requires a parent port.");
 
-parentPort.once("message", async ({ input }) => {
+parentPort.on("message", async ({ input }) => {
   try {
     const output = await compress(new Uint8Array(input));
     const bytes = Uint8Array.from(output);

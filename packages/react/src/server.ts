@@ -14,3 +14,12 @@ export function createGlyphPayload(
 ): GlyphPayload {
   return context.scramble(plaintext, options);
 }
+
+/** Server-only bounded-wait boundary for burst-tolerant runtimes. */
+export function createGlyphPayloadAsync(
+  context: ResponseContext,
+  plaintext: string,
+  options: ScrambleOptions,
+): Promise<GlyphPayload> {
+  return context.scrambleAsync(plaintext, options);
+}

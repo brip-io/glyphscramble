@@ -1,6 +1,6 @@
 # [R17] Runtime capacity, lifecycle, and observability
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#34](https://github.com/brip-io/glyphscramble/issues/34)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#34](https://github.com/brip-io/glyphscramble/issues/34)
 > **Blocked by:** R16 · **Blocks:** R12 performance and reliability qualification
 
 ## Objective
@@ -46,7 +46,7 @@ not alter the ceiling or replace the stable methodology required here.
 
 ## Design
 
-Separate ready, leased, and expiring indexes. A FIFO waiter queue receives the next generated variant up to a small deadline; queue bounds and abort signals prevent request pileups. One timer tracks the heap's earliest expiry and changes only when that minimum changes. Persistent workers initialize the WASM encoder once and receive transferable buffers.
+Separate ready, leased, and expiring indexes. A FIFO waiter queue receives the next generated variant up to a small deadline; queue bounds and abort signals prevent request pileups. Waiting begins lazily on the first `scrambleAsync()` call so merely creating an unused response context never consumes a one-use variant. The existing synchronous `scramble()` remains the explicit fail-fast path. One timer tracks the heap's earliest expiry and changes only when that minimum changes. Persistent workers initialize the WASM encoder once and receive transferable buffers.
 
 A capacity report combines measured generation rate, configured concurrency, face count, low/high watermarks, TTL-retained memory, and target traffic. An `onEvent` callback receives typed codes, timestamps, durations, counts, and error classes only. Drain is an explicit engine state.
 

@@ -106,8 +106,8 @@ const server = createServer(async (incoming, outgoing) => {
 
     // Render fully before committing headers. A genuinely streamed route must
     // opt in up front and set protected headers before its first body byte.
-    const context = engine.beginResponse();
-    const payload = context.scramble("Node Fetch protected value", {
+    const context = engine.beginResponse({ signal: request.signal });
+    const payload = await context.scrambleAsync("Node Fetch protected value", {
       font: "body",
       lang: "en",
     });
@@ -133,8 +133,8 @@ const server = createServer(async (incoming, outgoing) => {
 server.listen(Number(process.env.PORT ?? 3211), "127.0.0.1");
 
 async function shutdown() {
+  await engine.drain();
   await new Promise((resolve) => server.close(resolve));
-  await engine.close();
 }
 
 process.once("SIGINT", () => void shutdown());

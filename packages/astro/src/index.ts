@@ -119,7 +119,9 @@ export async function createAstroGlyphMiddleware(
 
     if (streaming.strategy === "route") {
       if (!streaming.protectedRoute(context)) return next();
-      const responseContext = engine.beginResponse();
+      const responseContext = engine.beginResponse({
+        signal: context.request.signal,
+      });
       (context.locals as GlyphAstroLocals).glyphscramble = responseContext;
       const response = await next();
       return new Response(response.body, {
@@ -129,7 +131,9 @@ export async function createAstroGlyphMiddleware(
       });
     }
 
-    const responseContext = engine.beginResponse();
+    const responseContext = engine.beginResponse({
+      signal: context.request.signal,
+    });
     (context.locals as GlyphAstroLocals).glyphscramble = responseContext;
     const response = await next();
     const body = await readResponseBody(response, maxBytes!);

@@ -18,8 +18,8 @@ Usage:
   glyphscramble init [--framework next|nuxt|sveltekit|astro|vite]
   glyphscramble prepare [--config glyphscramble.config.ts]
   glyphscramble inspect <font-file>
-  glyphscramble doctor [--root src] [--static-output dist-protected]
-  glyphscramble benchmark [--config glyphscramble.config.ts]
+  glyphscramble doctor [--root src] [--static-output dist-protected] [--capacity] [--target-rps 10]
+  glyphscramble benchmark [--config glyphscramble.config.ts] [--target-rps 10]
   glyphscramble static --input dist --output dist-protected [--public-base-path /] [--font-timeout-ms 8000] [--existing-output replace|reject] [--config glyphscramble.config.ts]
 
 GlyphScramble raises the cost of bulk DOM scraping. It is not DRM and does not
@@ -98,7 +98,65 @@ async function doctor(root: string): Promise<DoctorFinding[]> {
   return findings;
 }
 
-async function benchmark(configPath: string): Promise<void> {
+function targetRate(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0)
+    throw new Error("--target-rps must be a positive number.");
+  return parsed;
+}
+
+async function capacityDoctor(
+  configPath: string,
+  targetResponsesPerSecond: number | undefined,
+): Promise<DoctorFinding[]> {
+  const config = await loadGlyphConfig(configPath);
+  const secretEnvironments = [
+    config.rotation.secretEnv,
+    ...(config.rotation.previousKeys ?? []).map((key) => key.secretEnv),
+  ];
+  const oldSecrets = new Map(
+    secretEnvironments.map((name) => [name, process.env[name]]),
+  );
+  for (const name of secretEnvironments)
+    if (!process.env[name])
+      process.env[name] =
+        "local glyphscramble capacity probe, never used in production";
+  let engine: Awaited<ReturnType<typeof createGlyphEngine>> | undefined;
+  try {
+    engine = await createGlyphEngine(config);
+    const report = engine.capacityReport(targetResponsesPerSecond);
+    const findings: DoctorFinding[] = [
+      {
+        severity:
+          report.targetFitsGeneration === false ||
+          report.targetFitsCache === false
+            ? "warning"
+            : "info",
+        code: "RUNTIME-CAPACITY",
+        message: `Measured ${report.sustainableResponsesPerSecond} response variant(s)/s at p95 ${report.measuredFaceGenerationP95Ms} ms per face; cache retains approximately ${report.cacheLimitedResponses} response variant(s) for a ${report.tokenTtlSeconds}s token TTL.`,
+      },
+    ];
+    for (const message of report.guidance)
+      findings.push({
+        severity: message.startsWith("Measured") ? "info" : "warning",
+        code: "RUNTIME-CAPACITY-GUIDANCE",
+        message,
+      });
+    return findings;
+  } finally {
+    if (engine) await engine.close();
+    for (const [name, value] of oldSecrets) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+async function benchmark(
+  configPath: string,
+  targetResponsesPerSecond: number | undefined,
+): Promise<void> {
   const config = await loadGlyphConfig(configPath);
   const lock = await prepareGlyphFonts(config);
   const family = Object.values(lock.fonts)[0];
@@ -159,7 +217,7 @@ async function benchmark(configPath: string): Promise<void> {
       const acquisitionStarted = performance.now();
       const context = engine.beginResponse();
       const encodingStarted = performance.now();
-      const protectedPayload = context.scramble(sample, {
+      const protectedPayload = await context.scrambleAsync(sample, {
         font: family.id,
         face: face.id,
       });
@@ -177,6 +235,7 @@ async function benchmark(configPath: string): Promise<void> {
       await fontResponse.arrayBuffer();
     }
     const metrics = engine.metrics();
+    const capacity = engine.capacityReport(targetResponsesPerSecond);
     const encodingStats = timingStats(encoding);
     const acquisitionStats = timingStats(acquisition);
     const responseStats = timingStats(response);
@@ -190,6 +249,7 @@ async function benchmark(configPath: string): Promise<void> {
           normalizedBytes,
           coldPoolMilliseconds: Number(coldPoolMilliseconds.toFixed(3)),
           backgroundGenerationMilliseconds: metrics.generationMilliseconds,
+          capacity,
           responseAcquisitionMilliseconds: acquisitionStats,
           preparedFontResponseMilliseconds: responseStats,
           gates: {
@@ -254,6 +314,8 @@ async function main(): Promise<void> {
       "static-output": { type: "string" },
       "public-base-path": { type: "string" },
       "font-timeout-ms": { type: "string" },
+      capacity: { type: "boolean", default: false },
+      "target-rps": { type: "string" },
     },
   });
   if (command === "init") {
@@ -289,6 +351,13 @@ async function main(): Promise<void> {
     const findings = parsed.values["static-output"]
       ? await verifyStaticOutput(parsed.values["static-output"])
       : await doctor(parsed.values.root!);
+    if (parsed.values.capacity)
+      findings.push(
+        ...(await capacityDoctor(
+          parsed.values.config!,
+          targetRate(parsed.values["target-rps"]),
+        )),
+      );
     process.stdout.write(
       findings
         .map(
@@ -299,7 +368,11 @@ async function main(): Promise<void> {
     );
     if (findings.some((item) => item.severity === "error"))
       process.exitCode = 1;
-  } else if (command === "benchmark") await benchmark(parsed.values.config!);
+  } else if (command === "benchmark")
+    await benchmark(
+      parsed.values.config!,
+      targetRate(parsed.values["target-rps"]),
+    );
   else if (command === "static") {
     if (!parsed.values.input || !parsed.values.output)
       throw new Error("static requires --input and --output.");

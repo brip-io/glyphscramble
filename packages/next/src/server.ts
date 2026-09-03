@@ -84,7 +84,7 @@ async function initializeNextGlyphs(
     engine,
     getResponseContext,
     async scramble(text, scrambleOptions) {
-      return (await getResponseContext()).scramble(text, scrambleOptions);
+      return (await getResponseContext()).scrambleAsync(text, scrambleOptions);
     },
     beginRouteResponse: () => engine.beginResponse(),
     fontRoute: (request) => engine.fontResponse(request),

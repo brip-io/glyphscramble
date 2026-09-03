@@ -105,6 +105,10 @@ export function validateGlyphConfig(config: GlyphConfig): void {
     generationConcurrency: config.runtime?.generationConcurrency,
     generationQueueLimit: config.runtime?.generationQueueLimit,
     generationTimeoutMs: config.runtime?.generationTimeoutMs,
+    acquisitionTimeoutMs: config.runtime?.acquisitionTimeoutMs,
+    acquisitionQueueLimit: config.runtime?.acquisitionQueueLimit,
+    workerRecycleAfter: config.runtime?.workerRecycleAfter,
+    drainTimeoutMs: config.runtime?.drainTimeoutMs,
     cacheMaxBytes: config.runtime?.cacheMaxBytes,
   };
   for (const [name, value] of Object.entries(runtimeIntegers)) {

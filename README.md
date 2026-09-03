@@ -81,6 +81,10 @@ export default defineGlyphConfig({
     generationConcurrency: 2,
     generationQueueLimit: 64,
     generationTimeoutMs: 10_000,
+    acquisitionTimeoutMs: 50,
+    acquisitionQueueLimit: 128,
+    workerRecycleAfter: 256,
+    drainTimeoutMs: 30_000,
     cacheMaxBytes: 64 * 1024 * 1024,
   },
   static: {
@@ -94,18 +98,21 @@ export default defineGlyphConfig({
 });
 ```
 
-The production runtime prepares one-use WOFF2 variants in worker threads before
-protected responses need them. The first `scramble()` call (or explicit token
-read) consumes a variant exactly once; an unused response context consumes
-nothing. If demand outruns the bounded pool or active tokens fill the byte budget,
-it throws before plaintext is emitted. A process restart invalidates live font
-tokens, so keep HTML and its font route on the same stateful engine instance and
-size the cache for generated font bytes plus retained mapping storage × responses
-within the token TTL. The
+The production runtime prepares one-use WOFF2 variants in persistent worker
+threads before protected responses need them. The first `scrambleAsync()` call
+waits briefly for an imminent variant and consumes it exactly once;
+`scramble()` is the immediate fail-fast path. An unused response context
+consumes nothing. Bounded queue, timeout, cancellation, preflight byte, and
+post-generation byte checks all fail before plaintext is emitted. A process
+restart invalidates live font tokens, so keep HTML and its font route on the
+same stateful engine instance and size the cache for generated font bytes plus
+retained mapping storage × responses within the token TTL. The
 Next adapter deduplicates page and Route Handler module instances inside one
 Node process. Multi-process, serverless, and horizontally scaled Next delivery
-still require an external variant provider planned for R17; the beta must not
-be deployed that way. There is no implicit time-window fallback.
+still require request affinity or an external `FontVariantProvider`; the beta
+must not be deployed across isolated instances without it. There is no implicit
+time-window fallback. See [Runtime capacity and shutdown](docs/RUNTIME-CAPACITY.md)
+for sizing, aggregate events, and graceful drain.
 
 Generate production secrets with `openssl rand -base64 48`. To rotate without
 invalidating live documents, deploy a new `keyId` and current secret while
@@ -208,8 +215,8 @@ Read [Choosing what to protect](docs/USAGE-GUIDE.md) before integration, [the cl
 glyphscramble init        framework detection and scaffold
 glyphscramble prepare     resolve, normalize, inspect, and lock fonts
 glyphscramble inspect     report tables, coverage, format, axes, and color data
-glyphscramble doctor      find client risks or verify a complete static output tree
-glyphscramble benchmark   measure pool startup, generation, encoding, token validation, and font responses
+glyphscramble doctor      find client risks, verify static output, or check runtime capacity
+glyphscramble benchmark   measure pool startup, sustainable rate, encoding, token validation, and font responses
 glyphscramble static      post-process a static build
 ```
 

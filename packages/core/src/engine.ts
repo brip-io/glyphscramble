@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { loadPreparedFonts, type PreparedFont } from "./font-pipeline.js";
+import {
+  loadPreparedFontFamilies,
+  type PreparedFont,
+} from "./font-pipeline.js";
 import {
   issueToken,
   readToken,
@@ -16,8 +19,11 @@ import {
 } from "./variant-provider.js";
 import type {
   GlyphConfig,
+  GlyphAcquisitionOptions,
+  GlyphDrainOptions,
   GlyphEngine,
   GlyphPayload,
+  GlyphRuntimeEventHandler,
   ResponseContext,
   ScrambleOptions,
 } from "./types.js";
@@ -114,6 +120,7 @@ export async function createGlyphEngine(
     cwd?: string;
     variantProvider?: FontVariantProvider;
     now?: () => number;
+    onEvent?: GlyphRuntimeEventHandler;
   } = {},
 ): Promise<GlyphEngine> {
   validateGlyphConfig(config);
@@ -122,8 +129,13 @@ export async function createGlyphEngine(
   const fonts = new Map<string, RuntimeFont>();
   const families = new Map<string, RuntimeFamily>();
   const variantFaces: VariantFace[] = [];
-  for (const id of Object.keys(config.fonts)) {
-    const preparedFaces = await loadPreparedFonts(id, options.cwd);
+  const configuredFamilies = Object.keys(config.fonts);
+  const preparedFamilies = await loadPreparedFontFamilies(
+    configuredFamilies,
+    options.cwd,
+  );
+  for (const id of configuredFamilies) {
+    const preparedFaces = preparedFamilies.get(id)!;
     const runtimeFaces = new Map<string, RuntimeFont>();
     for (const prepared of preparedFaces) {
       const runtimeFont = {
@@ -154,6 +166,7 @@ export async function createGlyphEngine(
       variantRuntimeOptions(config.runtime),
       undefined,
       now,
+      options.onEvent,
     );
   try {
     await variantProvider.start();
@@ -163,21 +176,58 @@ export async function createGlyphEngine(
   }
 
   return {
-    beginResponse(): ResponseContext {
+    beginResponse(
+      responseAcquisition: GlyphAcquisitionOptions = {},
+    ): ResponseContext {
       let lease: ReturnType<FontVariantProvider["acquire"]> | undefined;
+      let leasePromise:
+        Promise<ReturnType<FontVariantProvider["acquire"]>> | undefined;
       let leaseIssuedAt: number | undefined;
       let issued: ReturnType<typeof issueToken> | undefined;
       let issuedFaces = "";
       const authorizedFaces = new Set<string>();
+      const expiryAt = (additionalMs = 0) =>
+        (Math.floor((now() + additionalMs) / 1000) +
+          config.rotation.tokenTtlSeconds) *
+        1000;
       const ensureLease = () => {
         if (lease) return lease;
+        if (leasePromise)
+          throw new Error(
+            "A response font variant is being acquired; await scrambleAsync() before using the synchronous path.",
+          );
         const issuedAt = now();
-        const expiresAt =
-          (Math.floor(issuedAt / 1000) + config.rotation.tokenTtlSeconds) *
-          1000;
-        lease = variantProvider.acquire(expiresAt);
+        lease = variantProvider.acquire(expiryAt());
         leaseIssuedAt = issuedAt;
         return lease;
+      };
+      const ensureLeaseAsync = async (
+        acquisition: GlyphAcquisitionOptions = {},
+      ) => {
+        if (lease) return lease;
+        if (!leasePromise) {
+          const timeoutMs =
+            acquisition.timeoutMs ??
+            responseAcquisition.timeoutMs ??
+            config.runtime?.acquisitionTimeoutMs ??
+            50;
+          const signal = acquisition.signal ?? responseAcquisition.signal;
+          leasePromise = variantProvider
+            .acquireAsync(expiryAt(timeoutMs), {
+              timeoutMs,
+              ...(signal === undefined ? {} : { signal }),
+            })
+            .then((acquired) => {
+              lease = acquired;
+              leaseIssuedAt = now();
+              return acquired;
+            })
+            .catch((error: unknown) => {
+              leasePromise = undefined;
+              throw error;
+            });
+        }
+        return leasePromise;
       };
       const ensureIssued = (): ReturnType<typeof issueToken> => {
         const responseLease = ensureLease();
@@ -198,6 +248,42 @@ export async function createGlyphEngine(
         issuedFaces = faceKey;
         return issued;
       };
+      const resolveFont = (scrambleOptions: ScrambleOptions) => {
+        const family = families.get(scrambleOptions.font);
+        if (!family)
+          throw new Error(
+            `Unknown GlyphScramble font: ${scrambleOptions.font}`,
+          );
+        const faceId = scrambleOptions.face ?? family.defaultFace;
+        const font = family.faces.get(faceId);
+        if (!font)
+          throw new Error(
+            `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
+          );
+        return font;
+      };
+      const scrambleWithLease = (
+        text: string,
+        scrambleOptions: ScrambleOptions,
+        responseLease: ReturnType<FontVariantProvider["acquire"]>,
+      ): GlyphPayload => {
+        const font = resolveFont(scrambleOptions);
+        const mapping = variantProvider.mapping(responseLease, runtimeId(font));
+        if (!mapping)
+          throw new Error(
+            "The response font variant expired before text could be scrambled.",
+          );
+        const encodedText = encodeText(text, mapping);
+        authorizedFaces.add(runtimeId(font));
+        const responseToken = ensureIssued();
+        return payload(
+          encodedText,
+          font,
+          responseToken,
+          config,
+          scrambleOptions,
+        );
+      };
       return {
         get token() {
           return ensureIssued().token;
@@ -213,36 +299,17 @@ export async function createGlyphEngine(
           });
         },
         scramble(text: string, scrambleOptions: ScrambleOptions): GlyphPayload {
-          const family = families.get(scrambleOptions.font);
-          if (!family)
-            throw new Error(
-              `Unknown GlyphScramble font: ${scrambleOptions.font}`,
-            );
-          const faceId = scrambleOptions.face ?? family.defaultFace;
-          const font = family.faces.get(faceId);
-          if (!font)
-            throw new Error(
-              `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
-            );
-          const responseLease = ensureLease();
-          const mapping = variantProvider.mapping(
-            responseLease,
-            runtimeId(font),
-          );
-          if (!mapping)
-            throw new Error(
-              "The response font variant expired before text could be scrambled.",
-            );
-          const encodedText = encodeText(text, mapping);
-          authorizedFaces.add(runtimeId(font));
-          const responseToken = ensureIssued();
-          return payload(
-            encodedText,
-            font,
-            responseToken,
-            config,
-            scrambleOptions,
-          );
+          resolveFont(scrambleOptions);
+          return scrambleWithLease(text, scrambleOptions, ensureLease());
+        },
+        async scrambleAsync(
+          text: string,
+          scrambleOptions: ScrambleOptions,
+          acquisition: GlyphAcquisitionOptions = {},
+        ): Promise<GlyphPayload> {
+          resolveFont(scrambleOptions);
+          const responseLease = await ensureLeaseAsync(acquisition);
+          return scrambleWithLease(text, scrambleOptions, responseLease);
         },
       };
     },
@@ -323,6 +390,17 @@ export async function createGlyphEngine(
 
     metrics() {
       return variantProvider.metrics();
+    },
+
+    capacityReport(targetResponsesPerSecond?: number) {
+      return variantProvider.capacityReport(
+        config.rotation.tokenTtlSeconds,
+        targetResponsesPerSecond,
+      );
+    },
+
+    async drain(drainOptions: GlyphDrainOptions = {}): Promise<void> {
+      await variantProvider.drain(drainOptions);
     },
 
     async close(): Promise<void> {
