@@ -84,7 +84,7 @@ Replace arbitrary CSS injection with a validated wire contract and leak-free, ca
 
 ### Release C — Qualified framework adapters
 
-#### R07 · React and Next 16 · **M**
+#### R07 · React and Next 16 · **M** · **Implemented in [PR #39](https://github.com/brip-io/glyphscramble/pull/39)**
 
 Provide a real request-scoped context, request-time rendering, route-scoped cache controls, streaming/RSC support, and safe initializer composition.
 
