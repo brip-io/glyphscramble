@@ -4,6 +4,8 @@
 
 The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and twelve independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
 
+R04 and R11 are merged and implemented. The dependency-ready runtime work continues with R01; issue state and implementation evidence remain canonical in each linked design.
+
 | ID      | Issue / design                                                                        | Size | Priority | GitHub issue                                              |
 | ------- | ------------------------------------------------------------------------------------- | ---: | -------: | --------------------------------------------------------- |
 | **R00** | [Beta release-readiness remediation (parent)](R00-release-readiness.md)               |    L |       P0 | [#1](https://github.com/brip-io/glyphscramble/issues/1)   |

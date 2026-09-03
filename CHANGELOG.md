@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Prepare explicit named font faces from structured CSS, enforce Unicode coverage, preserve license notices, and carry verified descriptors and source identities through dynamic and static delivery.
+- Bound remote font ingestion and harden SFNT, WOFF, WOFF2, and `cmap` validation; pin reproducible Unicode 17 classification so malformed or oversized build inputs fail closed.
+
 ## 0.1.0-beta.0
 
 - Initial core, CLI, per-response request engine, static post-build generator, and React/Next, Vue/Nuxt, Svelte/SvelteKit, Astro/Vite integration contracts.

@@ -1,6 +1,6 @@
 # [R11] Binary and Unicode hardening
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** [#12](https://github.com/brip-io/glyphscramble/issues/12)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented ([PR #16](https://github.com/brip-io/glyphscramble/pull/16)) · **GitHub issue:** [#12](https://github.com/brip-io/glyphscramble/issues/12)
 > **Requires:** R04 · **Blocks:** R01, R12
 
 ## Objective
@@ -72,6 +72,7 @@ Malformed sources fail within bounded resources, Unicode data regenerates byte-f
 
 ## Implementation evidence
 
+- Merged to `main` in [PR #16](https://github.com/brip-io/glyphscramble/pull/16), after its R04 dependency landed in PR #15.
 - The transport revalidates every redirect, separates IPv4/IPv6 deny lists, binds validated DNS answers to built-in connections, streams through configured byte limits, validates media types and magic, and cancels rejected bodies.
 - SFNT/WOFF/WOFF2 and `cmap` parsing enforce the documented structural, checksum, scalar, decompression, and collection limits.
 - `scripts/unicode-17-sources.json` pins upstream input and generated-output digests; online generation and offline `--ucd-dir` verification produce identical bytes.

@@ -1,6 +1,6 @@
 # [R00] Beta release-readiness remediation
 
-> **Size:** L · **Priority:** P0 · **Status:** Proposed parent · **GitHub issue:** [#1](https://github.com/brip-io/glyphscramble/issues/1)
+> **Size:** L · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#1](https://github.com/brip-io/glyphscramble/issues/1)
 > **Owner:** BRIP · **Reviewers:** runtime, framework, accessibility, security, and counsel/IP
 
 > **This is a parent project.** It is delivered through twelve independently mergeable child issues. This document owns architecture, ordering, and release gates; each child owns its implementation and tests.
@@ -17,7 +17,7 @@ The release-readiness review found two P0 architectural failures and several P1 
 - static post-processing rewrites HTML only, can corrupt raw-text descendants, and is not safe for hydrated applications;
 - generated framework middleware applies `private, no-store` too broadly;
 - static asset naming, accessibility behavior, font-face metadata, license output, client lifecycle handling, and framework scaffolds do not yet meet their documentation;
-- the current ten-unit-test suite and synthetic Playwright check do not qualify real fonts, scripts, browsers, leakage surfaces, or supported framework releases.
+- the initial ten-unit-test suite and synthetic Playwright check did not qualify real fonts, scripts, browsers, leakage surfaces, or supported framework releases.
 
 The approved product claim remains: **GlyphScramble raises the cost of bulk DOM scraping.** It is not DRM and does not prevent headless browsers, OCR, downloaded-font analysis, plaintext side channels, or an authorized reader from recovering content.
 
@@ -50,13 +50,13 @@ Make static output atomic and idempotent, reject raw-text/interactive/hydrated b
 
 **Exit criterion:** repeated clean and reused builds are byte-equivalent for the same inputs and seed, unsafe trees fail before output publication, and input remains recoverable.
 
-#### R04 · Font-face resolution, coverage, and licensing · **M**
+#### R04 · Font-face resolution, coverage, and licensing · **M** · **Implemented in [PR #15](https://github.com/brip-io/glyphscramble/pull/15)**
 
 Represent real faces and CSS descriptors, implement coverage semantics, and emit notices and verifiable lock metadata.
 
 **Exit criterion:** a multi-weight Google Fonts CSS source and direct local/remote faces produce deterministic, licensed, correctly described prepared artifacts.
 
-#### R11 · Binary and Unicode hardening · **M**
+#### R11 · Binary and Unicode hardening · **M** · **Implemented in [PR #16](https://github.com/brip-io/glyphscramble/pull/16)**
 
 Harden untrusted font/CSS parsing, pin Unicode generation inputs, and qualify cmap and shaping invariants with official and real fixtures.
 
