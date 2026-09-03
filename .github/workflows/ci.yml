@@ -72,6 +72,28 @@ jobs:
           name: next-playwright-report
           path: playwright-report
 
+  astro-vite-node-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:r10
+        env:
+          ASTRO_TELEMETRY_DISABLED: "1"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r10-playwright-report
+          path: playwright-report
+
   runtime-benchmark:
     strategy:
       fail-fast: false

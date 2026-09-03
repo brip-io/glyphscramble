@@ -24,14 +24,19 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && astro check --minimumSeverity error",
     "clean": "rm -rf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && astro check --minimumSeverity error"
   },
   "dependencies": {
     "@brip/glyphscramble": "workspace:^"
   },
   "peerDependencies": {
     "astro": ">=7 <8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "astro": "7.3.1",
+    "typescript": "^5.9.2"
   }
 }

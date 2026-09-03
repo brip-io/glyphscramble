@@ -5,7 +5,11 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist/**",
+      "**/dist-site/**",
+      "**/dist-static/**",
+      "**/dist-static-input/**",
       "**/node_modules/**",
+      "**/.astro/**",
       "examples/**/.next/**",
       "examples/**/.glyphscramble/**",
       "packages/core/src/generated/**",

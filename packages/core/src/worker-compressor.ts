@@ -1,6 +1,13 @@
 import { Worker } from "node:worker_threads";
 
-const WORKER_URL = new URL("./woff2-worker.mjs", import.meta.url);
+let workerSourcePromise: Promise<string> | undefined;
+
+function loadWorkerSource(): Promise<string> {
+  workerSourcePromise ??= import("./woff2-worker-source.js").then(
+    ({ default: source }) => source,
+  );
+  return workerSourcePromise;
+}
 
 function abortError(): Error {
   const error = new Error("WOFF2 generation was cancelled.");
@@ -9,13 +16,19 @@ function abortError(): Error {
 }
 
 /** Run the CPU-heavy WOFF2 WASM encoder outside the server event loop. */
-export function compressWoff2InWorker(
+export async function compressWoff2InWorker(
   input: Uint8Array,
   signal: AbortSignal,
 ): Promise<Uint8Array> {
-  if (signal.aborted) return Promise.reject(abortError());
+  if (signal.aborted) throw abortError();
 
-  const worker = new Worker(WORKER_URL);
+  const workerSource = await loadWorkerSource();
+  if (signal.aborted) throw abortError();
+
+  // The payload is generated as one self-contained CommonJS program. Using an
+  // evaluated worker avoids framework-specific URL/asset rewriting while the
+  // lazy import keeps the ~1 MB encoder payload out of startup evaluation.
+  const worker = new Worker(workerSource, { eval: true });
   const transferable = input.slice().buffer;
 
   return new Promise<Uint8Array>((resolve, reject) => {

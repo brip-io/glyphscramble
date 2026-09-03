@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add qualified Astro 7, Vite 8, and generic Node/Fetch integrations: Astro now typechecks its component, handles lazy streams before selective headers commit, and mounts per-node lifecycles; Vite stages ordinary builds into atomic static publications; a lazy self-contained WOFF2 worker remains portable through server bundlers; real consumers prove SSR/static leakage, subpath, CSP, rotation, abort, failure, and caching behavior.
 - Add a request-scoped Next 16 App Router integration with direct-navigation, RSC leakage, rotation, expiry refresh, selective caching, and GET/HEAD consumer coverage; generated routes now respect Next private-folder and Cache Components rules, independently bundled server modules share one process-local engine, TypeScript configs load across the supported Node lines, and React avoids equivalent-payload remounts behind explicit server-only boundaries.
 - Emit static fonts, CSS, JavaScript, and manifests under byte-derived build identities; add subpath-safe URLs, a strict-CSP fail-closed loader, persistent `aria-hidden` protection, generic accessible failure status, and deployment verification so stale CDN assets cannot silently pair with newer HTML.
 - Replace serialized payload CSS with a validated data-only contract and one reference-counted client lifecycle so exact font loads, reactive updates, CSP nonces, failures, and unmount cleanup behave consistently across framework adapters; precompute stable Unicode property groups so response rotation does not repeatedly classify the same face.

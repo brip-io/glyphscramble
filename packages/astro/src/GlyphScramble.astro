@@ -1,37 +1,70 @@
 ---
 import type { GlyphPayload } from "@brip/glyphscramble";
-const { payload } = Astro.props as { payload: GlyphPayload };
+
+export interface Props {
+  payload: GlyphPayload;
+  fontTimeoutMs?: number;
+  errorText?: string;
+}
+
+const { payload, fontTimeoutMs, errorText } = Astro.props;
 ---
 
-<span
-  hidden
-  aria-hidden="true"
-  lang={payload.lang}
-  data-glyphscramble-mount
-  data-glyphscramble-payload={JSON.stringify(payload)}
->{payload.encodedText}</span>
+<brip-glyphscramble-v2
+  data-payload={JSON.stringify(payload)}
+  data-timeout={fontTimeoutMs}
+  data-error={errorText}
+>
+  <span hidden aria-hidden="true" lang={payload.lang} data-content
+    >{payload.encodedText}</span
+  >
+</brip-glyphscramble-v2>
+
+<style>
+  brip-glyphscramble-v2 {
+    display: contents;
+  }
+</style>
+
 <script>
   import {
     mountGlyphPayload,
     type GlyphMountHandle,
   } from "@brip/glyphscramble/runtime";
 
-  const handles = new Map<HTMLElement, GlyphMountHandle>();
-  function mountAll() {
-    for (const node of document.querySelectorAll<HTMLElement>(
-      "[data-glyphscramble-mount]",
-    )) {
-      if (handles.has(node)) continue;
-      const serialized = node.dataset.glyphscramblePayload;
-      if (!serialized) continue;
-      handles.set(node, mountGlyphPayload(node, JSON.parse(serialized)));
+  const ELEMENT = "brip-glyphscramble-v2";
+
+  class GlyphScrambleElement extends HTMLElement {
+    #mount: GlyphMountHandle | undefined;
+
+    connectedCallback() {
+      if (this.#mount) return;
+      const element = this.querySelector<HTMLElement>(":scope > [data-content]");
+      const serialized = this.dataset.payload;
+      if (!element || !serialized) return;
+      try {
+        const timeout = this.dataset.timeout;
+        this.#mount = mountGlyphPayload(element, JSON.parse(serialized), {
+          ...(timeout ? { timeoutMs: Number(timeout) } : {}),
+          ...(this.dataset.error === undefined
+            ? {}
+            : { errorText: this.dataset.error }),
+        });
+      } catch {
+        element.textContent =
+          this.dataset.error ??
+          "This protected content could not be displayed.";
+        element.dataset.glyphscramble = "error";
+        element.hidden = false;
+      }
+    }
+
+    disconnectedCallback() {
+      this.#mount?.destroy();
+      this.#mount = undefined;
     }
   }
 
-  document.addEventListener("astro:before-swap", () => {
-    for (const handle of handles.values()) handle.destroy();
-    handles.clear();
-  });
-  document.addEventListener("astro:page-load", mountAll);
-  mountAll();
+  if (!customElements.get(ELEMENT))
+    customElements.define(ELEMENT, GlyphScrambleElement);
 </script>
