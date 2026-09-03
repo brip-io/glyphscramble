@@ -131,11 +131,21 @@ async function run(label, source, ceilings) {
     });
     const acquisition = [];
     const response = [];
+    const payloads = [];
     const sample = "High value block. ".repeat(625);
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
       const acquired = performance.now();
       const payload = engine.beginResponse().scramble(sample, { font: "body" });
       acquisition.push(performance.now() - acquired);
+      payloads.push(payload);
+    }
+
+    // Acquiring a variant schedules an asynchronous pool refill. Let those
+    // prepared-byte refills settle before timing the separate font-response
+    // phase, otherwise scheduler jitter is charged to whichever request happens
+    // to yield next rather than to the pool-generation metric that owns it.
+    await new Promise((resolve) => setImmediate(resolve));
+    for (const payload of payloads) {
       const responseStarted = performance.now();
       const font = await engine.fontResponse(
         new globalThis.Request(`https://benchmark.invalid${payload.fontUrl}`),
