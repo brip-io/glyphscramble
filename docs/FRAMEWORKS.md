@@ -2,7 +2,12 @@
 
 All SSR integrations follow the same sequence: create one process-level engine, wait for its one-use variant pool during startup, call `beginResponse()` for each dynamic document, await `scrambleAsync()` at the server-only plaintext boundary, render only `GlyphPayload`, route font requests to that same engine's `fontResponse()`, and mark the containing response `private, no-store` only when `ResponseContext.used` is true. Creating an unused context consumes no variant; `scramble()` remains available as an explicit no-wait path.
 
-Every client adapter delegates to the same validated `mountGlyphPayload()` lifecycle. The data-only v2 payload contains exact face descriptors and no serialized CSS; duplicate mounts share a face load, reactive updates abort stale work, and unmount releases timers, rules, and registrations. See [Client payload and font lifecycle](CLIENT-RUNTIME.md).
+Every client adapter delegates to the same validated `mountGlyphPayload()` lifecycle. The compact data-only v3 payload contains exact face descriptors and no serialized CSS; duplicate mounts and temporary remounts share a bounded face load, equivalent payload clones are no-ops, and semantic updates abort stale work. React, Vue, Svelte, and Astro expose the same `fontTimeoutMs` and localized `errorText` controls. See [Client payload and font lifecycle](CLIENT-RUNTIME.md).
+
+Core `beginResponse()` and the Next, Nuxt, SvelteKit, and Astro server-helper
+options accept the same `faces: [{ font, face }]` predeclaration when a route or
+application wants a smaller fixed token scope. Omitting it authorizes the
+bounded prepared configuration and remains the convenient default.
 
 The `response-pool` runtime is intentionally stateful. Do not create a new engine per request or route the font URL to an instance that cannot access the issuing process's variant. Bounded acquisition timeout or overload throws before rendering and must remain a closed failure. A load-balanced deployment needs request affinity or an external `FontVariantProvider`; it must not regenerate on the font request or silently reuse a mapping across responses. Use `engine.drain()` after removing an instance from application traffic so issued fonts remain available until expiry or the shutdown deadline. See [Runtime capacity and shutdown](RUNTIME-CAPACITY.md).
 

@@ -9,8 +9,6 @@ export function ClonedPayload({ payload }: { payload: GlyphPayload }) {
   const clonedPayload: GlyphPayload = {
     ...payload,
     face: { ...payload.face, unicodeRange: [...payload.face.unicodeRange] },
-    coverage: { ...payload.coverage, ranges: [...payload.coverage.ranges] },
-    rotation: { ...payload.rotation },
   };
 
   return (

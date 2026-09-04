@@ -7,6 +7,7 @@ import {
 
 const TOKEN_VERSION = 2;
 const TOKEN_MAX_BYTES = 4_096;
+export const MAX_TOKEN_FACES = 64;
 const KEY_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
 const FACE_ID = /^[a-z][a-z0-9_-]*@[a-z][a-z0-9_-]*$/i;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -79,6 +80,7 @@ function validateCoordination(coordination: TokenCoordination): void {
     throw new Error("Unsupported GlyphScramble token mode.");
   if (
     !Array.isArray(coordination.faces) ||
+    coordination.faces.length > MAX_TOKEN_FACES ||
     coordination.faces.some((face) => !FACE_ID.test(face)) ||
     new Set(coordination.faces).size !== coordination.faces.length
   )
@@ -120,11 +122,14 @@ export function issueToken(
     cipher.update(JSON.stringify(claims)),
     cipher.final(),
   ]);
+  const packed = Buffer.concat([header, iv, cipher.getAuthTag(), body]);
+  if (packed.length > TOKEN_MAX_BYTES)
+    throw new Error(
+      "GlyphScramble token scope exceeds the encrypted token byte limit. Predeclare a smaller response face set.",
+    );
   return {
     ...claims,
-    token: Buffer.concat([header, iv, cipher.getAuthTag(), body]).toString(
-      "base64url",
-    ),
+    token: packed.toString("base64url"),
   };
 }
 
@@ -191,7 +196,7 @@ export function readToken(
       typeof claims.variant !== "string" ||
       claims.variantMode !== "response-pool" ||
       !Array.isArray(claims.faces) ||
-      claims.faces.length > (options.maxFaces ?? 64)
+      claims.faces.length > (options.maxFaces ?? MAX_TOKEN_FACES)
     )
       throw new Error("Invalid GlyphScramble token claims.");
     validateCoordination(claims);

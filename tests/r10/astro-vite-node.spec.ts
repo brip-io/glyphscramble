@@ -34,7 +34,7 @@ test("Astro buffers lazy rendering before applying selective headers", async ({
   const body = await lazy.text();
   expect(body).not.toContain("Lazy Astro stream value");
   expect(JSON.parse(body)).toMatchObject({
-    version: 2,
+    version: 3,
     encodedText: expect.any(String),
   });
 });
@@ -48,7 +48,7 @@ test("Astro SSR emits no plaintext and mounts one lifecycle per block", async ({
   expect(await raw.text()).not.toContain("Astro protected value");
 
   await page.goto(`${ASTRO}/`);
-  const content = page.locator("brip-glyphscramble-v2 > [data-content]");
+  const content = page.locator("brip-glyphscramble-v3 > [data-content]");
   await expect(content).toHaveAttribute("data-glyphscramble", "ready");
   await expect(content).toBeVisible();
   await expect(content).not.toHaveText("Astro protected value");
@@ -62,7 +62,7 @@ test("Astro shows the localized generic error when its font fails", async ({
 }) => {
   await page.route("**/_glyphscramble/font/**", (route) => route.abort());
   await page.goto(`${ASTRO}/`);
-  const content = page.locator("brip-glyphscramble-v2 > [data-content]");
+  const content = page.locator("brip-glyphscramble-v3 > [data-content]");
   await expect(content).toHaveAttribute("data-glyphscramble", "error");
   await expect(content).toHaveText("Protected Astro content unavailable.");
   await expect(content).toBeVisible();

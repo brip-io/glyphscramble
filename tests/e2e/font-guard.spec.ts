@@ -31,7 +31,7 @@ test.beforeAll(async () => {
 function payload(suffix = "0123456789abcdef") {
   const fontToken = `v2.current.${suffix}`;
   return {
-    version: 2,
+    version: 3,
     encodedText: "Vhfuhw",
     font: "body",
     face: {
@@ -42,15 +42,9 @@ function payload(suffix = "0123456789abcdef") {
       stretch: "normal",
       unicodeRange: ["U+0020-007E"],
     },
-    fontToken,
     fontUrl: `/_glyphscramble/font/${fontToken}/body%40regular.woff2`,
     expiresAt: Math.floor(Date.now() / 1_000) + 60,
-    coverage: { identity: suffix.repeat(4), ranges: ["U+0020-007E"] },
-    rotation: {
-      scope: "response",
-      variantMode: "response-pool",
-      reusableAcrossResponses: false,
-    },
+    coverage: suffix.repeat(4),
     lang: "en",
     cspNonce: "browserNonce",
   };
@@ -94,7 +88,7 @@ async function serveRuntime(
         "content-security-policy":
           "default-src 'none'; script-src 'self'; font-src 'self'; style-src 'self' 'nonce-browserNonce'; style-src-attr 'none'",
       },
-      body: `<!doctype html><meta charset="utf-8"><span id="one" hidden aria-hidden="true"></span><span id="two" hidden aria-hidden="true"></span><script src="/runtime.js"></script><script src="/app.js"></script>`,
+      body: `<!doctype html><meta charset="utf-8"><span id="one" hidden aria-hidden="true"></span><span id="two" hidden aria-hidden="true"></span><span id="three" hidden aria-hidden="true"></span><script src="/runtime.js"></script><script src="/app.js"></script>`,
     });
   });
   await page.goto("https://glyph.test/");
@@ -112,10 +106,15 @@ test("a protected block begins hidden and exposes no accessibility text", async 
   await expect(page.locator('[aria-hidden="true"]')).toHaveText("Tdqfdu");
 });
 
-test("strict-CSP duplicate mounts share and release one exact face", async ({
+test("strict-CSP duplicate mounts share one face until bounded expiry", async ({
   page,
 }) => {
   const value = payload();
+  value.expiresAt = Math.floor(Date.now() / 1_000) + 2;
+  const fontRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith(".woff2")) fontRequests.push(request.url());
+  });
   await serveRuntime(
     page,
     `
@@ -157,7 +156,52 @@ test("strict-CSP duplicate mounts share and release one exact face", async ({
   await page.evaluate(() => Reflect.get(window, "handles")[0].destroy());
   await expect(page.locator("style")).toHaveCount(1);
   await page.evaluate(() => Reflect.get(window, "handles")[1].destroy());
-  await expect(page.locator("style")).toHaveCount(0);
+  await expect(page.locator("style")).toHaveCount(1);
+  expect(fontRequests).toHaveLength(1);
+  await expect(page.locator("style")).toHaveCount(0, { timeout: 3_000 });
+});
+
+test("regular/bold/regular blocks request each stable-token face once", async ({
+  page,
+}) => {
+  const regular = payload();
+  const bold = structuredClone(regular);
+  bold.face.id = "bold";
+  bold.face.family = "GlyphScramble-body-bold-0123456789abcdef";
+  bold.face.weight = "700";
+  bold.fontUrl = bold.fontUrl.replace(
+    "body%40regular.woff2",
+    "body%40bold.woff2",
+  );
+  const fontRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith(".woff2")) fontRequests.push(request.url());
+  });
+
+  await serveRuntime(
+    page,
+    `
+      const regular=${JSON.stringify(regular)};
+      const bold=${JSON.stringify(bold)};
+      window.handles=[
+        window.GlyphRuntime.mountGlyphPayload(document.querySelector("#one"),regular),
+        window.GlyphRuntime.mountGlyphPayload(document.querySelector("#two"),bold),
+        window.GlyphRuntime.mountGlyphPayload(document.querySelector("#three"),structuredClone(regular)),
+      ];
+      Promise.all(window.handles.map(handle=>handle.ready)).then(results=>window.mountResults=results);
+    `,
+  );
+
+  await page.waitForFunction(
+    () => document.querySelector("#three")?.dataset.glyphscramble === "ready",
+  );
+  expect(
+    await page.evaluate(() => Reflect.get(window, "mountResults")),
+  ).toEqual(["ready", "ready", "ready"]);
+  expect(new Set(fontRequests.map((url) => new URL(url).pathname)).size).toBe(
+    2,
+  );
+  expect(fontRequests).toHaveLength(2);
 });
 
 test("a rapid payload update aborts stale completion", async ({ page }) => {

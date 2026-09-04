@@ -5,6 +5,7 @@ import {
 } from "./font-pipeline.js";
 import {
   issueToken,
+  MAX_TOKEN_FACES,
   readToken,
   type TokenKey,
   type TokenKeyRing,
@@ -33,6 +34,7 @@ import type {
   GlyphPayload,
   GlyphProtectionResult,
   GlyphRuntimeEventHandler,
+  GlyphResponseOptions,
   ResponseContext,
   OptionalScrambleOptions,
   ScrambleOptions,
@@ -98,7 +100,7 @@ function payload(
   const fontUrl = `${config.routePrefix}/font/${encodeURIComponent(token)}/${encodeURIComponent(fileId)}.woff2`;
   const descriptors = font.metadata.descriptors;
   const result = {
-    version: 2,
+    version: 3,
     encodedText,
     font: font.id,
     face: {
@@ -109,18 +111,9 @@ function payload(
       stretch: descriptors.stretch,
       unicodeRange: descriptors.unicodeRange,
     },
-    fontToken: token,
     fontUrl,
     expiresAt: issued.exp,
-    coverage: {
-      identity: font.metadata.identity,
-      ranges: font.coverage,
-    },
-    rotation: {
-      scope: "response",
-      variantMode: "response-pool",
-      reusableAcrossResponses: false,
-    },
+    coverage: font.metadata.identity,
     ...(options.lang ? { lang: options.lang } : {}),
     ...(options.cspNonce ? { cspNonce: options.cspNonce } : {}),
   } as GlyphPayload;
@@ -199,21 +192,51 @@ export async function createGlyphEngine(
   }
 
   return {
-    beginResponse(
-      responseAcquisition: GlyphAcquisitionOptions = {},
-    ): ResponseContext {
-      if (responseAcquisition.timeoutMs !== undefined)
+    beginResponse(responseOptions: GlyphResponseOptions = {}): ResponseContext {
+      if (responseOptions.timeoutMs !== undefined)
         assertTimerDelay(
-          responseAcquisition.timeoutMs,
+          responseOptions.timeoutMs,
           "Response acquisition timeout",
         );
+      const configuredFaces = [...fonts.keys()].sort();
+      const authorizedFaces = (() => {
+        if (responseOptions.faces === undefined) return configuredFaces;
+        if (
+          !Array.isArray(responseOptions.faces) ||
+          responseOptions.faces.length === 0
+        )
+          throw new TypeError(
+            "Response faces must contain at least one prepared face.",
+          );
+        const selected = new Set<string>();
+        for (const selection of responseOptions.faces) {
+          if (!selection || typeof selection !== "object")
+            throw new TypeError(
+              "Response faces must contain font/face selectors.",
+            );
+          const family = families.get(selection.font);
+          if (!family)
+            throw new Error(`Unknown GlyphScramble font: ${selection.font}`);
+          const faceId = selection.face ?? family.defaultFace;
+          if (!family.faces.has(faceId))
+            throw new Error(
+              `Unknown GlyphScramble face: ${selection.font}.${faceId}`,
+            );
+          selected.add(`${selection.font}@${faceId}`);
+        }
+        return [...selected].sort();
+      })();
+      if (authorizedFaces.length > MAX_TOKEN_FACES)
+        throw new Error(
+          `A response can authorize at most ${MAX_TOKEN_FACES} prepared faces. Pass beginResponse({ faces: [...] }) to narrow the scope.`,
+        );
+      const authorizedFaceSet = new Set(authorizedFaces);
       let lease: ReturnType<FontVariantProvider["acquire"]> | undefined;
       let leasePromise:
         Promise<ReturnType<FontVariantProvider["acquire"]>> | undefined;
       let leaseIssuedAt: number | undefined;
       let issued: ReturnType<typeof issueToken> | undefined;
-      let issuedFaces = "";
-      const authorizedFaces = new Set<string>();
+      const usedFaces = new Set<string>();
       const expiryAt = (additionalMs = 0) =>
         (Math.floor((now() + additionalMs) / 1000) +
           config.rotation.tokenTtlSeconds) *
@@ -236,11 +259,11 @@ export async function createGlyphEngine(
         if (!leasePromise) {
           const timeoutMs =
             acquisition.timeoutMs ??
-            responseAcquisition.timeoutMs ??
+            responseOptions.timeoutMs ??
             config.runtime?.acquisitionTimeoutMs ??
             50;
           assertTimerDelay(timeoutMs, "Response acquisition timeout");
-          const signal = acquisition.signal ?? responseAcquisition.signal;
+          const signal = acquisition.signal ?? responseOptions.signal;
           leasePromise = variantProvider
             .acquireAsync(expiryAt(timeoutMs), {
               timeoutMs,
@@ -260,9 +283,7 @@ export async function createGlyphEngine(
       };
       const ensureIssued = (): ReturnType<typeof issueToken> => {
         const responseLease = ensureLease();
-        const faces = [...authorizedFaces].sort();
-        const faceKey = faces.join("\0");
-        if (issued && issuedFaces === faceKey) return issued;
+        if (issued) return issued;
         issued = issueToken(
           keys.current,
           config.rotation.tokenTtlSeconds,
@@ -270,11 +291,10 @@ export async function createGlyphEngine(
             seed: responseLease.seed,
             variant: responseLease.id,
             variantMode: "response-pool",
-            faces,
+            faces: authorizedFaces,
           },
           leaseIssuedAt,
         );
-        issuedFaces = faceKey;
         return issued;
       };
       const resolveFont = (scrambleOptions: ScrambleOptions) => {
@@ -290,6 +310,12 @@ export async function createGlyphEngine(
             `Unknown GlyphScramble face: ${scrambleOptions.font}.${faceId}`,
           );
         return font;
+      };
+      const assertAuthorized = (font: RuntimeFont) => {
+        if (!authorizedFaceSet.has(runtimeId(font)))
+          throw new Error(
+            `GlyphScramble face ${font.id}.${font.faceId} was not predeclared for this response. Add it to beginResponse({ faces: [...] }) before emitting payload bytes.`,
+          );
       };
       const contentError = (error: UnsupportedTextError, font: RuntimeFont) =>
         new GlyphContentError({
@@ -315,6 +341,8 @@ export async function createGlyphEngine(
         responseLease: ReturnType<FontVariantProvider["acquire"]>,
       ): GlyphPayload => {
         const font = resolveFont(scrambleOptions);
+        const faceId = runtimeId(font);
+        assertAuthorized(font);
         const mapping = variantProvider.mapping(responseLease, runtimeId(font));
         if (!mapping)
           throw new Error(
@@ -327,24 +355,15 @@ export async function createGlyphEngine(
           if (!(error instanceof UnsupportedTextError)) throw error;
           throw contentError(error, font);
         }
-        const faceId = runtimeId(font);
-        const alreadyAuthorized = authorizedFaces.has(faceId);
-        authorizedFaces.add(faceId);
-        try {
-          const responseToken = ensureIssued();
-          return payload(
-            encodedText,
-            font,
-            responseToken,
-            config,
-            scrambleOptions,
-          );
-        } catch (error) {
-          if (!alreadyAuthorized) authorizedFaces.delete(faceId);
-          issued = undefined;
-          issuedFaces = "";
-          throw error;
-        }
+        const result = payload(
+          encodedText,
+          font,
+          ensureIssued(),
+          config,
+          scrambleOptions,
+        );
+        usedFaces.add(faceId);
+        return result;
       };
       const scramble = (
         text: string,
@@ -353,6 +372,7 @@ export async function createGlyphEngine(
         assertGlyphPayloadOptions(scrambleOptions);
         const font = resolveFont(scrambleOptions);
         validateText(text, font);
+        assertAuthorized(font);
         return scrambleWithLease(text, scrambleOptions, ensureLease());
       };
       const scrambleAsync = async (
@@ -363,17 +383,21 @@ export async function createGlyphEngine(
         assertGlyphPayloadOptions(scrambleOptions);
         const font = resolveFont(scrambleOptions);
         validateText(text, font);
+        assertAuthorized(font);
         const responseLease = await ensureLeaseAsync(acquisition);
         return scrambleWithLease(text, scrambleOptions, responseLease);
       };
       return {
         get used() {
-          return authorizedFaces.size > 0;
+          return usedFaces.size > 0;
         },
         usage() {
           return Object.freeze({
-            used: authorizedFaces.size > 0,
-            authorizedFaces: Object.freeze([...authorizedFaces].sort()),
+            used: usedFaces.size > 0,
+            authorizedFaces: Object.freeze(
+              usedFaces.size > 0 ? authorizedFaces : [],
+            ),
+            usedFaces: Object.freeze([...usedFaces].sort()),
             ...(lease ? { variantId: lease.id } : {}),
           });
         },

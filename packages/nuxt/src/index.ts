@@ -2,6 +2,7 @@ import {
   createGlyphEngine,
   responseHeadersForContext,
   type GlyphConfig,
+  type GlyphResponseFace,
   type ResponseContext,
 } from "@brip/glyphscramble";
 
@@ -14,11 +15,19 @@ export interface GlyphNitroEvent {
 
 export async function createNuxtGlyphs(
   config: GlyphConfig,
-  options: { cwd?: string } = {},
+  options: { cwd?: string; faces?: readonly GlyphResponseFace[] } = {},
 ) {
-  const engine = await createGlyphEngine(config, options);
+  const engine = await createGlyphEngine(config, {
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+  });
+  const beginResponse = (request: Request) =>
+    engine.beginResponse({
+      signal: request.signal,
+      ...(options.faces === undefined ? {} : { faces: options.faces }),
+    });
   return {
     engine,
+    beginResponse,
     async middleware(
       event: GlyphNitroEvent,
       next: () => Promise<Response>,
@@ -29,9 +38,7 @@ export async function createNuxtGlyphs(
         )
       )
         return engine.fontResponse(event.request);
-      const responseContext = engine.beginResponse({
-        signal: event.request.signal,
-      });
+      const responseContext = beginResponse(event.request);
       event.context.glyphscramble = responseContext;
       const response = await next();
       return new Response(response.body, {

@@ -27,6 +27,7 @@ export {
   VariantUnavailableError,
   variantRuntimeOptions,
 } from "./variant-provider.js";
+export { MAX_TOKEN_FACES } from "./token.js";
 export type {
   FontVariantLease,
   FontVariantProvider,
@@ -124,6 +125,8 @@ export type {
   GlyphLockfile,
   GlyphPayload,
   GlyphProtectionResult,
+  GlyphResponseFace,
+  GlyphResponseOptions,
   GlyphContentDiagnostic,
   GlyphPayloadCoverage,
   GlyphPayloadFace,

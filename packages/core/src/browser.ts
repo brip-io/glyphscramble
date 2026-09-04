@@ -52,6 +52,10 @@ interface FaceRegistryEntry {
   refs: number;
   face: FontFace;
   load: Promise<FontFace>;
+  settled: boolean;
+  expiresAt: number;
+  cleanupTimer: ReturnType<typeof setTimeout>;
+  lastUsed: number;
   className?: string;
   style?: HTMLStyleElement;
 }
@@ -62,6 +66,7 @@ interface FaceRegistry {
 }
 
 const registries = new WeakMap<Document, FaceRegistry>();
+const MAX_RETAINED_DOCUMENT_FACES = 64;
 
 function objectAt(value: unknown, path: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value))
@@ -152,17 +157,18 @@ export function assertGlyphPayload(
       "encodedText",
       "font",
       "face",
-      "fontToken",
       "fontUrl",
       "expiresAt",
       "coverage",
-      "rotation",
       "lang",
       "cspNonce",
     ],
     "payload",
   );
-  if (payload.version !== 2) throw new TypeError("payload.version must be 2.");
+  if (payload.version !== 3)
+    throw new TypeError(
+      "payload.version must be 3. GlyphScramble payload versions cannot be mixed; regenerate the payload with the installed server package.",
+    );
   const encodedText = stringAt(payload.encodedText, "payload.encodedText", {
     min: 0,
     max: options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES,
@@ -172,10 +178,6 @@ export function assertGlyphPayload(
   const font = stringAt(payload.font, "payload.font", {
     max: MAX_IDENTIFIER_LENGTH,
     pattern: SAFE_IDENTIFIER,
-  });
-  const fontToken = stringAt(payload.fontToken, "payload.fontToken", {
-    max: MAX_TOKEN_LENGTH,
-    pattern: SAFE_TOKEN,
   });
   const fontUrl = stringAt(payload.fontUrl, "payload.fontUrl", {
     max: MAX_FONT_URL_LENGTH,
@@ -219,44 +221,58 @@ export function assertGlyphPayload(
     SAFE_UNICODE_RANGE,
   );
 
-  const coverage = objectAt(payload.coverage, "payload.coverage");
-  exactKeys(coverage, ["identity", "ranges"], "payload.coverage");
-  stringAt(coverage.identity, "payload.coverage.identity", {
+  stringAt(payload.coverage, "payload.coverage", {
     max: 64,
     pattern: SAFE_COVERAGE_IDENTITY,
   });
-  stringArrayAt(coverage.ranges, "payload.coverage.ranges", SAFE_UNICODE_RANGE);
-  if (JSON.stringify(face.unicodeRange) !== JSON.stringify(coverage.ranges))
-    throw new TypeError("payload coverage does not match its face descriptor.");
-
-  const rotation = objectAt(payload.rotation, "payload.rotation");
-  exactKeys(
-    rotation,
-    ["scope", "variantMode", "reusableAcrossResponses"],
-    "payload.rotation",
-  );
-  if (
-    rotation.scope !== "response" ||
-    rotation.variantMode !== "response-pool" ||
-    rotation.reusableAcrossResponses !== false
-  )
-    throw new TypeError("payload.rotation is invalid.");
   assertGlyphPayloadOptions(payload);
   if (
     family !== `GlyphScramble-${font}-${faceId}-${family.slice(-16)}` ||
     !/^[a-f0-9]{16}$/i.test(family.slice(-16))
   )
     throw new TypeError("payload.face.family is inconsistent with its ids.");
+  const suffix = `/${font}%40${faceId}.woff2`;
+  const token = fontUrl.endsWith(suffix)
+    ? fontUrl.slice(0, -suffix.length).split("/").at(-1)
+    : undefined;
   if (
     fontUrl.startsWith("//") ||
     /%(?:2f|5c)/i.test(fontUrl) ||
     fontUrl.split("/").some((part) => part === "." || part === "..") ||
-    !fontUrl.includes(`/font/${fontToken}/`) ||
-    !fontUrl.endsWith(`/${font}%40${faceId}.woff2`)
+    !fontUrl.includes("/font/") ||
+    !token ||
+    token.length > MAX_TOKEN_LENGTH ||
+    !SAFE_TOKEN.test(token) ||
+    !fontUrl.endsWith(suffix)
   )
-    throw new TypeError("payload.fontUrl is inconsistent with its token.");
+    throw new TypeError("payload.fontUrl is inconsistent with its face.");
 
   assertPayloadWireSize(payload, options.maxBytes ?? MAX_GLYPH_PAYLOAD_BYTES);
+}
+
+function validatedPayloadIdentity(value: GlyphPayload): string {
+  return JSON.stringify([
+    value.version,
+    value.encodedText,
+    value.font,
+    value.face.id,
+    value.face.family,
+    value.face.weight,
+    value.face.style,
+    value.face.stretch,
+    value.face.unicodeRange,
+    value.fontUrl,
+    value.expiresAt,
+    value.coverage,
+    value.lang ?? null,
+    value.cspNonce ?? null,
+  ]);
+}
+
+/** Stable scalar identity used by adapters and the shared mount lifecycle. */
+export function glyphPayloadIdentity(value: unknown): string {
+  assertGlyphPayload(value);
+  return validatedPayloadIdentity(value);
 }
 
 /** CSP sources required by the runtime's same-origin font and bundled script. */
@@ -286,9 +302,10 @@ function registryFor(document: Document): FaceRegistry {
 
 function faceKey(payload: GlyphPayload): string {
   return JSON.stringify([
-    payload.coverage.identity,
+    payload.coverage,
     payload.face,
     payload.fontUrl,
+    payload.expiresAt,
     payload.cspNonce ?? null,
   ]);
 }
@@ -301,9 +318,35 @@ function representativeText(text: string): string {
   return [...text].slice(0, 32).join("") || " ";
 }
 
+function discardEntry(
+  document: Document,
+  registry: FaceRegistry,
+  key: string,
+  entry: FaceRegistryEntry,
+): void {
+  if (registry.entries.get(key) !== entry) return;
+  registry.entries.delete(key);
+  clearTimeout(entry.cleanupTimer);
+  document.fonts.delete(entry.face);
+  entry.style?.remove();
+}
+
+function reserveRegistrySlot(document: Document, registry: FaceRegistry): void {
+  if (registry.entries.size < MAX_RETAINED_DOCUMENT_FACES) return;
+  const unused = [...registry.entries.entries()]
+    .filter(([, entry]) => entry.refs === 0)
+    .sort((left, right) => left[1].lastUsed - right[1].lastUsed)[0];
+  if (!unused)
+    throw new Error(
+      `GlyphScramble reached the ${MAX_RETAINED_DOCUMENT_FACES}-face document registry limit.`,
+    );
+  discardEntry(document, registry, unused[0], unused[1]);
+}
+
 function createEntry(
   document: Document,
   registry: FaceRegistry,
+  key: string,
   payload: GlyphPayload,
 ): FaceRegistryEntry {
   const FontFaceConstructor =
@@ -324,7 +367,18 @@ function createEntry(
   let style: HTMLStyleElement | undefined;
   document.fonts.add(face);
   try {
-    const entry: FaceRegistryEntry = { refs: 0, face, load: face.load() };
+    const entry = {
+      refs: 0,
+      face,
+      load: undefined as unknown as Promise<FontFace>,
+      settled: false,
+      expiresAt: payload.expiresAt,
+      cleanupTimer: undefined as unknown as ReturnType<typeof setTimeout>,
+      lastUsed: Date.now(),
+    } as FaceRegistryEntry;
+    entry.load = face.load().finally(() => {
+      entry.settled = true;
+    });
     if (payload.cspNonce) {
       const className = `glyphscramble-face-${++registry.nextClass}`;
       style = document.createElement("style");
@@ -334,6 +388,11 @@ function createEntry(
       entry.className = className;
       entry.style = style;
     }
+    const delay = Math.max(1, payload.expiresAt * 1_000 - Date.now());
+    entry.cleanupTimer = setTimeout(() => {
+      if (entry.refs === 0) discardEntry(document, registry, key, entry);
+    }, delay);
+    (entry.cleanupTimer as unknown as { unref?: () => void }).unref?.();
     return entry;
   } catch (error) {
     document.fonts.delete(face);
@@ -350,10 +409,12 @@ function acquireFace(
   const key = faceKey(payload);
   let entry = registry.entries.get(key);
   if (!entry) {
-    entry = createEntry(document, registry, payload);
+    reserveRegistrySlot(document, registry);
+    entry = createEntry(document, registry, key, payload);
     registry.entries.set(key, entry);
   }
   entry.refs += 1;
+  entry.lastUsed = Date.now();
   return { key, entry };
 }
 
@@ -365,9 +426,9 @@ function releaseFace(
   const registry = registryFor(document);
   entry.refs -= 1;
   if (entry.refs > 0 || registry.entries.get(key) !== entry) return;
-  registry.entries.delete(key);
-  document.fonts.delete(entry.face);
-  entry.style?.remove();
+  entry.lastUsed = Date.now();
+  if (!entry.settled || entry.expiresAt * 1_000 <= Date.now())
+    discardEntry(document, registry, key, entry);
 }
 
 function applyFace(
@@ -428,6 +489,8 @@ export function mountGlyphPayload(
       }
     | undefined;
   let destroyed = false;
+  let semanticIdentity: string | undefined;
+  let currentReady: Promise<GlyphMountResult> | undefined;
 
   const releaseCurrent = (): void => {
     if (!current) return;
@@ -530,6 +593,12 @@ export function mountGlyphPayload(
         return "aborted";
       removeFace(element, acquired.entry, originalStyle);
       releaseFace(document, acquired.key, acquired.entry);
+      discardEntry(
+        document,
+        registryFor(document),
+        acquired.key,
+        acquired.entry,
+      );
       current = undefined;
       element.textContent =
         options.errorText ?? "This protected content could not be displayed.";
@@ -545,7 +614,11 @@ export function mountGlyphPayload(
   const update = (value: unknown): Promise<GlyphMountResult> => {
     if (destroyed) return Promise.resolve("aborted");
     assertGlyphPayload(value);
-    return run(value);
+    const nextIdentity = validatedPayloadIdentity(value);
+    if (nextIdentity === semanticIdentity && currentReady) return currentReady;
+    semanticIdentity = nextIdentity;
+    currentReady = run(value);
+    return currentReady;
   };
 
   const ready = update(initialPayload);
@@ -556,6 +629,8 @@ export function mountGlyphPayload(
       if (destroyed) return;
       destroyed = true;
       releaseCurrent();
+      semanticIdentity = undefined;
+      currentReady = undefined;
       delete element.dataset.glyphscramble;
       element.hidden = true;
       if (originalLang === null) element.removeAttribute("lang");

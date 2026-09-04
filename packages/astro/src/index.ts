@@ -5,6 +5,7 @@ import {
   responseHeadersForContext,
   type GlyphConfig,
   type GlyphEngine,
+  type GlyphResponseFace,
   type ResponseContext,
 } from "@brip/glyphscramble";
 
@@ -29,6 +30,8 @@ export type AstroStreamingPolicy =
 
 export interface AstroGlyphOptions {
   cwd?: string;
+  /** Fixed prepared-face scope for protected routes handled here. */
+  faces?: readonly GlyphResponseFace[];
   streaming?: AstroStreamingPolicy;
 }
 
@@ -121,6 +124,7 @@ export async function createAstroGlyphMiddleware(
       if (!streaming.protectedRoute(context)) return next();
       const responseContext = engine.beginResponse({
         signal: context.request.signal,
+        ...(options.faces === undefined ? {} : { faces: options.faces }),
       });
       (context.locals as GlyphAstroLocals).glyphscramble = responseContext;
       const response = await next();
@@ -133,6 +137,7 @@ export async function createAstroGlyphMiddleware(
 
     const responseContext = engine.beginResponse({
       signal: context.request.signal,
+      ...(options.faces === undefined ? {} : { faces: options.faces }),
     });
     (context.locals as GlyphAstroLocals).glyphscramble = responseContext;
     const response = await next();
