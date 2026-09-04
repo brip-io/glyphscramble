@@ -89,7 +89,7 @@ Replace arbitrary CSS injection with a validated wire contract and leak-free, ca
 
 Provide a real request-scoped context, request-time rendering, route-scoped cache controls, streaming/RSC support, and safe initializer composition.
 
-#### R08 · Vue 3 and Nuxt 4 · **M** · **Implemented**
+#### R08 · Vue 3 and Nuxt 4 · **M** · **Implemented in [PR #57](https://github.com/brip-io/glyphscramble/pull/57)**
 
 Ship a proper Nuxt Kit module plus reactive Vue payload handling and Nitro integration.
 
