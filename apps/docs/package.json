@@ -1,0 +1,27 @@
+{
+  "name": "@brip/glyphscramble-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:demo": "node scripts/generate-demo-fixtures.mjs",
+    "predev": "pnpm --filter @brip/glyphscramble build && pnpm prepare:demo",
+    "dev": "next dev",
+    "prebuild": "pnpm prepare:demo",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:^",
+    "@fontsource-variable/instrument-sans": "^5.2.8",
+    "@phosphor-icons/react": "^2.1.10",
+    "next": "^16.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
+  }
+}

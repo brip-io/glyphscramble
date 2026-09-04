@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 dist/
 coverage/
 playwright-report/
@@ -6,6 +7,7 @@ test-results/
 .env
 .DS_Store
 *.log
+*.tsbuildinfo
 packages/demo/.next/
 packages/demo/.output/
 examples/next/.glyphscramble/
@@ -18,3 +20,5 @@ examples/astro/dist-static-input/
 examples/vite-static/.glyphscramble/
 examples/vite-static/dist-site/
 examples/node-fetch/.glyphscramble/
+apps/docs/.next/
+apps/docs/out/

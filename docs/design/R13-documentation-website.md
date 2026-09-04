@@ -19,7 +19,7 @@ David's BRIP documentation work established the right maintenance discipline eve
 - every page has a source Markdown representation, edit link, and machine-readable discovery path;
 - generated reference material reads canonical product constants instead of retyping them into prose.
 
-For GlyphScramble, repository-authored Markdown/MDX is the natural source and a dedicated docs framework is justified. [Astro Starlight](https://starlight.astro.build/) provides a static-first, accessible documentation shell with navigation, search, SEO metadata, syntax highlighting, content collections, and component extension points. The site will reuse BRIP's architectural lessons and visual tokens without importing the BRIP application or coupling either deployment.
+For GlyphScramble, repository-authored Markdown/MDX is the natural source and a dedicated public site is justified. The site uses the Next.js App Router with static export, matching the main BRIP site's frontend conventions while retaining a deployment artifact that needs no server runtime. The site reuses BRIP's architectural lessons and copied, versioned visual tokens without importing the private BRIP application or coupling either deployment.
 
 ## Goals
 
@@ -128,9 +128,9 @@ Every page MUST:
 
 ## Platform architecture
 
-Create `apps/docs` as a private pnpm workspace package using Astro and Starlight. Update `pnpm-workspace.yaml` to include `apps/*`. The site builds to static files and has no required server runtime.
+Create `apps/docs` as a private pnpm workspace package using the Next.js App Router and `output: "export"`. Update `pnpm-workspace.yaml` to include `apps/*`. The site builds to static files and has no required server runtime.
 
-Repository Markdown/MDX under `apps/docs/src/content/docs` is canonical public prose. Existing end-user documents are migrated rather than duplicated; `docs/design/` remains internal engineering material. A typed collection schema validates frontmatter and a checked `docs-order.ts` registry defines the public sequence and grouping.
+Repository Markdown/MDX under `apps/docs/content` is canonical public prose. Existing end-user documents are migrated rather than duplicated; `docs/design/` remains internal engineering material. A typed content schema validates frontmatter and a checked `docs-order.ts` registry defines the public sequence and grouping.
 
 The registry is the single input for:
 
@@ -142,7 +142,7 @@ The registry is the single input for:
 - claim/status validation;
 - broken-link and orphan-page checks.
 
-Starlight owns its accessible shell and search integration, but a repository check owns completeness. No page can exist only in the filesystem or only in the nav.
+Next.js owns routing, rendering, metadata, and static export, while repository components own the accessible documentation shell and local search integration. A repository check owns completeness. No page can exist only in the filesystem or only in the navigation.
 
 ## Search and agent-readable output
 
@@ -201,7 +201,7 @@ The site ships a strict CSP, no third-party scripts, no analytics by default, no
 
 ## Scope and deliverables
 
-- `apps/docs` Starlight application and repository workspace integration.
+- `apps/docs` Next.js static-export application and repository workspace integration.
 - Canonical public information architecture and migrated public Markdown/MDX.
 - Search, deep links, breadcrumbs, previous/next, mobile navigation, copy, and edit actions.
 - Per-page Markdown, `llms.txt`, and `llms-full.txt` outputs.
@@ -231,7 +231,7 @@ The site records no new user events. Operational observability is build/deploy s
 
 ## Risks
 
-- Starlight customization can become a hidden design-system fork. Keep overrides token-level and use its navigation semantics.
+- A custom documentation shell can drift from the main BRIP experience. Keep copied brand tokens versioned, preserve conventional documentation navigation, and test accessibility behavior directly.
 - A generated full-corpus endpoint can become large. Emit deterministic text, compression, and a size gate; split by section later only if measured need justifies it.
 - Premature versioning duplicates maintenance. As [Docusaurus notes](https://docusaurus.io/docs/versioning), versioned docs add complexity and are usually unnecessary when readers should use the latest release; defer until the first incompatible stable line is actually maintained.
 - Public example prose can outrun implementation. Packed-package compilation and qualification-manifest checks fail closed.
