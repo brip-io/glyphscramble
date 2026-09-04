@@ -1,5 +1,5 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { initProject } from "../src/init.js";
@@ -213,6 +213,69 @@ describe("framework initializer", () => {
     );
     await expect(
       readFile(join(cwd, "glyphscramble.config.ts"), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("creates a typed three-file SvelteKit integration", async () => {
+    const cwd = await frameworkProject({ "@sveltejs/kit": "2.70.3" });
+    const result = await initProject({ cwd });
+    expect(result).toMatchObject({
+      framework: "sveltekit",
+      packageName: "@brip/glyphscramble-sveltekit",
+      created: [
+        "glyphscramble.config.ts",
+        "src/lib/server/glyphscramble.ts",
+        "src/glyphscramble.d.ts",
+        "src/hooks.server.ts",
+      ],
+      notes: [],
+    });
+    expect(
+      await readFile(join(cwd, "src/lib/server/glyphscramble.ts"), "utf8"),
+    ).toContain("await createGlyphHandle(config)");
+    expect(
+      await readFile(join(cwd, "src/glyphscramble.d.ts"), "utf8"),
+    ).toContain("glyphscramble?: ResponseContext");
+    await expect(initProject({ cwd })).resolves.toMatchObject({
+      created: [],
+      existing: [
+        "glyphscramble.config.ts",
+        "src/lib/server/glyphscramble.ts",
+        "src/glyphscramble.d.ts",
+        "src/hooks.server.ts",
+      ],
+    });
+  });
+
+  it("preserves an existing SvelteKit hook and gives exact sequence instructions", async () => {
+    const cwd = await frameworkProject({ "@sveltejs/kit": "2.70.3" });
+    const hookPath = join(cwd, "src", "hooks.server.ts");
+    await mkdir(dirname(hookPath), { recursive: true });
+    const source =
+      "export const handle = async ({ event, resolve }) => resolve(event);\n";
+    await writeFile(hookPath, source);
+    const result = await initProject({ cwd });
+    expect(result.created).toEqual([
+      "glyphscramble.config.ts",
+      "src/lib/server/glyphscramble.ts",
+      "src/glyphscramble.d.ts",
+    ]);
+    expect(result.notes.join("\n")).toMatch(
+      /sequence\(glyphHandle, appHandle\)/,
+    );
+    expect(await readFile(hookPath, "utf8")).toBe(source);
+  });
+
+  it("rejects ambiguous SvelteKit server hook files before writing", async () => {
+    const cwd = await frameworkProject({ "@sveltejs/kit": "2.70.3" });
+    await mkdir(join(cwd, "src"), { recursive: true });
+    await writeFile(join(cwd, "src/hooks.server.ts"), "export {};\n");
+    await writeFile(join(cwd, "src/hooks.server.js"), "export {};\n");
+    await expect(initProject({ cwd })).rejects.toThrow(
+      /Multiple SvelteKit server hook files.*No files were changed/,
+    );
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts")),
     ).rejects.toThrow();
   });
 

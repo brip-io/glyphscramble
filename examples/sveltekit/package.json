@@ -1,0 +1,27 @@
+{
+  "name": "@brip/glyphscramble-example-sveltekit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:glyphs": "node ../../packages/core/dist/cli.js prepare --config glyphscramble.config.ts",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "build:fixture": "vite build",
+    "start": "node build"
+  },
+  "dependencies": {
+    "@brip/glyphscramble": "workspace:*",
+    "@brip/glyphscramble-svelte": "workspace:*",
+    "@brip/glyphscramble-sveltekit": "workspace:*",
+    "@fontsource-variable/inter": "5.3.0",
+    "@sveltejs/adapter-node": "5.5.7",
+    "@sveltejs/kit": "2.70.3",
+    "svelte": "5.57.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "svelte-check": "4.7.6",
+    "typescript": "^5.9.2",
+    "vite": "8.2.2"
+  }
+}

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replace the Svelte/SvelteKit stubs with packaged Svelte 5 artifacts, a real typed SvelteKit 2 handle, safe existing-hook composition, selective and route-scoped streaming cache controls, and a production adapter-node consumer that verifies rotation, lifecycle cleanup, and plaintext-leakage boundaries.
 - Replace the Nuxt stub with a Nuxt Kit module that installs a typed request context, font route, component, selective cache handling, explicit streaming-route policy, collision-safe initializer support, and a qualified Nuxt 4/Vue 3 browser consumer while refusing unsupported edge/serverless presets.
 - Fix each response's bounded face authorization before its first protected byte, compact the browser wire contract to payload v3 without duplicate token/coverage/rotation fields, retain settled faces in an expiry-bounded document cache, ignore semantically equivalent payload clones, and align narrowed face scopes plus localized failures across server and UI adapters.
 - Enforce shared server/browser payload and coverage bounds, reject overflowing timer values, classify font and unsupported-content failures with safe repair guidance, add an explicit no-plaintext optional-block result, correct IPv4-in-IPv6 and redirect handling, remove hidden response-token leasing, document token-path log redaction, derive lockfile/CLI identity from the packed package version, and preserve the browser runtime as one self-contained ESM artifact.
