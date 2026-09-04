@@ -129,6 +129,75 @@ function manualViteInstructions(path: string): string {
   return `${path} is not a simple object-form Vite config that GlyphScramble can patch safely. Add these imports and plugin entry manually, then rerun init:\n\nimport glyphConfig from "./glyphscramble.config.ts";\nimport { glyphscrambleStatic } from "@brip/glyphscramble-vite";\n\nexport default defineConfig({\n  plugins: [glyphscrambleStatic(glyphConfig)],\n});\n\nNo files were changed.`;
 }
 
+const NUXT_MODULE = "@brip/glyphscramble-nuxt/module";
+
+function manualNuxtInstructions(path: string): string {
+  return `${path} is not a simple object-form Nuxt config that GlyphScramble can patch safely. Add ${JSON.stringify(NUXT_MODULE)} to the modules array manually, then rerun init. No files were changed.`;
+}
+
+function patchSimpleNuxtConfig(source: string, path: string): string {
+  const match =
+    /^(?<prefix>(?:import[^\n]*\n)*\s*export default defineNuxtConfig\(\{\s*\n)(?<body>[\s\S]*)(?<suffix>\n\}\);?\s*)$/.exec(
+      source,
+    );
+  if (!match?.groups) throw new Error(manualNuxtInstructions(path));
+  const prefix = match.groups.prefix!;
+  const body = match.groups.body!;
+  const suffix = match.groups.suffix!;
+  const moduleProperties = [...body.matchAll(/^ {2}modules\s*:/gm)];
+  if (moduleProperties.length > 1)
+    throw new Error(manualNuxtInstructions(path));
+  if (moduleProperties.length === 0) {
+    if (source.includes("glyphscramble"))
+      throw new Error(manualNuxtInstructions(path));
+    return `${prefix}  modules: [${JSON.stringify(NUXT_MODULE)}],\n${body}${suffix}`;
+  }
+
+  const modules =
+    /^(?<indent> {2}modules\s*:\s*)\[(?<entries>[^\]]*)\](?<comma>,?)/m.exec(
+      body,
+    );
+  if (!modules?.groups) throw new Error(manualNuxtInstructions(path));
+  const entries = modules.groups.entries!;
+  if (entries.includes(NUXT_MODULE)) return source;
+  if (source.includes("glyphscramble"))
+    throw new Error(manualNuxtInstructions(path));
+  const existing = entries.trim();
+  const replacement = `${modules.groups.indent!}[\n    ${JSON.stringify(NUXT_MODULE)},${existing ? `\n    ${existing.replace(/\n\s*/g, "\n    ")}` : ""}\n  ]${modules.groups.comma!}`;
+  return `${prefix}${body.replace(modules[0], replacement)}${suffix}`;
+}
+
+async function nuxtArtifacts(cwd: string): Promise<IntegrationArtifact[]> {
+  const candidates = [
+    "nuxt.config.ts",
+    "nuxt.config.mts",
+    "nuxt.config.js",
+    "nuxt.config.mjs",
+  ]
+    .map((name) => join(cwd, name))
+    .filter(existsSync);
+  if (candidates.length > 1)
+    throw new Error(
+      `Multiple Nuxt config files exist (${candidates.map((path) => displayPath(cwd, path)).join(", ")}). Keep one canonical config, then rerun init. No files were changed.`,
+    );
+  if (candidates.length === 0)
+    return [
+      {
+        path: join(cwd, "nuxt.config.ts"),
+        content: `export default defineNuxtConfig({\n  modules: [${JSON.stringify(NUXT_MODULE)}],\n});\n`,
+      },
+    ];
+  const path = candidates[0]!;
+  const source = await readFile(path, "utf8");
+  return [
+    {
+      path,
+      content: patchSimpleNuxtConfig(source, displayPath(cwd, path)),
+      replace: source,
+    },
+  ];
+}
+
 function patchSimpleViteConfig(source: string, path: string): string {
   if (
     source.includes('from "@brip/glyphscramble-vite"') &&
@@ -211,16 +280,7 @@ async function integrationTemplates(
       return {
         packageName: "@brip/glyphscramble-nuxt",
         notes: [],
-        artifacts: [
-          {
-            path: join(cwd, "modules", "glyphscramble.ts"),
-            content: `export { default } from "@brip/glyphscramble-nuxt/module";\n`,
-          },
-          {
-            path: join(cwd, "server", "middleware", "glyphscramble.ts"),
-            content: `import config from "../../glyphscramble.config";\nimport { createNuxtGlyphs } from "@brip/glyphscramble-nuxt";\nimport { defineEventHandler, setResponseHeader, toWebRequest } from "h3";\n\nconst glyphs = await createNuxtGlyphs(config);\nexport default defineEventHandler(async (event) => {\n  const request = toWebRequest(event);\n  if (new URL(request.url).pathname.startsWith(config.routePrefix + "/font/")) return glyphs.engine.fontResponse(request);\n  event.context.glyphscramble = glyphs.beginResponse(request);\n  setResponseHeader(event, "Cache-Control", "private, no-store");\n});\n`,
-          },
-        ],
+        artifacts: await nuxtArtifacts(cwd),
       };
     case "sveltekit":
       return {

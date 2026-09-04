@@ -1,6 +1,6 @@
 # [R08] Vue 3 and Nuxt 4 integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#9](https://github.com/brip-io/glyphscramble/issues/9)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented · **GitHub issue:** [#9](https://github.com/brip-io/glyphscramble/issues/9)
 > **Blocked by:** R05, R06 · **Blocks:** R12
 
 ## Objective
@@ -44,6 +44,19 @@ Publish a conventional `defineNuxtModule` package with runtime files under the N
 
 The Vue component uses a watcher tied to R06's mount handle and destroys prior state before applying new payloads.
 
+Nuxt can finalize an ordinary endpoint's context before committing response
+headers, but it cannot infer that a page has embedded a payload fetched from a
+different Nitro request or that a lazy stream will scramble after the response
+hook. `streaming.protectedRoutes` is therefore the explicit early-header
+contract for those routes. It matches exact paths and descendants and applies
+`private, no-store` at request start.
+
+The request engine uses Node worker threads and keeps one-use font variants in
+process memory. R08 consequently narrows v0.1 to Nitro's single-process
+`node-server` preset and fails the build for edge or serverless presets. An
+external R17 `FontVariantProvider` is required before those presets or multiple
+instances can be qualified honestly.
+
 ## Scope
 
 - `packages/nuxt/src/module.ts` plus runtime module files
@@ -70,3 +83,23 @@ The Vue component uses a watcher tied to R06's mount handle and destroys prior s
 ## Exit criteria
 
 Adding the module to a Nuxt 4 fixture installs all required runtime pieces, reactive updates work without leaks, protected responses rotate, and unprotected pages preserve their original cache behavior.
+
+## Implementation evidence
+
+- `packages/nuxt/src/module.ts` uses Nuxt Kit to register the Vue component,
+  request plugin, font handler, server composable, and generated H3 context
+  types from one module entry.
+- `packages/nuxt/src/runtime/` owns one response context per H3 event, applies
+  selective headers after normal handlers, and applies route-scoped headers
+  before explicitly declared lazy or cross-request page rendering.
+- `packages/core/src/init.ts` creates or safely patches conventional Nuxt
+  module arrays, is idempotent, and refuses dynamic or ambiguous files before
+  writing anything.
+- `examples/nuxt` is a Nuxt 4.5 / Vue 3.5 production consumer. Its Playwright
+  suite covers HTML, hydration and chunk leakage, reactive replacement,
+  navigation rotation, concurrent isolation, token expiry, GET/HEAD routing,
+  delayed streams, font failure, query-string route matching, and ordinary
+  cache preservation.
+- The package rejects unqualified Nitro edge and serverless presets with an
+  actionable process-local provider explanation; CI runs the qualified Node
+  consumer independently.

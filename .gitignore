@@ -12,6 +12,9 @@ packages/demo/.next/
 packages/demo/.output/
 examples/next/.glyphscramble/
 examples/next/.next/
+examples/nuxt/.glyphscramble/
+examples/nuxt/.nuxt/
+examples/nuxt/.output/
 packages/astro/.astro/
 examples/astro/.astro/
 examples/astro/.glyphscramble/

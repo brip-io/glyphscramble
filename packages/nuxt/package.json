@@ -13,6 +13,10 @@
     "./module": {
       "types": "./dist/module.d.ts",
       "import": "./dist/module.js"
+    },
+    "./context": {
+      "types": "./dist/context.d.ts",
+      "import": "./dist/context.js"
     }
   },
   "files": [
@@ -32,10 +36,17 @@
   },
   "dependencies": {
     "@brip/glyphscramble": "workspace:^",
-    "@brip/glyphscramble-vue": "workspace:^"
+    "@brip/glyphscramble-vue": "workspace:^",
+    "@nuxt/kit": "^4.5.2",
+    "@nuxt/schema": "4.5.2",
+    "h3": "^1.15.11"
   },
   "peerDependencies": {
     "nuxt": ">=4 <5",
     "vue": ">=3.5 <4"
+  },
+  "devDependencies": {
+    "nuxt": "4.5.2",
+    "vue": "3.5.42"
   }
 }

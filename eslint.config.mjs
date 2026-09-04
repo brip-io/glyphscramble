@@ -9,6 +9,8 @@ export default tseslint.config(
       "**/dist-static/**",
       "**/dist-static-input/**",
       "**/.next/**",
+      "**/.nuxt/**",
+      "**/.output/**",
       "**/node_modules/**",
       "**/out/**",
       "**/.astro/**",

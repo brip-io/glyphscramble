@@ -53,7 +53,78 @@ generated nor required and cannot decide cache policy after downstream render.
 
 ## Vue 3 and Nuxt 4
 
-The Nuxt middleware attaches a response context to the Nitro event and handles the font prefix before rendering. Pass the resulting payload to the Vue component. Do not serialize the original string into Nuxt state.
+Install the core, Vue, and Nuxt packages, then let the initializer add the
+module to a conventional `nuxt.config`:
+
+```bash
+pnpm add @brip/glyphscramble @brip/glyphscramble-vue @brip/glyphscramble-nuxt
+pnpm exec glyphscramble init
+pnpm exec glyphscramble prepare
+```
+
+The module registers the component, Nitro request plugin, typed request
+context, and GET/HEAD font route. Keep plaintext in a server route and return
+only payloads:
+
+```ts
+// server/api/premium.get.ts
+import { useGlyphScramble } from "@brip/glyphscramble-nuxt/context";
+
+export default defineEventHandler(async (event) => {
+  const glyphs = useGlyphScramble(event);
+  return glyphs.scrambleAsync(loadPremiumExcerpt(), {
+    font: "body",
+    lang: "en",
+  });
+});
+```
+
+```vue
+<script setup lang="ts">
+import type { GlyphPayload } from "@brip/glyphscramble";
+
+const { data: payload } = await useFetch<GlyphPayload>("/api/premium");
+</script>
+
+<template>
+  <GlyphScramble
+    v-if="payload"
+    :payload="payload"
+    error-text="This protected excerpt could not be displayed."
+  />
+</template>
+```
+
+Do not put the original string in page props, `useState`, `useAsyncData`,
+runtime config, or a client component: each would serialize it into HTML,
+Nuxt hydration data, or a browser chunk. A page that embeds a payload fetched
+from another server route must declare its route up front so Nitro commits the
+private cache policy before streaming begins:
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    [
+      "@brip/glyphscramble-nuxt/module",
+      { streaming: { protectedRoutes: ["/premium"] } },
+    ],
+  ],
+});
+```
+
+Entries are canonical root-relative paths and match the exact path plus its
+descendants. Ordinary routes retain their existing cache headers. Direct server handlers that call
+`useGlyphScramble(event)` are marked `private, no-store` after use; explicitly
+listed page or lazy-stream routes are marked at request start because their
+headers may commit before Nitro can observe body-time scrambling.
+
+Vue payload updates use the shared abortable lifecycle, reveal only after the
+replacement font loads, and accept `font-timeout-ms` plus `error-text`.
+Equivalent cloned payloads are no-ops. The Nuxt v0.1 adapter is deliberately
+limited to Nitro's single-process `node-server` preset on Node 22/24. Edge,
+serverless, clustered, and horizontally scaled deployment remain unsupported
+until an external `FontVariantProvider` can make issued variants available to
+the later font request.
 
 ## Svelte 5 and SvelteKit 2
 

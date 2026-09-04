@@ -1,4 +1,5 @@
 export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
+export { loadGlyphConfig } from "./config-loader.js";
 export { PACKAGE_VERSION } from "./generated/version.js";
 export {
   GLYPH_CONTENT_REPAIR_URL,
