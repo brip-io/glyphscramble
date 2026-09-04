@@ -32,7 +32,7 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 7. Font notices and license metadata MUST accompany redistributed generated artifacts.
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
-10. Public release remains blocked on the open R13-R15 and R18-R19 work,
+10. Public release remains blocked on the open R13-R15 and R19 work,
     counsel/IP approval, and all R12 release gates.
 
 ## Milestones and issue breakdown
@@ -131,7 +131,7 @@ Retain generation-time mappings on variants, replace per-swap HMAC with an unbia
 
 Add bounded async acquisition, scalable expiry, persistent workers, graceful drain, diagnostics, stable benchmark methodology, and an evidence-based WOFF 1.0 spike.
 
-#### R18 · Multi-face payload and client efficiency · **M**
+#### R18 · Multi-face payload and client efficiency · **M** · **Implemented in [PR #53](https://github.com/brip-io/glyphscramble/pull/53)**
 
 Keep authorization stable across faces, deduplicate descriptors/downloads, and make equivalent client payload updates lifecycle no-ops.
 
