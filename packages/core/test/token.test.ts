@@ -86,5 +86,11 @@ describe("response tokens", () => {
     expect(() =>
       issueToken({ ...current, secret: "weak" }, 60, coordination),
     ).toThrow(/at least 32/);
+    expect(() =>
+      issueToken(current, 60, {
+        ...coordination,
+        faces: Array.from({ length: 65 }, (_, index) => `body@face${index}`),
+      }),
+    ).toThrow(/faces/);
   });
 });

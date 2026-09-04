@@ -1,6 +1,6 @@
 # [R18] Multi-face payload and client efficiency
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#35](https://github.com/brip-io/glyphscramble/issues/35)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#35](https://github.com/brip-io/glyphscramble/issues/35)
 > **Blocked by:** R06 and R16 · **Blocks:** R12 payload/browser qualification
 
 ## Objective
@@ -37,6 +37,31 @@ The 2026-09-03 review confirmed that `ensureIssued()` replaces the token wheneve
 ## Design
 
 Evaluate two compatible mechanisms: `beginResponse({ fonts/faces })` predeclaration, and family-wide authorization on first use. Prefer the smallest authorization that remains stable before bytes escape. Introduce a response face manifest keyed by immutable face identity; payload blocks reference that key plus encoded text. Client adapters derive a scalar semantic identity from URL, encoded text, descriptors, expiry, language, and nonce rather than JavaScript object identity.
+
+### Chosen implementation
+
+`beginResponse()` fixes its authorization scope at construction. The convenient
+default is every prepared face in the bounded engine configuration; routes can
+narrow that scope with `beginResponse({ faces: [{ font, face }] })`. The token
+is issued once on first successful protection and never replaced. An omitted
+or undeclared face fails before acquiring a variant, while `ResponseUsage`
+separates the stable authorized set from faces actually used.
+
+Payload v3 takes the requirement's self-contained alternative to a separately
+serialized response manifest. Every block remains independently streamable,
+but exact duplicates are removed: the token exists only inside `fontUrl`, the
+coverage ranges exist only in `face.unicodeRange`, `coverage` is the immutable
+identity string, and response-pool rotation is implied by the v3 contract.
+This preserves the one-prop adapter DX and avoids requiring a manifest provider
+to precede lazy RSC/Astro blocks.
+
+The shared runtime exports one validated semantic-identity helper. React uses
+it as its effect key, while the mount lifecycle makes cloned updates no-ops for
+Vue, Svelte, vanilla, and custom integrations. A reference-counted 64-entry
+document registry retains settled zero-reference faces only until token expiry,
+evicts least-recently-used idle entries under pressure, and removes failed or
+abandoned loads eagerly. This covers temporary framework remounts without an
+unbounded font/style cache.
 
 ## Scope and deliverables
 

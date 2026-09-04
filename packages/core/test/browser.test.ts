@@ -150,7 +150,7 @@ function environment() {
 function payload(suffix = "0123456789abcdef") {
   const fontToken = `v2.current.${suffix}`;
   return {
-    version: 2,
+    version: 3,
     encodedText: "Vhfuhw 😀",
     font: "body",
     face: {
@@ -161,18 +161,9 @@ function payload(suffix = "0123456789abcdef") {
       stretch: "normal",
       unicodeRange: ["U+0020-007E"],
     },
-    fontToken,
     fontUrl: `/_glyphscramble/font/${fontToken}/body%40regular.woff2`,
     expiresAt: Math.floor(Date.now() / 1_000) + 60,
-    coverage: {
-      identity: suffix.repeat(4),
-      ranges: ["U+0020-007E"],
-    },
-    rotation: {
-      scope: "response",
-      variantMode: "response-pool",
-      reusableAcrossResponses: false,
-    },
+    coverage: suffix.repeat(4),
     lang: "en-GB",
     cspNonce: "bm9uY2U=",
   };
@@ -193,9 +184,15 @@ afterEach(() => {
 });
 
 describe("GlyphPayload validation", () => {
-  it("accepts the data-only v2 wire contract", () => {
+  it("accepts the compact data-only v3 wire contract", () => {
     const value: unknown = payload();
     expect(() => assertGlyphPayload(value)).not.toThrow();
+  });
+
+  it("rejects a legacy payload with a clear mixed-version diagnostic", () => {
+    const value = payload() as Record<string, unknown>;
+    value.version = 2;
+    expect(() => assertGlyphPayload(value)).toThrow(/cannot be mixed/);
   });
 
   it("accepts variable face descriptor ranges", () => {
@@ -228,10 +225,13 @@ describe("GlyphPayload validation", () => {
       value.fontUrl = "/_glyphscramble/font/another-token/body.woff2";
     }),
     changed((value) => {
+      (value.face as Record<string, unknown>).id = "bold";
+    }),
+    changed((value) => {
       (value.face as Record<string, unknown>).weight = "400;display:block";
     }),
     changed((value) => {
-      (value.coverage as Record<string, unknown>).ranges = ["U+0100-01FF"];
+      value.coverage = "not-a-coverage-identity";
     }),
     changed((value) => {
       value.encodedText = "\ud800";
@@ -306,8 +306,35 @@ describe("font lifecycle", () => {
     expect(env.fonts.deleted).toHaveLength(0);
     expect(env.styles[0]?.removed).toBe(false);
     second.destroy();
-    expect(env.fonts.deleted).toHaveLength(1);
-    expect(env.styles[0]?.removed).toBe(true);
+    expect(env.fonts.deleted).toHaveLength(0);
+    expect(env.styles[0]?.removed).toBe(false);
+  });
+
+  it("treats equivalent payload clones as lifecycle no-ops", async () => {
+    const env = environment();
+    const element = env.element();
+    const value = payload();
+    const mount = mountGlyphPayload(element, value);
+    await expect(mount.ready).resolves.toBe("ready");
+
+    await expect(mount.update(structuredClone(value))).resolves.toBe("ready");
+    expect(FakeFontFace.created).toHaveLength(1);
+    expect(env.fonts.loadCalls).toHaveLength(1);
+    expect(element.dataset.glyphscramble).toBe("ready");
+    mount.destroy();
+  });
+
+  it("reuses a settled face after all mounts temporarily detach", async () => {
+    const env = environment();
+    const value = payload();
+    const first = mountGlyphPayload(env.element(), value);
+    await expect(first.ready).resolves.toBe("ready");
+    first.destroy();
+
+    const second = mountGlyphPayload(env.element(), structuredClone(value));
+    await expect(second.ready).resolves.toBe("ready");
+    expect(FakeFontFace.created).toHaveLength(1);
+    second.destroy();
   });
 
   it("aborts superseded work without mutating the updated element", async () => {
@@ -332,7 +359,7 @@ describe("font lifecycle", () => {
     expect(env.fonts.deleted).not.toContain(FakeFontFace.created[1]);
 
     mount.destroy();
-    expect(env.fonts.deleted).toContain(FakeFontFace.created[1]);
+    expect(env.fonts.deleted).not.toContain(FakeFontFace.created[1]);
     expect(element.hidden).toBe(true);
     expect(element.dataset.glyphscramble).toBeUndefined();
   });

@@ -10,7 +10,7 @@ export interface Props {
 const { payload, fontTimeoutMs, errorText } = Astro.props;
 ---
 
-<brip-glyphscramble-v2
+<brip-glyphscramble-v3
   data-payload={JSON.stringify(payload)}
   data-timeout={fontTimeoutMs}
   data-error={errorText}
@@ -18,10 +18,10 @@ const { payload, fontTimeoutMs, errorText } = Astro.props;
   <span hidden aria-hidden="true" lang={payload.lang} data-content
     >{payload.encodedText}</span
   >
-</brip-glyphscramble-v2>
+</brip-glyphscramble-v3>
 
 <style>
-  brip-glyphscramble-v2 {
+  brip-glyphscramble-v3 {
     display: contents;
   }
 </style>
@@ -32,7 +32,7 @@ const { payload, fontTimeoutMs, errorText } = Astro.props;
     type GlyphMountHandle,
   } from "@brip/glyphscramble/runtime";
 
-  const ELEMENT = "brip-glyphscramble-v2";
+  const ELEMENT = "brip-glyphscramble-v3";
 
   class GlyphScrambleElement extends HTMLElement {
     #mount: GlyphMountHandle | undefined;

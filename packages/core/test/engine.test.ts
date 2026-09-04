@@ -47,6 +47,12 @@ async function fixture() {
   return { cwd, config };
 }
 
+function tokenFromFontUrl(fontUrl: string): string {
+  const token = fontUrl.split("/").at(-2);
+  if (!token) throw new Error("Fixture font URL did not contain a token.");
+  return token;
+}
+
 describe("request engine", () => {
   it("accepts retained mappings from a custom variant provider", async () => {
     const { cwd, config } = await fixture();
@@ -208,13 +214,13 @@ describe("request engine", () => {
       .scramble("Secret Value", { font: "body" });
     expect(one.encodedText).not.toBe("Secret Value");
     expect(one.encodedText).not.toBe(two.encodedText);
-    expect(one.fontToken).not.toBe(two.fontToken);
+    expect(tokenFromFontUrl(one.fontUrl)).not.toBe(
+      tokenFromFontUrl(two.fontUrl),
+    );
     expect(one.face.id).toBe("default");
-    expect(one.rotation).toEqual({
-      scope: "response",
-      variantMode: "response-pool",
-      reusableAcrossResponses: false,
-    });
+    expect(one.version).toBe(3);
+    expect("fontToken" in one).toBe(false);
+    expect("rotation" in one).toBe(false);
     expect(JSON.stringify(one)).not.toContain("Secret Value");
     const generationsBeforeRequests = engine.metrics().generations;
     const [response, duplicate] = await Promise.all([
@@ -244,7 +250,11 @@ describe("request engine", () => {
     const engine = await createGlyphEngine(config, { cwd });
     const context = engine.beginResponse();
     expect(context.used).toBe(false);
-    expect(context.usage()).toEqual({ used: false, authorizedFaces: [] });
+    expect(context.usage()).toEqual({
+      used: false,
+      authorizedFaces: [],
+      usedFaces: [],
+    });
     expect(
       responseHeadersForContext(context, {
         "cache-control": "public, max-age=3600",
@@ -256,6 +266,7 @@ describe("request engine", () => {
     expect(context.usage()).toMatchObject({
       used: true,
       authorizedFaces: ["body@default"],
+      usedFaces: ["body@default"],
       variantId: expect.any(String),
     });
     const protectedHeaders = responseHeadersForContext(context, {
@@ -312,15 +323,14 @@ describe("request engine", () => {
       "test secret with more than thirty two characters";
     const engine = await createGlyphEngine(config, { cwd });
     const value = engine.beginResponse().scramble("Secret", { font: "body" });
-    const middle = Math.floor(value.fontToken.length / 2);
-    const replacement = value.fontToken[middle] === "A" ? "B" : "A";
+    const token = tokenFromFontUrl(value.fontUrl);
+    const middle = Math.floor(token.length / 2);
+    const replacement = token[middle] === "A" ? "B" : "A";
     const tampered =
-      value.fontToken.slice(0, middle) +
-      replacement +
-      value.fontToken.slice(middle + 1);
+      token.slice(0, middle) + replacement + token.slice(middle + 1);
     const response = await engine.fontResponse(
       new Request(
-        `https://example.test${value.fontUrl.replace(value.fontToken, tampered)}`,
+        `https://example.test${value.fontUrl.replace(token, tampered)}`,
       ),
     );
     expect(response.status).toBe(401);
@@ -404,7 +414,10 @@ describe("request engine", () => {
       }),
     ).toThrow(/payload\.lang/);
     expect(context.used).toBe(false);
-    expect(context.usage().authorizedFaces).toEqual([]);
+    expect(context.usage()).toMatchObject({
+      authorizedFaces: [],
+      usedFaces: [],
+    });
     expect(engine.metrics().leasesIssued).toBe(0);
 
     expect(() =>
@@ -484,6 +497,15 @@ describe("request engine", () => {
           },
           defaultFace: "regular",
         },
+        heading: {
+          source: {
+            kind: "google-css",
+            url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700",
+          },
+          license: { spdx: "OFL-1.1", file: "./licenses/OFL.txt" },
+          faces: { regular: { family: "Inter", weight: 400 } },
+          defaultFace: "regular",
+        },
       },
       rotation: {
         scope: "response",
@@ -512,24 +534,29 @@ describe("request engine", () => {
     const engine = await createGlyphEngine(config, { cwd });
     const context = engine.beginResponse();
     const regular = context.scramble("Secret", { font: "body", lang: "en" });
-    const missesBeforeUnauthorized = engine.metrics().fontMisses;
+    const missesBeforePreparedFace = engine.metrics().fontMisses;
     expect(
       await engine.fontResponse(
         new Request(
           `https://example.test${regular.fontUrl.replace("body%40regular.woff2", "body%40bold.woff2")}`,
         ),
       ),
-    ).toMatchObject({ status: 403 });
-    expect(engine.metrics().fontMisses).toBe(missesBeforeUnauthorized);
+    ).toMatchObject({ status: 200 });
+    expect(engine.metrics().fontMisses).toBe(missesBeforePreparedFace);
     const bold = context.scramble("Secret", { font: "body", face: "bold" });
-    expect(regular.version).toBe(2);
+    const regularAgain = context.scramble("Secret", {
+      font: "body",
+      face: "regular",
+    });
+    const heading = context.scramble("Secret", { font: "heading" });
+    expect(regular.version).toBe(3);
     expect(regular.face).toMatchObject({
       id: "regular",
       weight: "400",
       style: "normal",
     });
     expect(regular.lang).toBe("en");
-    expect(regular.coverage.ranges).toEqual(regular.face.unicodeRange);
+    expect(regular.coverage).toMatch(/^[a-f0-9]{64}$/);
     expect("css" in regular).toBe(false);
     expect("family" in regular).toBe(false);
     expect(bold.face).toMatchObject({
@@ -538,6 +565,17 @@ describe("request engine", () => {
       style: "italic",
     });
     expect(bold.fontUrl).not.toBe(regular.fontUrl);
+    expect(tokenFromFontUrl(bold.fontUrl)).toBe(
+      tokenFromFontUrl(regular.fontUrl),
+    );
+    expect(tokenFromFontUrl(heading.fontUrl)).toBe(
+      tokenFromFontUrl(regular.fontUrl),
+    );
+    expect(regularAgain.fontUrl).toBe(regular.fontUrl);
+    expect(context.usage()).toMatchObject({
+      authorizedFaces: ["body@bold", "body@regular", "heading@regular"],
+      usedFaces: ["body@bold", "body@regular", "heading@regular"],
+    });
     expect(
       await engine.fontResponse(
         new Request(`https://example.test${bold.fontUrl}`),
@@ -546,6 +584,47 @@ describe("request engine", () => {
     expect(() =>
       context.scramble("Secret", { font: "body", face: "missing" }),
     ).toThrow(/Unknown GlyphScramble face/);
+
+    const narrowed = engine.beginResponse({
+      faces: [{ font: "body", face: "regular" }],
+    });
+    const narrowedRegular = narrowed.scramble("Secret", { font: "body" });
+    const leasesBeforeUndeclared = engine.metrics().leasesIssued;
+    expect(() =>
+      narrowed.scramble("Secret", { font: "body", face: "bold" }),
+    ).toThrow(/not predeclared/);
+    expect(engine.metrics().leasesIssued).toBe(leasesBeforeUndeclared);
+    expect(
+      await engine.fontResponse(
+        new Request(
+          `https://example.test${narrowedRegular.fontUrl.replace("body%40regular.woff2", "body%40bold.woff2")}`,
+        ),
+      ),
+    ).toMatchObject({ status: 403 });
+
+    const token = tokenFromFontUrl(regular.fontUrl);
+    const legacyPayload = {
+      ...regular,
+      version: 2,
+      fontToken: token,
+      coverage: {
+        identity: regular.coverage,
+        ranges: regular.face.unicodeRange,
+      },
+      rotation: {
+        scope: "response",
+        variantMode: "response-pool",
+        reusableAcrossResponses: false,
+      },
+    };
+    const blocks = 20;
+    const compactBytes = Buffer.byteLength(
+      JSON.stringify(Array.from({ length: blocks }, () => regular)),
+    );
+    const legacyBytes = Buffer.byteLength(
+      JSON.stringify(Array.from({ length: blocks }, () => legacyPayload)),
+    );
+    expect(compactBytes).toBeLessThan(legacyBytes * 0.75);
     await engine.close();
   });
 });

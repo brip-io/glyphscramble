@@ -9,6 +9,7 @@ import {
   type GlyphConfig,
   type GlyphPayload,
   type GlyphProtectionResult,
+  type GlyphResponseFace,
   type OptionalScrambleOptions,
   type ResponseContext,
   type ScrambleOptions,
@@ -38,6 +39,8 @@ export interface NextGlyphs {
 
 export interface NextGlyphOptions {
   cwd?: string;
+  /** Fixed prepared-face scope shared by this helper's response contexts. */
+  faces?: readonly GlyphResponseFace[];
   /**
    * Stable identity for one engine in this process. Set this only when two
    * intentionally separate GlyphScramble configurations are otherwise equal.
@@ -68,7 +71,11 @@ function engineRegistry(): Map<string, Promise<NextGlyphs>> {
 function engineKey(config: GlyphConfig, options: NextGlyphOptions): string {
   return (
     options.instanceKey ??
-    JSON.stringify([options.cwd ?? process.cwd(), stableValue(config)])
+    JSON.stringify([
+      options.cwd ?? process.cwd(),
+      stableValue(config),
+      stableValue(options.faces ?? null),
+    ])
   );
 }
 
@@ -84,7 +91,9 @@ async function initializeNextGlyphs(
     // Next 16 excludes work below connection() from prerendering and emits its
     // private no-store policy for the resulting dynamic HTML/RSC response.
     await connection();
-    return engine.beginResponse();
+    return engine.beginResponse({
+      ...(options.faces === undefined ? {} : { faces: options.faces }),
+    });
   });
 
   return {
@@ -96,7 +105,10 @@ async function initializeNextGlyphs(
     async protect(text, scrambleOptions) {
       return (await getResponseContext()).protectAsync(text, scrambleOptions);
     },
-    beginRouteResponse: () => engine.beginResponse(),
+    beginRouteResponse: () =>
+      engine.beginResponse({
+        ...(options.faces === undefined ? {} : { faces: options.faces }),
+      }),
     fontRoute: (request) => engine.fontResponse(request),
     responseHeadersFor: (context, headers) =>
       responseHeadersForContext(context, headers),

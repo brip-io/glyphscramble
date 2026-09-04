@@ -133,28 +133,19 @@ export interface GlyphPayloadFace {
   readonly unicodeRange: readonly string[];
 }
 
-export interface GlyphPayloadCoverage {
-  /** Stable identity of the prepared face descriptors and allowed coverage. */
-  readonly identity: string;
-  readonly ranges: readonly string[];
-}
+/** Stable identity of the prepared face descriptors and allowed coverage. */
+export type GlyphPayloadCoverage = string;
 
 export interface GlyphPayload {
   readonly [glyphPayloadBrand]: true;
-  readonly version: 2;
+  readonly version: 3;
   readonly encodedText: string;
   readonly font: string;
   readonly face: GlyphPayloadFace;
-  readonly fontToken: string;
   readonly fontUrl: string;
   /** Unix time in seconds after which this response mapping must not render. */
   readonly expiresAt: number;
   readonly coverage: GlyphPayloadCoverage;
-  readonly rotation: {
-    readonly scope: "response";
-    readonly variantMode: "response-pool";
-    readonly reusableAcrossResponses: false;
-  };
   readonly lang?: string;
   readonly cspNonce?: string;
 }
@@ -215,6 +206,20 @@ export interface GlyphAcquisitionOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface GlyphResponseFace {
+  readonly font: string;
+  /** Defaults to the configured default face for this family. */
+  readonly face?: string;
+}
+
+export interface GlyphResponseOptions extends GlyphAcquisitionOptions {
+  /**
+   * Prepared faces authorized by this response's stable token. Omit to
+   * authorize the bounded configured set. An explicit list narrows scope.
+   */
+  readonly faces?: readonly GlyphResponseFace[];
+}
+
 export interface GlyphDrainOptions {
   /** Overrides runtime.drainTimeoutMs. */
   readonly timeoutMs?: number;
@@ -268,7 +273,10 @@ export interface GlyphCapacityReport {
 
 export interface ResponseUsage {
   readonly used: boolean;
+  /** Stable token scope after the first protected block is emitted. */
   readonly authorizedFaces: readonly string[];
+  /** Faces actually referenced by emitted payloads. */
+  readonly usedFaces: readonly string[];
   /** Opaque one-use provider identity; never log or expose it to clients. */
   readonly variantId?: string;
 }
@@ -377,7 +385,7 @@ export interface GlyphLockfile {
 }
 
 export interface GlyphEngine {
-  beginResponse(acquisition?: GlyphAcquisitionOptions): ResponseContext;
+  beginResponse(options?: GlyphResponseOptions): ResponseContext;
   fontResponse(request: Request): Promise<Response>;
   metrics(): GlyphEngineMetrics;
   capacityReport(targetResponsesPerSecond?: number): GlyphCapacityReport;

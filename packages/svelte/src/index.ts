@@ -7,6 +7,7 @@ import type { GlyphPayload } from "@brip/glyphscramble";
 export interface GlyphActionOptions {
   payload: GlyphPayload;
   timeoutMs?: number;
+  errorText?: string;
 }
 
 function actionOptions(value: GlyphPayload | GlyphActionOptions) {
@@ -19,17 +20,21 @@ export function glyphPayload(
 ) {
   const initial = actionOptions(value);
   let timeoutMs = initial.timeoutMs;
+  let errorText = initial.errorText;
   let mount: GlyphMountHandle = mountGlyphPayload(node, initial.payload, {
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(errorText === undefined ? {} : { errorText }),
   });
   return {
     update(next: GlyphPayload | GlyphActionOptions) {
       const options = actionOptions(next);
-      if (options.timeoutMs !== timeoutMs) {
+      if (options.timeoutMs !== timeoutMs || options.errorText !== errorText) {
         mount.destroy();
         timeoutMs = options.timeoutMs;
+        errorText = options.errorText;
         mount = mountGlyphPayload(node, options.payload, {
           ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          ...(errorText === undefined ? {} : { errorText }),
         });
       } else {
         void mount.update(options.payload);
