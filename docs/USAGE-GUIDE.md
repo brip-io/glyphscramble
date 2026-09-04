@@ -101,13 +101,26 @@ block and produce a manifest warning. A different nested font is ambiguous and
 fails. Unmarked HTML and non-HTML files retain their exact bytes. Always compile
 from the original generator output, never from a previously protected tree.
 
-The content-addressed static manifest records source HTML SHA-256 values,
-transformed files, the complete asset graph, selected font identities, the
-algorithm version, a one-way seed identity, and warnings. It contains neither
-the mapping seed nor protected plaintext. Run
+The content-addressed static manifest v3 records source HTML SHA-256 values,
+transformed files, protected-output fingerprints, the complete asset graph,
+selected font identities, the algorithm version, a one-way seed identity, the
+generic failure text, and warnings. It contains neither the mapping seed nor
+protected plaintext. Run
 `glyphscramble doctor --static-output <directory>` before publishing; it rejects
-tampered assets, stale HTML references, and trees containing more than one
-build manifest.
+tampered assets or protected text, stale HTML references, and trees containing
+more than one build manifest.
+
+Planning validates normalization and every protected scalar before staging. A
+known text failure reports the source file, DOM path, font, face, code point,
+and repair guidance without echoing the source text. HTML transformation uses
+a clone of the validated parse, but final verification always reparses the
+published bytes independently.
+
+Static file work is deterministic and bounded to eight concurrent tasks by
+default; use `--concurrency <1-32>` to fit a constrained build runner. The beta
+regression gate covers 10,000 same-tag siblings, 1,000 nested elements, and a
+40-page/100-asset publication. These are tested ceilings, not an unlimited-size
+claim; see [Static deployment](STATIC-DEPLOYMENT.md#scale-and-concurrency).
 
 ## Caching
 

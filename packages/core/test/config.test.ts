@@ -90,6 +90,7 @@ describe("runtime configuration", () => {
           publicBasePath: "/docs/",
           fontLoadTimeoutMs: 5_000,
           fontFailure: "generic-error",
+          errorText: "Protected excerpt unavailable.",
         },
       }),
     ).toBeDefined();
@@ -108,6 +109,14 @@ describe("runtime configuration", () => {
           static: { publicBasePath } as GlyphConfig["static"],
         }),
       ).toThrow(/publicBasePath/);
+
+    for (const errorText of ["", "   ", "x".repeat(513)])
+      expect(() =>
+        defineGlyphConfig({
+          ...value,
+          static: { errorText },
+        }),
+      ).toThrow(/errorText.*512 UTF-8 bytes/);
     expect(() =>
       defineGlyphConfig({
         ...value,

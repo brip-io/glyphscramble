@@ -1,7 +1,11 @@
 import type { GlyphConfig, GlyphConfigInput } from "./types.js";
 import spdxParse from "spdx-expression-parse";
 import { parseCoverage } from "./coverage.js";
-import { assertTimerDelay, MAX_TIMER_DELAY_MS } from "./limits.js";
+import {
+  assertStaticErrorText,
+  assertTimerDelay,
+  MAX_TIMER_DELAY_MS,
+} from "./limits.js";
 
 const HTTPS = /^https:\/\//i;
 const MAX_NORMALIZED_BYTES = 16 * 1024 * 1024;
@@ -178,6 +182,8 @@ export function validateGlyphConfig(config: GlyphConfig): void {
     config.static.fontFailure !== "generic-error"
   )
     throw new Error("static.fontFailure must be generic-error.");
+  if (config.static?.errorText !== undefined)
+    assertStaticErrorText(config.static.errorText);
   const entries = Object.entries(config.fonts);
   if (entries.length === 0)
     throw new Error("At least one font must be configured.");

@@ -15,6 +15,7 @@ export default defineGlyphConfig({
     publicBasePath: "/docs",
     fontLoadTimeoutMs: 8_000,
     fontFailure: "generic-error",
+    errorText: "Protected content could not be displayed.",
   },
 });
 ```
@@ -27,9 +28,14 @@ stores the bytes elsewhere.
 
 ```bash
 npx glyphscramble prepare
-npx glyphscramble static --input dist --output dist-protected
+npx glyphscramble static --input dist --output dist-protected --concurrency 8
 npx glyphscramble doctor --static-output dist-protected
 ```
+
+`errorText` localizes the generic visible failure status and is capped at 512
+UTF-8 bytes. It must not repeat or summarize the protected source. The same
+generic text is recorded in the version 3 manifest so `doctor` can reject a page whose
+failure contract was changed after publication.
 
 In Vite 7 or 8, `glyphscrambleStatic(config)` can own this two-tree flow from
 the normal `vite build` command. It captures the user's final `outDir`, directs
@@ -43,6 +49,30 @@ destination. Upload that tree as one release. Do not merge it into an existing
 output directory: an old and new manifest in one tree is deliberately rejected
 as a mixed build. Hosts without an atomic directory swap should publish to a
 new versioned prefix, verify it, then switch routing to that prefix.
+
+## Scale and concurrency
+
+Static planning indexes a document in one traversal, materializes DOM paths
+only for protected nodes or diagnostics, and skips expensive safety detectors
+for unrelated subtrees. It validates NFC and font coverage before staging; a
+failure names the source file, DOM path, font, face, code point, and the
+coverage or normalization repair. Transformation reuses a clone of that
+validated parse, while `doctor` independently reparses the published HTML and
+checks its protected-text fingerprint.
+
+File and asset work uses eight concurrent tasks by default. Set
+`--concurrency <1-32>` (or `static.concurrency` through the programmatic API)
+to match the memory and file-descriptor budget of the build runner. A value of
+one is useful on constrained CI. Output and manifest order remain deterministic
+at every setting, and a failed pool settles in-flight tasks before the staging
+directory is removed.
+
+The automated Node 22/24 regression gate covers a 10,000-sibling document and
+a 1,000-level deep document within three seconds each, plus deterministic
+serial/eight-way publication of 40 HTML files and 100 assets. These are tested
+ceilings for the beta, not a claim of unlimited document or site size. Measure
+larger sites on the intended build runner and lower concurrency when retained
+parse trees and parallel file buffers create memory pressure.
 
 ## Cache policy
 
