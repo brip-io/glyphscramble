@@ -8,13 +8,17 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
       "import": "./dist/index.js"
     },
-    "./GlyphScramble.svelte": "./src/GlyphScramble.svelte"
+    "./GlyphScramble.svelte": {
+      "types": "./dist/GlyphScramble.svelte.d.ts",
+      "svelte": "./dist/GlyphScramble.svelte",
+      "default": "./dist/GlyphScramble.svelte"
+    }
   },
   "files": [
-    "dist",
-    "src/GlyphScramble.svelte"
+    "dist"
   ],
   "engines": {
     "node": ">=22"
@@ -24,14 +28,19 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm run clean && svelte-package -i src -o dist",
     "clean": "rm -rf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@brip/glyphscramble": "workspace:^"
   },
   "peerDependencies": {
     "svelte": ">=5 <6"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "2.5.8",
+    "svelte": "5.57.0",
+    "svelte-check": "4.7.6"
   }
 }

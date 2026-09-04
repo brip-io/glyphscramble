@@ -15,6 +15,10 @@ examples/next/.next/
 examples/nuxt/.glyphscramble/
 examples/nuxt/.nuxt/
 examples/nuxt/.output/
+examples/sveltekit/.glyphscramble/
+examples/sveltekit/.svelte-kit/
+examples/sveltekit/build/
+packages/svelte/.svelte-kit/
 packages/astro/.astro/
 examples/astro/.astro/
 examples/astro/.glyphscramble/

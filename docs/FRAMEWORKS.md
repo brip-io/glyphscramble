@@ -128,7 +128,93 @@ the later font request.
 
 ## Svelte 5 and SvelteKit 2
 
-Install `createGlyphHandle()` as the server handle. It places the response context in `event.locals.glyphscramble`. Render the package component or apply the `glyphPayload` action to an element containing only `encodedText`.
+Install the core, Svelte, and SvelteKit packages, then let the initializer create
+the process-level helper, locals augmentation, and (when no server hook exists)
+the server hook:
+
+```bash
+pnpm add @brip/glyphscramble @brip/glyphscramble-svelte @brip/glyphscramble-sveltekit
+pnpm exec glyphscramble init
+pnpm exec glyphscramble prepare
+```
+
+If `src/hooks.server.ts` already exists, `init` leaves it untouched and prints
+the exact composition. Rename its exported handle to `appHandle`, then put the
+GlyphScramble handle first so it owns the complete downstream request:
+
+```ts
+import { sequence } from "@sveltejs/kit/hooks";
+import { glyphHandle } from "$lib/server/glyphscramble";
+
+export const handle = sequence(glyphHandle, appHandle);
+```
+
+Keep plaintext exclusively in a server-only `+page.server.ts` or `+server.ts`.
+The handle installs one typed context in `event.locals`; return only branded
+payloads from the server load:
+
+```ts
+// src/routes/premium/+page.server.ts
+import { getGlyphResponseContext } from "@brip/glyphscramble-sveltekit";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async (event) => {
+  const glyphs = getGlyphResponseContext(event);
+  return {
+    excerpt: await glyphs.scrambleAsync(loadPremiumExcerpt(), {
+      font: "body",
+      lang: "en",
+    }),
+  };
+};
+```
+
+```svelte
+<script lang="ts">
+  import { GlyphScramble } from "@brip/glyphscramble-svelte";
+  import type { PageData } from "./$types";
+
+  let { data }: { data: PageData } = $props();
+</script>
+
+<GlyphScramble
+  payload={data.excerpt}
+  errorText="This protected excerpt could not be displayed."
+/>
+```
+
+The component and `glyphPayload` action share the abortable client lifecycle:
+updates hide until the replacement font loads, equivalent payload clones do
+nothing, and unmount destroys pending work. `fontTimeoutMs`/`timeoutMs` and
+`errorText` customize only the generic failure state; plaintext must never be
+used as fallback text.
+
+SvelteKit may begin streaming before deferred `load` promises settle. Declare
+every page that can receive a protected payload after response headers could be
+finalized:
+
+```ts
+export const glyphHandle = await createGlyphHandle(config, {
+  streaming: { protectedRoutes: ["/premium"] },
+});
+```
+
+Entries must be canonical root-relative paths and match the exact path plus
+descendants. A listed route is `private, no-store` from request start. Other
+responses preserve their cache headers unless their own request context emits
+a payload. Do not place plaintext in universal `+page.ts` loads, Svelte stores,
+client components, form values, error messages, or public API responses: those
+surfaces serialize it to the browser independently of this adapter.
+
+The qualified v0.1 deployment is `@sveltejs/adapter-node` in one Node 22/24
+process. The variant store is process-local, so edge/serverless functions,
+clustered workers, restarts between document and font requests, and horizontal
+instances are unsupported without request affinity or an external
+`FontVariantProvider`. Call `glyphHandle.drain()` during graceful removal from
+traffic and `glyphHandle.close()` at process shutdown. Do not prerender routes
+that use per-response protection. Hydrated SvelteKit static output is outside
+the static compiler's safety boundary; only non-hydrated HTML may use the
+separate [static deployment](STATIC-DEPLOYMENT.md) workflow.
 
 ## Astro 7
 

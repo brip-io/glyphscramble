@@ -1,6 +1,6 @@
 # [R09] Svelte 5 and SvelteKit 2 integration
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#10](https://github.com/brip-io/glyphscramble/issues/10)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#10](https://github.com/brip-io/glyphscramble/issues/10)
 > **Blocked by:** R05, R06 · **Blocks:** R12
 
 ## Objective
@@ -42,7 +42,22 @@ The `.svelte` component is shipped from source but excluded from TypeScript/Svel
 
 Use Svelte package tooling to emit a standard component library and declarations. `createGlyphHandle()` returns a genuine SvelteKit `Handle` and can be passed directly to `sequence(existing, glyphHandle)`. Locals augmentation is emitted through a documented `app.d.ts` snippet or package-safe declaration strategy.
 
-The component owns an R06 mount handle in an effect and destroys it whenever the payload changes or the node unmounts.
+The component delegates to a typed Svelte action. That action owns one R06
+mount handle, updates the existing handle for semantic payload changes, remounts
+only when lifecycle options change, and destroys it when the element unmounts.
+
+`createGlyphHandle()` is a real SvelteKit `Handle` augmented with lifecycle
+methods. It intercepts only the configured font prefix, creates one context for
+every other request, and stores it in typed `event.locals`. After ordinary
+resolution it clones the response and applies selective headers. Because a
+deferred load can outlive that observation point, canonical
+`streaming.protectedRoutes` commit `private, no-store` before resolution; each
+entry matches its exact path and descendants.
+
+The runtime keeps generated variants in process memory. R09 therefore qualifies
+the Node adapter in a single process on Node 22/24. Edge, serverless, clustered,
+and horizontally scaled shapes remain unsupported until an external provider
+can make an issued variant available to the later font request.
 
 ## Scope
 
@@ -69,3 +84,26 @@ The component owns an R06 mount handle in an effect and destroys it whenever the
 ## Exit criteria
 
 A packaged Svelte component and real SvelteKit handle compile against supported peers, compose with an existing hook, rotate correctly through navigation, and leave no plaintext or client lifecycle leaks.
+
+## Implementation evidence
+
+- `packages/svelte` is built with `svelte-package`, checked with `svelte-check`
+  against Svelte 5, and publishes compiled source plus declarations from
+  `dist` rather than an unchecked repository component.
+- Its component and action accept the shared R18 timeout/localized-error
+  options and implement mount, semantic update, option remount, stale-work
+  cancellation, and destroy through R06.
+- `packages/sveltekit` imports real `Handle`, `RequestEvent`, and
+  `RequestHandler` types, provides a typed locals accessor, scopes font routing,
+  preserves ordinary response caching, and supports explicit early headers for
+  deferred/streamed routes.
+- `glyphscramble init` creates the helper, locals declaration, and a hook when
+  safe. Existing hooks are preserved with exact `sequence()` instructions;
+  ambiguous multiple server hooks fail before any write.
+- `examples/sveltekit` is a SvelteKit 2 / Svelte 5 adapter-node production
+  consumer with an existing composed hook, direct server loads, protected JSON,
+  deferred data, navigation, and failure fixtures.
+- Its Playwright suite covers HTML, serialized data, client-chunk and error
+  leakage; reactive replacement and equivalent clones; request isolation,
+  rotation, GET/HEAD fonts, token expiry, ordinary caching, delayed streaming,
+  stale completion, and localized font failure. CI runs it independently.

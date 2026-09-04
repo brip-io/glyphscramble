@@ -198,6 +198,83 @@ async function nuxtArtifacts(cwd: string): Promise<IntegrationArtifact[]> {
   ];
 }
 
+const SVELTEKIT_HOOK_TEMPLATE = `import { glyphHandle } from "$lib/server/glyphscramble";
+
+export const handle = glyphHandle;
+`;
+
+async function svelteKitArtifacts(cwd: string): Promise<{
+  artifacts: IntegrationArtifact[];
+  notes: string[];
+}> {
+  const hookCandidates = [
+    "src/hooks.server.ts",
+    "src/hooks.server.js",
+    "src/hooks.server.mts",
+    "src/hooks.server.mjs",
+  ]
+    .map((name) => join(cwd, name))
+    .filter(existsSync);
+  if (hookCandidates.length > 1)
+    throw new Error(
+      `Multiple SvelteKit server hook files exist (${hookCandidates.map((path) => displayPath(cwd, path)).join(", ")}). Keep one canonical hook, then rerun init. No files were changed.`,
+    );
+
+  const helper: IntegrationArtifact = {
+    path: join(cwd, "src", "lib", "server", "glyphscramble.ts"),
+    content: `import config from "../../../glyphscramble.config";
+import { createGlyphHandle } from "@brip/glyphscramble-sveltekit";
+
+export const glyphHandle = await createGlyphHandle(config);
+`,
+  };
+  const types: IntegrationArtifact = {
+    path: join(cwd, "src", "glyphscramble.d.ts"),
+    content: `import type { ResponseContext } from "@brip/glyphscramble";
+
+declare global {
+  namespace App {
+    interface Locals {
+      glyphscramble?: ResponseContext;
+    }
+  }
+}
+
+export {};
+`,
+  };
+  if (hookCandidates.length === 0)
+    return {
+      notes: [],
+      artifacts: [
+        helper,
+        types,
+        {
+          path: join(cwd, "src", "hooks.server.ts"),
+          content: SVELTEKIT_HOOK_TEMPLATE,
+        },
+      ],
+    };
+
+  const existingHook = hookCandidates[0]!;
+  const hookPath = displayPath(cwd, existingHook);
+  if ((await readFile(existingHook, "utf8")) === SVELTEKIT_HOOK_TEMPLATE)
+    return {
+      notes: [],
+      artifacts: [
+        helper,
+        types,
+        { path: existingHook, content: SVELTEKIT_HOOK_TEMPLATE },
+      ],
+    };
+  return {
+    artifacts: [helper, types],
+    notes: [
+      `Left existing ${hookPath} unchanged. Rename its exported handle to appHandle, then compose it after GlyphScramble:\n\nimport { sequence } from "@sveltejs/kit/hooks";\nimport { glyphHandle } from "$lib/server/glyphscramble";\n\nexport const handle = sequence(glyphHandle, appHandle);`,
+    ],
+  };
+}
+
 function patchSimpleViteConfig(source: string, path: string): string {
   if (
     source.includes('from "@brip/glyphscramble-vite"') &&
@@ -282,17 +359,14 @@ async function integrationTemplates(
         notes: [],
         artifacts: await nuxtArtifacts(cwd),
       };
-    case "sveltekit":
+    case "sveltekit": {
+      const sveltekit = await svelteKitArtifacts(cwd);
       return {
         packageName: "@brip/glyphscramble-sveltekit",
-        notes: [],
-        artifacts: [
-          {
-            path: join(cwd, "src", "hooks.server.ts"),
-            content: `import config from "../glyphscramble.config";\nimport { createGlyphHandle } from "@brip/glyphscramble-sveltekit";\n\nexport const handle = await createGlyphHandle(config);\n`,
-          },
-        ],
+        notes: sveltekit.notes,
+        artifacts: sveltekit.artifacts,
       };
+    }
     case "astro":
       return {
         packageName: "@brip/glyphscramble-astro",
