@@ -11,21 +11,28 @@ import {
   sep,
 } from "node:path";
 import { parse } from "parse5";
+import { mapBounded, staticIoConcurrency } from "./bounded-tasks.js";
+import { loadPreparedFont } from "./font-pipeline.js";
 import type { GlyphConfig } from "./types.js";
+import {
+  assertTextSupported,
+  createPermutationPlan,
+  UnsupportedTextError,
+} from "./unicode.js";
 
 interface HtmlAttribute {
   name: string;
   value: string;
 }
 
-interface HtmlNode {
+export interface StaticHtmlNode {
   nodeName: string;
   value?: string;
   attrs?: HtmlAttribute[];
-  childNodes?: HtmlNode[];
-  parentNode?: HtmlNode;
+  childNodes?: StaticHtmlNode[];
+  parentNode?: StaticHtmlNode;
   tagName?: string;
-  content?: HtmlNode;
+  content?: StaticHtmlNode;
 }
 
 export interface StaticElementSnapshot {
@@ -72,6 +79,8 @@ export interface StaticBuildPlannerOptions {
   readonly outputDir: string;
   readonly cwd?: string;
   readonly hydrationDetectors?: readonly StaticHydrationDetector[];
+  /** Bounded file I/O and HTML planning concurrency. Defaults to 8. */
+  readonly concurrency?: number;
 }
 
 export class StaticBuildPlanError extends Error {
@@ -145,40 +154,92 @@ const PLAINTEXT_ATTRIBUTES = new Set([
   "value",
 ]);
 
-function attr(node: HtmlNode, name: string): string | undefined {
+function attr(node: StaticHtmlNode, name: string): string | undefined {
   return node.attrs?.find((item) => item.name.toLowerCase() === name)?.value;
 }
 
-function attributes(node: HtmlNode): Readonly<Record<string, string>> {
+function attributes(node: StaticHtmlNode): Readonly<Record<string, string>> {
   return Object.fromEntries(
     (node.attrs ?? []).map((item) => [item.name.toLowerCase(), item.value]),
   );
 }
 
-function children(node: HtmlNode): readonly HtmlNode[] {
+function children(node: StaticHtmlNode): readonly StaticHtmlNode[] {
   return [...(node.childNodes ?? []), ...(node.content?.childNodes ?? [])];
 }
 
-function elementPath(node: HtmlNode): string {
-  const parts: string[] = [];
-  let current: HtmlNode | undefined = node;
-  while (current?.parentNode) {
-    if (current.tagName) {
-      const siblings = (current.parentNode.childNodes ?? []).filter(
-        (item) => item.tagName === current!.tagName,
-      );
-      parts.push(`${current.tagName}[${siblings.indexOf(current) + 1}]`);
-    }
-    current = current.parentNode;
-  }
-  return parts.reverse().join(" > ") || "#document";
+interface ElementPathRef {
+  readonly parent?: ElementPathRef;
+  readonly tagName: string;
+  readonly index: number;
+  rendered?: string;
 }
 
-function snapshot(node: HtmlNode): StaticElementSnapshot {
+function indexElementPaths(
+  document: StaticHtmlNode,
+): WeakMap<StaticHtmlNode, ElementPathRef> {
+  const paths = new WeakMap<StaticHtmlNode, ElementPathRef>();
+  const visit = (
+    node: StaticHtmlNode,
+    nearest: ElementPathRef | undefined,
+  ): void => {
+    const counts = new Map<string, number>();
+    for (const child of children(node)) {
+      let childPath = nearest;
+      if (child.tagName) {
+        const index = (counts.get(child.tagName) ?? 0) + 1;
+        counts.set(child.tagName, index);
+        const indexed: ElementPathRef = {
+          ...(nearest === undefined ? {} : { parent: nearest }),
+          tagName: child.tagName,
+          index,
+        };
+        childPath = indexed;
+        paths.set(child, indexed);
+      }
+      visit(child, childPath);
+    }
+  };
+  visit(document, undefined);
+  return paths;
+}
+
+function renderElementPath(path: ElementPathRef | undefined): string {
+  if (!path) return "#document";
+  if (path.rendered) return path.rendered;
+  const missing: ElementPathRef[] = [];
+  let current: ElementPathRef | undefined = path;
+  while (current && !current.rendered) {
+    missing.push(current);
+    current = current.parent;
+  }
+  let rendered = current?.rendered ?? "";
+  while (missing.length > 0) {
+    const part = missing.pop()!;
+    rendered = `${rendered}${rendered ? " > " : ""}${part.tagName}[${part.index}]`;
+    part.rendered = rendered;
+  }
+  return rendered;
+}
+
+function elementPath(
+  node: StaticHtmlNode,
+  paths: WeakMap<StaticHtmlNode, ElementPathRef>,
+): string {
+  return renderElementPath(paths.get(node));
+}
+
+function snapshot(
+  node: StaticHtmlNode,
+  paths: WeakMap<StaticHtmlNode, ElementPathRef>,
+): StaticElementSnapshot {
+  const values = Object.freeze({ ...attributes(node) });
   return {
     tagName: node.tagName!,
-    path: elementPath(node),
-    attributes: attributes(node),
+    get path() {
+      return elementPath(node, paths);
+    },
+    attributes: values,
   };
 }
 
@@ -241,7 +302,7 @@ export const DEFAULT_STATIC_HYDRATION_DETECTORS: readonly StaticHydrationDetecto
     },
   ];
 
-function interactiveReason(node: HtmlNode): string | undefined {
+function interactiveReason(node: StaticHtmlNode): string | undefined {
   if (!node.tagName) return undefined;
   const tagReason = UNSAFE_ELEMENTS.get(node.tagName);
   if (tagReason) return `<${node.tagName}> is unsafe: ${tagReason}`;
@@ -269,11 +330,12 @@ function interactiveReason(node: HtmlNode): string | undefined {
 }
 
 function hydrationReason(
-  node: HtmlNode,
+  node: StaticHtmlNode,
   detectors: readonly StaticHydrationDetector[],
+  paths: WeakMap<StaticHtmlNode, ElementPathRef>,
 ): string | undefined {
   if (!node.tagName) return undefined;
-  const element = snapshot(node);
+  const element = snapshot(node, paths);
   for (const detector of detectors) {
     const marker = detector.detect(element);
     if (marker)
@@ -286,18 +348,27 @@ interface HtmlScan {
   protectedBlocks: number;
   fonts: readonly string[];
   warnings: readonly StaticPlanWarning[];
+  protectedText: readonly ProtectedTextSpan[];
 }
 
-function nodeText(node: HtmlNode): string {
+interface ProtectedTextSpan {
+  readonly file: string;
+  readonly path: string;
+  readonly font: string;
+  readonly text: string;
+}
+
+function nodeText(node: StaticHtmlNode): string {
   if (node.nodeName === "#text") return node.value ?? "";
   return children(node).map(nodeText).join("");
 }
 
 function documentHydrationReason(
-  document: HtmlNode,
+  document: StaticHtmlNode,
+  paths: WeakMap<StaticHtmlNode, ElementPathRef>,
 ): { path: string; reason: string } | undefined {
   let result: { path: string; reason: string } | undefined;
-  const visit = (node: HtmlNode): void => {
+  const visit = (node: StaticHtmlNode): void => {
     if (result) return;
     if (node.tagName === "script") {
       const values = attributes(node);
@@ -320,7 +391,7 @@ function documentHydrationReason(
               ? `src containing "${frameworkSource}"`
               : `payload marker "${frameworkPayload}"`;
         result = {
-          path: elementPath(node),
+          path: elementPath(node, paths),
           reason: `document script ${marker} may hydrate protected content or retain it in a client bundle`,
         };
         return;
@@ -333,7 +404,7 @@ function documentHydrationReason(
 }
 
 function scanHtml(
-  document: HtmlNode,
+  document: StaticHtmlNode,
   file: string,
   configuredFonts: ReadonlySet<string>,
   detectors: readonly StaticHydrationDetector[],
@@ -341,18 +412,33 @@ function scanHtml(
   let protectedBlocks = 0;
   const fonts = new Set<string>();
   const warnings: StaticPlanWarning[] = [];
-  const documentHydration = documentHydrationReason(document);
+  const protectedText: ProtectedTextSpan[] = [];
+  const paths = indexElementPaths(document);
+  const relevant = new WeakSet<StaticHtmlNode>();
+  const markRelevant = (node: StaticHtmlNode): boolean => {
+    let containsMarker = attr(node, MARKER) !== undefined;
+    for (const child of children(node))
+      containsMarker = markRelevant(child) || containsMarker;
+    if (containsMarker) relevant.add(node);
+    return containsMarker;
+  };
+  if (!markRelevant(document))
+    return { protectedBlocks: 0, fonts: [], warnings: [], protectedText: [] };
+  const documentHydration = documentHydrationReason(document, paths);
 
   const visit = (
-    node: HtmlNode,
+    node: StaticHtmlNode,
     active: { font: string; path: string } | undefined,
     unsafeAncestor: { path: string; reason: string } | undefined,
     hydrationAncestor: { path: string; reason: string } | undefined,
+    nearestPath: ElementPathRef | undefined,
   ): void => {
-    const path = node.tagName ? elementPath(node) : "#document";
+    if (!active && !relevant.has(node)) return;
+    const currentPath = node.tagName ? paths.get(node) : nearestPath;
+    const path = (): string => renderElementPath(currentPath);
     const ownUnsafe = node.tagName ? interactiveReason(node) : undefined;
     const ownHydration = node.tagName
-      ? hydrationReason(node, detectors)
+      ? hydrationReason(node, detectors, paths)
       : undefined;
     const marker = attr(node, MARKER);
     let nextActive = active;
@@ -362,76 +448,137 @@ function scanHtml(
         if (marker !== active.font)
           throw new StaticBuildPlanError(
             file,
-            path,
+            path(),
             `nested GlyphScramble font "${marker}" conflicts with ancestor font "${active.font}" at ${active.path}`,
           );
         warnings.push({
           code: "nested-same-font",
           file,
-          path,
+          path: path(),
           message: `Nested marker reuses "${marker}" and is compiled as part of the ancestor block.`,
         });
       } else {
         if (!configuredFonts.has(marker))
           throw new StaticBuildPlanError(
             file,
-            path,
+            path(),
             `unknown GlyphScramble font "${marker || "(empty)"}"`,
           );
         if (documentHydration)
           throw new StaticBuildPlanError(
             file,
-            path,
+            path(),
             `protected block is in a document with a hydration boundary at ${documentHydration.path}: ${documentHydration.reason}`,
           );
         if (unsafeAncestor)
           throw new StaticBuildPlanError(
             file,
-            path,
+            path(),
             `protected block is inside unsafe ancestor ${unsafeAncestor.path}: ${unsafeAncestor.reason}`,
           );
         if (hydrationAncestor)
           throw new StaticBuildPlanError(
             file,
-            path,
+            path(),
             `protected block is inside hydrated ancestor ${hydrationAncestor.path}: ${hydrationAncestor.reason}`,
           );
-        nextActive = { font: marker, path };
+        nextActive = { font: marker, path: path() };
         protectedBlocks++;
         fonts.add(marker);
       }
     }
 
     if (nextActive && ownUnsafe)
-      throw new StaticBuildPlanError(file, path, ownUnsafe);
+      throw new StaticBuildPlanError(file, path(), ownUnsafe);
     if (nextActive && ownHydration)
-      throw new StaticBuildPlanError(file, path, ownHydration);
+      throw new StaticBuildPlanError(file, path(), ownHydration);
     if (nextActive && node.nodeName === "#comment")
       throw new StaticBuildPlanError(
         file,
-        active?.path ?? path,
+        active?.path ?? path(),
         "HTML comments inside a protected block would remain in plaintext",
       );
+    if (
+      nextActive &&
+      node.nodeName === "#text" &&
+      typeof node.value === "string" &&
+      node.value.length > 0
+    )
+      protectedText.push({
+        file,
+        path: path(),
+        font: nextActive.font,
+        text: node.value,
+      });
 
     const nextUnsafe =
-      unsafeAncestor ?? (ownUnsafe ? { path, reason: ownUnsafe } : undefined);
+      unsafeAncestor ??
+      (ownUnsafe ? { path: path(), reason: ownUnsafe } : undefined);
     const nextHydration =
       hydrationAncestor ??
-      (ownHydration ? { path, reason: ownHydration } : undefined);
+      (ownHydration ? { path: path(), reason: ownHydration } : undefined);
     for (const child of children(node))
-      visit(child, nextActive, nextUnsafe, nextHydration);
+      visit(child, nextActive, nextUnsafe, nextHydration, currentPath);
   };
 
-  visit(document, undefined, undefined, undefined);
+  visit(document, undefined, undefined, undefined, undefined);
   return {
     protectedBlocks,
     fonts: [...fonts].sort(),
     warnings,
+    protectedText,
   };
 }
 
 function sha256(input: Uint8Array): string {
   return createHash("sha256").update(input).digest("hex");
+}
+
+const plannedDocuments = new WeakMap<
+  StaticBuildPlan,
+  ReadonlyMap<string, StaticHtmlNode>
+>();
+
+/** Internal handoff used by the static publisher after it revalidates bytes. */
+export function cloneStaticPlannedDocument(
+  plan: StaticBuildPlan,
+  path: string,
+): StaticHtmlNode | undefined {
+  const document = plannedDocuments.get(plan)?.get(path);
+  return document ? structuredClone(document) : undefined;
+}
+
+async function validateProtectedText(
+  cwd: string,
+  spans: readonly ProtectedTextSpan[],
+  concurrency: number,
+): Promise<void> {
+  const fontIds = [...new Set(spans.map((span) => span.font))].sort();
+  const prepared = await mapBounded(fontIds, concurrency, async (font) => {
+    const face = await loadPreparedFont(font, cwd);
+    const encodable = new Set(
+      createPermutationPlan(face.metadata.codepoints).groups.flatMap((group) =>
+        group.values.length < 2 ? [] : group.values,
+      ),
+    );
+    return [font, { face: face.faceId, encodable }] as const;
+  });
+  const byFont = new Map(prepared);
+  for (const span of spans) {
+    const font = byFont.get(span.font)!;
+    try {
+      assertTextSupported(span.text, (codepoint) =>
+        font.encodable.has(codepoint),
+      );
+    } catch (error) {
+      if (!(error instanceof UnsupportedTextError)) throw error;
+      throw new StaticBuildPlanError(
+        span.file,
+        span.path,
+        `font "${span.font}" face "${font.face}" cannot encode protected text: ${error.message} Choose a prepared face whose coverage and Unicode property groups include this scalar, adjust the explicit coverage subset, or leave this block unprotected.`,
+      );
+    }
+  }
 }
 
 function portable(path: string): string {
@@ -500,17 +647,21 @@ async function sourceTree(root: string): Promise<TreeEntry[]> {
 }
 
 export class StaticBuildPlanner {
+  readonly #cwd: string;
   readonly #input: string;
   readonly #output: string;
   readonly #detectors: readonly StaticHydrationDetector[];
+  readonly #concurrency: number;
 
   constructor(
     private readonly config: GlyphConfig,
     options: StaticBuildPlannerOptions,
   ) {
     const cwd = options.cwd ?? process.cwd();
+    this.#cwd = cwd;
     this.#input = resolve(cwd, options.inputDir);
     this.#output = resolve(cwd, options.outputDir);
+    this.#concurrency = staticIoConcurrency(options.concurrency);
     this.#detectors = [
       ...DEFAULT_STATIC_HYDRATION_DETECTORS,
       ...(options.hydrationDetectors ?? []),
@@ -543,63 +694,89 @@ export class StaticBuildPlanner {
     const directories = tree
       .filter((entry) => entry.directory)
       .map((entry) => entry.path);
-    const files: StaticPlannedFile[] = [];
+    const documents = new Map<string, StaticHtmlNode>();
     const allFonts = new Set<string>();
     const warnings: StaticPlanWarning[] = [];
+    const protectedText: ProtectedTextSpan[] = [];
     let protectedBlocks = 0;
-    let htmlFiles = 0;
-
-    for (const entry of tree) {
-      if (entry.directory) continue;
-      const isHtml = extname(entry.path).toLowerCase() === ".html";
-      if (!isHtml) {
-        files.push({
-          path: entry.path,
-          kind: "asset",
-          transformed: false,
-          protectedBlocks: 0,
-          fonts: [],
-        });
-        continue;
-      }
-      htmlFiles++;
-      const source = new Uint8Array(
-        await readFile(join(this.#input, ...entry.path.split("/"))),
-      );
-      const hash = sha256(source);
-      const text = new TextDecoder().decode(source);
-      if (!MARKER_PATTERN.test(text)) {
-        files.push({
-          path: entry.path,
-          kind: "html",
-          sourceSha256: hash,
-          transformed: false,
-          protectedBlocks: 0,
-          fonts: [],
-        });
-        continue;
-      }
-      const markedText = new TextDecoder("utf-8", { fatal: true }).decode(
-        source,
-      );
-      const scanned = scanHtml(
-        parse(markedText) as unknown as HtmlNode,
-        entry.path,
-        new Set(Object.keys(this.config.fonts)),
-        this.#detectors,
-      );
+    const fileEntries = tree.filter((entry) => !entry.directory);
+    const configuredFonts = new Set(Object.keys(this.config.fonts));
+    const planned = await mapBounded(
+      fileEntries,
+      this.#concurrency,
+      async (
+        entry,
+      ): Promise<{
+        file: StaticPlannedFile;
+        document?: StaticHtmlNode;
+        scan?: HtmlScan;
+      }> => {
+        const isHtml = extname(entry.path).toLowerCase() === ".html";
+        if (!isHtml) {
+          return {
+            file: {
+              path: entry.path,
+              kind: "asset",
+              transformed: false,
+              protectedBlocks: 0,
+              fonts: [],
+            },
+          };
+        }
+        const source = new Uint8Array(
+          await readFile(join(this.#input, ...entry.path.split("/"))),
+        );
+        const hash = sha256(source);
+        const text = new TextDecoder().decode(source);
+        if (!MARKER_PATTERN.test(text)) {
+          return {
+            file: {
+              path: entry.path,
+              kind: "html",
+              sourceSha256: hash,
+              transformed: false,
+              protectedBlocks: 0,
+              fonts: [],
+            },
+          };
+        }
+        const markedText = new TextDecoder("utf-8", { fatal: true }).decode(
+          source,
+        );
+        const document = parse(markedText) as unknown as StaticHtmlNode;
+        const scanned = scanHtml(
+          document,
+          entry.path,
+          configuredFonts,
+          this.#detectors,
+        );
+        return {
+          file: {
+            path: entry.path,
+            kind: "html",
+            sourceSha256: hash,
+            transformed: scanned.protectedBlocks > 0,
+            protectedBlocks: scanned.protectedBlocks,
+            fonts: scanned.fonts,
+          },
+          document,
+          scan: scanned,
+        };
+      },
+    );
+    const files = planned.map(({ file }) => file);
+    for (const result of planned) {
+      const scanned = result.scan;
+      if (!scanned) continue;
       for (const font of scanned.fonts) allFonts.add(font);
       protectedBlocks += scanned.protectedBlocks;
       warnings.push(...scanned.warnings);
-      files.push({
-        path: entry.path,
-        kind: "html",
-        sourceSha256: hash,
-        transformed: scanned.protectedBlocks > 0,
-        protectedBlocks: scanned.protectedBlocks,
-        fonts: scanned.fonts,
-      });
+      protectedText.push(...scanned.protectedText);
+      if (result.file.transformed && result.document)
+        documents.set(result.file.path, result.document);
     }
+
+    await validateProtectedText(this.#cwd, protectedText, this.#concurrency);
 
     if (
       files.some((file) => file.path === "glyphscramble-static-manifest.json")
@@ -616,16 +793,18 @@ export class StaticBuildPlanner {
         "Static input already contains reserved _glyphscramble assets; always compile from the unprotected source build.",
       );
 
-    return {
+    const plan: StaticBuildPlan = {
       version: 1,
       inputDir: this.#input,
       outputDir: this.#output,
       directories,
       files,
-      htmlFiles,
+      htmlFiles: files.filter((file) => file.kind === "html").length,
       protectedBlocks,
       fonts: [...allFonts].sort(),
       warnings,
     };
+    plannedDocuments.set(plan, documents);
+    return plan;
   }
 }

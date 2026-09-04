@@ -35,10 +35,10 @@
       "family": "GlyphScrambleStatic-body-c4d6163bdf89ea65",
       "fontFile": "/demo-fixtures/static-a.woff2",
       "fontIdentity": "f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b",
-      "fontUrl": "/_glyphscramble/7f7f2356534169399cfbee473aba6ef3b4adc430bff522642739750045214042/body.f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b.woff2",
+      "fontUrl": "/_glyphscramble/6d35067a9f988778bd7edbc0c6d12b18b2c0001441d41aac6370fce9f9f41e41/body.f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "7f7f2356534169399cfbee473aba6ef3b4adc430bff522642739750045214042"
+      "buildId": "6d35067a9f988778bd7edbc0c6d12b18b2c0001441d41aac6370fce9f9f41e41"
     },
     "b": {
       "id": "static-b",
@@ -47,10 +47,10 @@
       "family": "GlyphScrambleStatic-body-739ad2e1c6459f29",
       "fontFile": "/demo-fixtures/static-b.woff2",
       "fontIdentity": "c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5",
-      "fontUrl": "/_glyphscramble/fb6c060dd8383be2adef1d09f8f378ed67c16ae34da859b17e151efa14fee84c/body.c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5.woff2",
+      "fontUrl": "/_glyphscramble/f00ce5f1ea65ed0c07e6bcf7089a8ed178ab22e5bd2b1556ea18008f1cad6fca/body.c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "fb6c060dd8383be2adef1d09f8f378ed67c16ae34da859b17e151efa14fee84c"
+      "buildId": "f00ce5f1ea65ed0c07e6bcf7089a8ed178ab22e5bd2b1556ea18008f1cad6fca"
     }
   }
 }

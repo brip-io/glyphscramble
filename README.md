@@ -91,6 +91,7 @@ export default defineGlyphConfig({
     publicBasePath: "/docs",
     fontLoadTimeoutMs: 8_000,
     fontFailure: "generic-error",
+    errorText: "Protected content could not be displayed.",
   },
   routePrefix: "/_glyphscramble",
   unsupported: "error",
@@ -157,7 +158,7 @@ Then post-process into a separate directory:
 
 ```bash
 npx glyphscramble prepare
-npx glyphscramble static --input dist --output dist-protected
+npx glyphscramble static --input dist --output dist-protected --concurrency 8
 ```
 
 The command scans the untouched source first, stages a fresh sibling tree, and
@@ -174,12 +175,19 @@ compiled as one outer block and recorded as a warning; conflicting font IDs
 fail. A custom `StaticHydrationDetector` can make a project-specific marker a
 hard boundary.
 
+The planner validates NFC and selected-face coverage before staging and reports
+the source file, DOM path, font, face, and safe repair guidance. File and asset
+work is deterministic at a configurable concurrency of 1–32 (default 8); the
+documented beta gate covers 10,000 siblings, 1,000 nested elements, and a
+40-page/100-asset publication.
+
 The output uses `/_glyphscramble/<build-id>/` (or the configured public base
 path) and content-addresses every font, stylesheet, loader, and manifest by its
-emitted bytes. The manifest records the build ID, asset graph, source HTML
-hashes, selected font identities, a one-way seed identity, and warnings—never
-protected text or the seed. Font notices live beside those immutable assets. A
-new random mapping is generated on every build. Passing `--seed` makes builds
+emitted bytes. The version 3 manifest records the build ID, asset graph, source HTML
+hashes, protected-output fingerprints, selected font identities, localized
+generic failure text, a one-way seed identity, and warnings—never protected
+text or the seed. Font notices live beside those immutable assets. A new random
+mapping is generated on every build. Passing `--seed` makes builds
 reproducible but also makes mappings reproducible; keep that option for
 deterministic CI only.
 
@@ -189,10 +197,11 @@ Verify the complete publication before upload or after download:
 npx glyphscramble doctor --static-output dist-protected
 ```
 
-The verifier rejects missing or modified assets, invalid content-addressed
-names, undeclared transformed pages, and output trees containing manifests from
-multiple builds. See [Static deployment](docs/STATIC-DEPLOYMENT.md) for subpath,
-CSP, cache-header, accessibility, and atomic-publish guidance.
+The verifier independently reparses HTML and rejects missing or modified
+assets, mutated protected text, invalid content-addressed names, undeclared
+transformed pages, and output trees containing manifests from multiple builds.
+See [Static deployment](docs/STATIC-DEPLOYMENT.md) for subpath, CSP,
+cache-header, accessibility, atomic-publish, and scale guidance.
 
 Static mode has excellent CDN behavior but weaker resistance: every visitor and every page in that build shares a downloadable mapping. It must never be described as per-response rotation.
 

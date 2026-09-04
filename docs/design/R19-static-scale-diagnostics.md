@@ -1,6 +1,6 @@
 # [R19] Static compiler scale and diagnostics
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#36](https://github.com/brip-io/glyphscramble/issues/36)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#36](https://github.com/brip-io/glyphscramble/issues/36)
 > **Blocked by:** R02 and R03 · **Blocks:** R12 static qualification
 
 ## Objective
@@ -68,3 +68,27 @@ Track path indexes during one traversal and materialize strings only when needed
 ## Exit criteria
 
 Wide/deep static fixtures scale within documented budgets, known text failures stop in planning with actionable file/DOM context, output remains deterministic and transactional under bounded concurrency, and the independent verifier still catches every mixed/plaintext mutation.
+
+## Implementation evidence
+
+- Planning builds one weakly referenced path index with per-parent tag counters,
+  lazily renders paths, and runs configurable hydration detectors only within
+  protected or ancestor-relevant regions. Document-level script hazards retain
+  their independent global scan.
+- The planner loads each selected prepared face and validates NFC plus the
+  actual Unicode permutation pool before any staging directory exists. Its
+  safe error includes file, DOM path, font, face, code point, normalization
+  state, and coverage repair guidance without source text.
+- Transformation clones the validated planned AST after rechecking the source
+  digest. Publication and asset generation use a deterministic bounded task
+  pool (default 8, configurable 1–32) that fully settles in-flight operations
+  before transactional rollback.
+- The manifest carries a one-way fingerprint of the encoded protected text and
+  the localized generic failure contract. The final verifier freshly parses
+  emitted HTML and rejects protected-text or marker mutations independently of
+  planner state.
+- Node 22/24 tests cover 10,000 same-tag siblings, 1,000 nested elements,
+  40 mixed HTML files, 100 assets, serial/eight-way byte equivalence, source
+  mutation, injected I/O failure, localized failure output, and plaintext
+  restoration. The wide/deep gates are each capped at three seconds; those
+  fixture sizes are documented as beta ceilings rather than unlimited scale.

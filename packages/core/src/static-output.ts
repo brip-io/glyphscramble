@@ -12,12 +12,16 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parse, serialize } from "parse5";
+import { mapBounded, staticIoConcurrency } from "./bounded-tasks.js";
+import { assertStaticErrorText } from "./limits.js";
 import { loadPreparedFont, toWoff2 } from "./font-pipeline.js";
 import { parseSfnt, remapCmap } from "./sfnt.js";
 import {
   StaticBuildPlanner,
+  cloneStaticPlannedDocument,
   type StaticBuildPlan,
   type StaticBuildPlannerOptions,
+  type StaticHtmlNode,
   type StaticPlannedFile,
 } from "./static-plan.js";
 import { createPermutation, encodeText, type Permutation } from "./unicode.js";
@@ -30,22 +34,10 @@ import type {
 const STATIC_ALGORITHM = "glyphscramble-static-v3" as const;
 const DEFAULT_FONT_LOAD_TIMEOUT_MS = 8_000;
 const MAX_FONT_LOAD_TIMEOUT_MS = 60_000;
-const FAILURE_TEXT = "This protected content could not be displayed.";
+const DEFAULT_FAILURE_TEXT = "This protected content could not be displayed.";
 const ASSET_ROOT = "_glyphscramble";
 
-interface HtmlAttribute {
-  name: string;
-  value: string;
-}
-
-interface HtmlNode {
-  nodeName: string;
-  value?: string;
-  attrs?: HtmlAttribute[];
-  childNodes?: HtmlNode[];
-  parentNode?: HtmlNode;
-  tagName?: string;
-}
+type HtmlNode = StaticHtmlNode;
 
 interface StaticFont {
   id: string;
@@ -82,6 +74,8 @@ export interface StaticSiteOptions extends StaticBuildPlannerOptions {
   publicBasePath?: string;
   /** Overrides `config.static.fontLoadTimeoutMs` for this publication. */
   fontLoadTimeoutMs?: number;
+  /** Overrides the localized, generic fail-closed status text. */
+  errorText?: string;
 }
 
 export interface StaticManifestHtmlFile {
@@ -90,6 +84,8 @@ export interface StaticManifestHtmlFile {
   transformed: boolean;
   protectedBlocks: number;
   fonts: readonly string[];
+  /** Digest of protected encoded text-node structure for mutation detection. */
+  readonly protectedTextSha256?: string;
 }
 
 export interface StaticManifestAsset {
@@ -107,12 +103,13 @@ export interface StaticGlyphCspDirectives {
 }
 
 export interface StaticBuildManifest {
-  version: 2;
+  version: 3;
   algorithm: typeof STATIC_ALGORITHM;
   buildId: string;
   seedIdentitySha256: string;
   publicBasePath: string;
   fontLoadTimeoutMs: number;
+  failureText: string;
   assetDirectory: string;
   assets: readonly StaticManifestAsset[];
   fontIdentities: Readonly<Record<string, string>>;
@@ -174,6 +171,15 @@ function walk(node: HtmlNode, visitor: (node: HtmlNode) => void): void {
   for (const child of node.childNodes ?? []) walk(child, visitor);
 }
 
+function textContent(node: HtmlNode): string {
+  let text = "";
+  walk(node, (child) => {
+    if (child.nodeName === "#text" && typeof child.value === "string")
+      text += child.value;
+  });
+  return text;
+}
+
 function hasProtectedAncestor(node: HtmlNode): boolean {
   let parent = node.parentNode;
   while (parent) {
@@ -181,6 +187,63 @@ function hasProtectedAncestor(node: HtmlNode): boolean {
     parent = parent.parentNode;
   }
   return false;
+}
+
+function topLevelProtectedBlocks(document: HtmlNode): HtmlNode[] {
+  const blocks: HtmlNode[] = [];
+  walk(document, (node) => {
+    if (
+      attribute(node, "data-glyphscramble-font") !== undefined &&
+      !hasProtectedAncestor(node)
+    )
+      blocks.push(node);
+  });
+  return blocks;
+}
+
+function protectedTextSha256(document: HtmlNode): string {
+  const blocks = topLevelProtectedBlocks(document).map((block) => {
+    const values: string[] = [];
+    walk(block, (node) => {
+      if (node.nodeName === "#text" && typeof node.value === "string")
+        values.push(node.value);
+    });
+    return values;
+  });
+  return sha256(JSON.stringify(blocks));
+}
+
+function protectedFontIds(document: HtmlNode): string[] {
+  return [
+    ...new Set(
+      topLevelProtectedBlocks(document)
+        .map((block) => attribute(block, "data-glyphscramble-font"))
+        .filter((font): font is string => font !== undefined),
+    ),
+  ].sort();
+}
+
+function protectedPresentationContractValid(
+  document: HtmlNode,
+  failureText: string,
+): boolean {
+  return topLevelProtectedBlocks(document).every((block) => {
+    const parent = block.parentNode;
+    const siblings = parent?.childNodes;
+    const index = siblings?.indexOf(block) ?? -1;
+    const status = index >= 0 ? siblings?.[index + 1] : undefined;
+    return (
+      attribute(block, "hidden") !== undefined &&
+      attribute(block, "aria-hidden") === "true" &&
+      attribute(block, "data-glyphscramble-state") === "loading" &&
+      (attribute(block, "data-glyphscramble-family")?.length ?? 0) > 0 &&
+      status?.tagName === "span" &&
+      attribute(status, "role") === "status" &&
+      attribute(status, "aria-live") === "polite" &&
+      attribute(status, "data-glyphscramble-status") === "pending" &&
+      textContent(status) === failureText
+    );
+  });
 }
 
 function appendHeadNode(head: HtmlNode, node: HtmlNode): void {
@@ -316,7 +379,11 @@ function publicAssetUrl(publicBasePath: string, path: string): string {
 function staticSettings(
   config: GlyphConfig,
   options: StaticSiteOptions,
-): { publicBasePath: string; fontLoadTimeoutMs: number } {
+): {
+  publicBasePath: string;
+  fontLoadTimeoutMs: number;
+  errorText: string;
+} {
   const publicBasePath = normalizePublicBasePath(
     options.publicBasePath ?? config.static?.publicBasePath ?? "/",
   );
@@ -332,10 +399,13 @@ function staticSettings(
     throw new Error(
       `Static fontLoadTimeoutMs must be a positive integer no greater than ${MAX_FONT_LOAD_TIMEOUT_MS}.`,
     );
-  return { publicBasePath, fontLoadTimeoutMs };
+  const errorText =
+    options.errorText ?? config.static?.errorText ?? DEFAULT_FAILURE_TEXT;
+  assertStaticErrorText(errorText, "Static errorText");
+  return { publicBasePath, fontLoadTimeoutMs, errorText };
 }
 
-function statusNode(parent: HtmlNode): HtmlNode {
+function statusNode(parent: HtmlNode, failureText: string): HtmlNode {
   return {
     nodeName: "span",
     tagName: "span",
@@ -345,28 +415,18 @@ function statusNode(parent: HtmlNode): HtmlNode {
       { name: "role", value: "status" },
       { name: "aria-live", value: "polite" },
     ],
-    childNodes: [{ nodeName: "#text", value: FAILURE_TEXT }],
+    childNodes: [{ nodeName: "#text", value: failureText }],
     parentNode: parent,
   };
 }
 
 function transformHtml(
-  source: Uint8Array,
+  document: HtmlNode,
   file: StaticPlannedFile,
   fonts: ReadonlyMap<string, StaticFont>,
   resources: StaticResources,
 ): string {
-  const document = parse(
-    new TextDecoder().decode(source),
-  ) as unknown as HtmlNode;
-  const blocks: HtmlNode[] = [];
-  walk(document, (node) => {
-    if (
-      attribute(node, "data-glyphscramble-font") !== undefined &&
-      !hasProtectedAncestor(node)
-    )
-      blocks.push(node);
-  });
+  const blocks = topLevelProtectedBlocks(document);
   for (const node of blocks) {
     const fontId = attribute(node, "data-glyphscramble-font")!;
     const font = fonts.get(fontId);
@@ -388,7 +448,11 @@ function transformHtml(
     const index = siblings.indexOf(node);
     if (index < 0)
       throw new Error(`${file.path} changed while adding failure status.`);
-    siblings.splice(index + 1, 0, statusNode(parent));
+    siblings.splice(
+      index + 1,
+      0,
+      statusNode(parent, resources.manifest.failureText),
+    );
     parent.childNodes = siblings;
   }
   if (blocks.length !== file.protectedBlocks)
@@ -404,16 +468,18 @@ async function stageSourceTree(
   staged: string,
   fonts: ReadonlyMap<string, StaticFont>,
   resources: StaticResources,
+  concurrency: number,
 ): Promise<void> {
-  for (const directory of plan.directories)
+  await mapBounded(plan.directories, concurrency, async (directory) => {
     await mkdir(sourcePath(staged, directory), { recursive: true });
-  for (const file of plan.files) {
+  });
+  await mapBounded(plan.files, concurrency, async (file) => {
     const sourceFile = sourcePath(plan.inputDir, file.path);
     const stagedFile = sourcePath(staged, file.path);
     await mkdir(dirname(stagedFile), { recursive: true });
     if (file.kind === "asset") {
       await copyFile(sourceFile, stagedFile);
-      continue;
+      return;
     }
     const source = new Uint8Array(await readFile(sourceFile));
     if (sha256(source) !== file.sourceSha256)
@@ -422,10 +488,18 @@ async function stageSourceTree(
       );
     if (!file.transformed) {
       await writeFile(stagedFile, source);
-      continue;
+      return;
     }
-    await writeFile(stagedFile, transformHtml(source, file, fonts, resources));
-  }
+    const document = cloneStaticPlannedDocument(plan, file.path);
+    if (!document)
+      throw new Error(
+        `${file.path} has no validated static plan representation; rerun planning and transformation together.`,
+      );
+    await writeFile(
+      stagedFile,
+      transformHtml(document, file, fonts, resources),
+    );
+  });
 }
 
 async function prepareStaticFonts(
@@ -488,19 +562,43 @@ function staticLoader(timeoutMs: number): string {
   return `(()=>{const t=${timeoutMs};for(const e of document.querySelectorAll('[data-glyphscramble-font][data-glyphscramble-state="loading"]')){const s=e.nextElementSibling;const fail=()=>{e.hidden=true;e.dataset.glyphscrambleState='error';if(s instanceof HTMLElement&&s.hasAttribute('data-glyphscramble-status'))s.dataset.glyphscrambleStatus='error'};(async()=>{let timer;try{if(!(s instanceof HTMLElement)||!s.hasAttribute('data-glyphscramble-status'))throw 0;const family=e.dataset.glyphscrambleFamily;if(!family)throw 0;const style=getComputedStyle(e);const query=style.font;const text=e.textContent||' ';const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('font timeout')),t)});const loaded=await Promise.race([document.fonts.load(query,text),timeout]);if(!Array.isArray(loaded)||loaded.length===0||!document.fonts.check(query,text)||!getComputedStyle(e).fontFamily.includes(family))throw 0;clearTimeout(timer);s.hidden=true;s.dataset.glyphscrambleStatus='ready';e.dataset.glyphscrambleState='ready';e.hidden=false}catch{clearTimeout(timer);fail()}})()}})();\n`;
 }
 
-function manifestHtml(plan: StaticBuildPlan): StaticManifestHtmlFile[] {
+function manifestHtml(
+  plan: StaticBuildPlan,
+  fonts: ReadonlyMap<string, StaticFont>,
+): StaticManifestHtmlFile[] {
   return plan.files
     .filter(
       (file): file is StaticPlannedFile & { sourceSha256: string } =>
         file.kind === "html" && file.sourceSha256 !== undefined,
     )
-    .map((file) => ({
-      path: file.path,
-      sourceSha256: file.sourceSha256,
-      transformed: file.transformed,
-      protectedBlocks: file.protectedBlocks,
-      fonts: file.fonts,
-    }));
+    .map((file) => {
+      const common = {
+        path: file.path,
+        sourceSha256: file.sourceSha256,
+        transformed: file.transformed,
+        protectedBlocks: file.protectedBlocks,
+        fonts: file.fonts,
+      };
+      if (!file.transformed) return common;
+      const document = cloneStaticPlannedDocument(plan, file.path);
+      if (!document)
+        throw new Error(
+          `${file.path} has no validated static plan representation; rerun planning and publication together.`,
+        );
+      for (const block of topLevelProtectedBlocks(document)) {
+        const fontId = attribute(block, "data-glyphscramble-font")!;
+        const font = fonts.get(fontId);
+        if (!font)
+          throw new Error(
+            `${file.path} planned unavailable static font ${fontId}.`,
+          );
+        encodeDescendants(block, font.permutation);
+      }
+      return {
+        ...common,
+        protectedTextSha256: protectedTextSha256(document),
+      };
+    });
 }
 
 interface StaticBuildIdentity {
@@ -508,6 +606,7 @@ interface StaticBuildIdentity {
   seedIdentitySha256: string;
   publicBasePath: string;
   fontLoadTimeoutMs: number;
+  failureText: string;
   sourceHtml: readonly StaticManifestHtmlFile[];
   fontIdentities: Readonly<Record<string, string>>;
   assets: readonly {
@@ -528,6 +627,8 @@ async function buildResources(
   seed: string,
   publicBasePath: string,
   fontLoadTimeoutMs: number,
+  failureText: string,
+  concurrency: number,
 ): Promise<{ resources: StaticResources; fonts: Map<string, StaticFont> }> {
   const seedIdentitySha256 = sha256(`glyphscramble-static-seed\0${seed}`);
   const fonts = await prepareStaticFonts(
@@ -549,10 +650,13 @@ async function buildResources(
   const scriptBytes = new TextEncoder().encode(staticLoader(fontLoadTimeoutMs));
   const scriptFile = `static.${sha256(scriptBytes)}.js`;
   pending.push({ file: scriptFile, bytes: scriptBytes, kind: "script" });
-  for (const id of plan.fonts) {
-    const bytes = new Uint8Array(
+  const licenses = await mapBounded(plan.fonts, concurrency, async (id) => ({
+    id,
+    bytes: new Uint8Array(
       await readFile(resolve(cwd, `.glyphscramble/licenses/${id}.LICENSE.txt`)),
-    );
+    ),
+  }));
+  for (const { id, bytes } of licenses) {
     pending.push({
       file: `licenses/${id}.LICENSE.txt`,
       bytes,
@@ -560,7 +664,7 @@ async function buildResources(
     });
   }
   pending.sort((left, right) => left.file.localeCompare(right.file));
-  const sourceHtml = manifestHtml(plan);
+  const sourceHtml = manifestHtml(plan, fonts);
   const fontIdentities = Object.fromEntries(
     [...fonts].map(([id, font]) => [id, font.identity]),
   );
@@ -569,6 +673,7 @@ async function buildResources(
     seedIdentitySha256,
     publicBasePath,
     fontLoadTimeoutMs,
+    failureText,
     sourceHtml,
     fontIdentities,
     assets: pending.map((asset) => ({
@@ -586,12 +691,13 @@ async function buildResources(
     kind: asset.kind,
   }));
   const manifest: StaticBuildManifest = {
-    version: 2,
+    version: 3,
     algorithm: STATIC_ALGORITHM,
     buildId,
     seedIdentitySha256,
     publicBasePath,
     fontLoadTimeoutMs,
+    failureText,
     assetDirectory,
     assets,
     fontIdentities,
@@ -635,12 +741,13 @@ async function buildResources(
 async function writeStaticAssets(
   staged: string,
   resources: StaticResources,
+  concurrency: number,
 ): Promise<void> {
-  for (const [path, bytes] of resources.files) {
+  await mapBounded([...resources.files], concurrency, async ([path, bytes]) => {
     const destination = sourcePath(staged, path);
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, bytes);
-  }
+  });
 }
 
 function safeRelativePath(path: string): boolean {
@@ -699,6 +806,15 @@ function addError(
     message,
     ...(file ? { file } : {}),
   });
+}
+
+function validStaticFailureText(value: unknown): value is string {
+  try {
+    assertStaticErrorText(value as string, "Manifest failureText");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -781,7 +897,7 @@ export async function verifyStaticOutput(
       manifestFile,
     );
   if (
-    manifest.version !== 2 ||
+    manifest.version !== 3 ||
     manifest.algorithm !== STATIC_ALGORITHM ||
     !/^[a-f0-9]{64}$/i.test(manifest.buildId) ||
     manifest.assetDirectory !== `${ASSET_ROOT}/${manifest.buildId}` ||
@@ -796,6 +912,7 @@ export async function verifyStaticOutput(
   const identityFieldsValid =
     typeof manifest.seedIdentitySha256 === "string" &&
     typeof manifest.publicBasePath === "string" &&
+    validStaticFailureText(manifest.failureText) &&
     Number.isSafeInteger(manifest.fontLoadTimeoutMs) &&
     Array.isArray(manifest.sourceHtml) &&
     typeof manifest.fontIdentities === "object" &&
@@ -815,6 +932,7 @@ export async function verifyStaticOutput(
       seedIdentitySha256: manifest.seedIdentitySha256,
       publicBasePath: manifest.publicBasePath,
       fontLoadTimeoutMs: manifest.fontLoadTimeoutMs,
+      failureText: manifest.failureText,
       sourceHtml: manifest.sourceHtml,
       fontIdentities: manifest.fontIdentities,
       assets: manifestAssets.map((asset) => ({
@@ -920,6 +1038,41 @@ export async function verifyStaticOutput(
   const transformed = new Set(
     Array.isArray(manifest.transformedFiles) ? manifest.transformedFiles : [],
   );
+  const sourceHtml = Array.isArray(manifest.sourceHtml)
+    ? manifest.sourceHtml.filter(
+        (file): file is StaticManifestHtmlFile =>
+          typeof file === "object" &&
+          file !== null &&
+          typeof file.path === "string" &&
+          safeRelativePath(file.path) &&
+          /^[a-f0-9]{64}$/i.test(file.sourceSha256) &&
+          typeof file.transformed === "boolean" &&
+          Number.isSafeInteger(file.protectedBlocks) &&
+          file.protectedBlocks >= 0 &&
+          Array.isArray(file.fonts) &&
+          file.fonts.every((font: unknown) => typeof font === "string") &&
+          (!file.transformed ||
+            /^[a-f0-9]{64}$/i.test(file.protectedTextSha256 ?? "")),
+      )
+    : [];
+  if (
+    !Array.isArray(manifest.sourceHtml) ||
+    sourceHtml.length !== manifest.sourceHtml.length
+  )
+    addError(
+      findings,
+      "STATIC-MANIFEST-CONTRACT",
+      "Manifest sourceHtml entries are invalid.",
+      manifestFile,
+    );
+  if (new Set(sourceHtml.map((file) => file.path)).size !== sourceHtml.length)
+    addError(
+      findings,
+      "STATIC-MANIFEST-CONTRACT",
+      "Manifest sourceHtml paths must be unique.",
+      manifestFile,
+    );
+  const declaredHtml = new Map(sourceHtml.map((file) => [file.path, file]));
   if (!Array.isArray(manifest.transformedFiles))
     addError(
       findings,
@@ -932,17 +1085,39 @@ export async function verifyStaticOutput(
     const document = parse(
       await readFile(sourcePath(root, path), "utf8"),
     ) as unknown as HtmlNode;
-    let blocks = 0;
-    walk(document, (node) => {
-      if (
-        attribute(node, "data-glyphscramble-font") !== undefined &&
-        !hasProtectedAncestor(node)
-      )
-        blocks++;
-    });
+    const blocks = topLevelProtectedBlocks(document).length;
     const manifests = metaValues(document, "glyphscramble-manifest");
     const builds = metaValues(document, "glyphscramble-build");
     if (blocks === 0 && manifests.length === 0) continue;
+    const declared = declaredHtml.get(path);
+    if (
+      !declared ||
+      declared.protectedBlocks !== blocks ||
+      !/^[a-f0-9]{64}$/i.test(declared.protectedTextSha256 ?? "") ||
+      declared.protectedTextSha256 !== protectedTextSha256(document)
+    )
+      addError(
+        findings,
+        "STATIC-HTML-TEXT",
+        "Protected encoded text or block structure does not match the independently verified manifest fingerprint.",
+        path,
+      );
+    const declaredFonts = Array.isArray(declared?.fonts)
+      ? [...declared.fonts].sort()
+      : [];
+    if (
+      !declared?.transformed ||
+      JSON.stringify(declaredFonts) !==
+        JSON.stringify(protectedFontIds(document)) ||
+      !validStaticFailureText(manifest.failureText) ||
+      !protectedPresentationContractValid(document, manifest.failureText)
+    )
+      addError(
+        findings,
+        "STATIC-HTML-CONTRACT",
+        "Protected font, hidden-state, or generic failure contract does not match the manifest.",
+        path,
+      );
     if (
       manifests.length !== 1 ||
       manifests[0] !== expectedManifestUrl ||
@@ -993,6 +1168,7 @@ export async function buildStaticSite(
   options: StaticSiteOptions,
 ): Promise<StaticSiteResult> {
   const cwd = options.cwd ?? process.cwd();
+  const concurrency = staticIoConcurrency(options.concurrency);
   const plan = await new StaticBuildPlanner(config, options).plan();
   if (options.existingOutput === "reject" && (await exists(plan.outputDir)))
     throw new Error(
@@ -1006,6 +1182,8 @@ export async function buildStaticSite(
     seed,
     settings.publicBasePath,
     settings.fontLoadTimeoutMs,
+    settings.errorText,
+    concurrency,
   );
   const outputParent = dirname(plan.outputDir);
   await mkdir(outputParent, { recursive: true });
@@ -1014,8 +1192,8 @@ export async function buildStaticSite(
   );
   let published = false;
   try {
-    await stageSourceTree(plan, staged, fonts, resources);
-    await writeStaticAssets(staged, resources);
+    await stageSourceTree(plan, staged, fonts, resources, concurrency);
+    await writeStaticAssets(staged, resources, concurrency);
     const verification = await verifyStaticOutput(staged);
     const errors = verification.filter((item) => item.severity === "error");
     if (errors.length > 0)

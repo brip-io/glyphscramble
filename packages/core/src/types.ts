@@ -96,6 +96,8 @@ export interface GlyphConfig {
     fontLoadTimeoutMs?: number;
     /** Static output never substitutes plaintext after a font failure. */
     fontFailure?: "generic-error";
+    /** Localized generic status; it must never contain the protected text. */
+    errorText?: string;
   };
 }
 

@@ -2,6 +2,7 @@ export const MAX_TIMER_DELAY_MS = 2_147_483_647;
 export const MAX_GLYPH_PAYLOAD_BYTES = 1024 * 1024;
 export const MAX_COVERAGE_RANGES = 1024;
 export const MAX_COVERAGE_RANGE_BYTES = 32;
+export const MAX_STATIC_ERROR_TEXT_BYTES = 512;
 
 const encoder = new TextEncoder();
 
@@ -43,4 +44,18 @@ export function assertPayloadWireSize(
     throw new TypeError("maxBytes must be a positive safe integer.");
   if (encoder.encode(JSON.stringify(value)).byteLength > maximum)
     throw new TypeError(`payload exceeds the ${maximum} byte limit.`);
+}
+
+export function assertStaticErrorText(
+  value: string,
+  option = "static.errorText",
+): void {
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    encoder.encode(value).byteLength > MAX_STATIC_ERROR_TEXT_BYTES
+  )
+    throw new TypeError(
+      `${option} must be non-empty and no greater than ${MAX_STATIC_ERROR_TEXT_BYTES} UTF-8 bytes.`,
+    );
 }

@@ -11,8 +11,13 @@ export {
   MAX_COVERAGE_RANGES,
   MAX_COVERAGE_RANGE_BYTES,
   MAX_GLYPH_PAYLOAD_BYTES,
+  MAX_STATIC_ERROR_TEXT_BYTES,
   MAX_TIMER_DELAY_MS,
 } from "./limits.js";
+export {
+  DEFAULT_STATIC_IO_CONCURRENCY,
+  MAX_STATIC_IO_CONCURRENCY,
+} from "./bounded-tasks.js";
 export {
   createGlyphEngine,
   protectedResponseHeaders,

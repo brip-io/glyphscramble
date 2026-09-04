@@ -21,7 +21,7 @@ Usage:
   glyphscramble inspect <font-file>
   glyphscramble doctor [--root src] [--static-output dist-protected] [--capacity] [--target-rps 10]
   glyphscramble benchmark [--config glyphscramble.config.ts] [--target-rps 10]
-  glyphscramble static --input dist --output dist-protected [--public-base-path /] [--font-timeout-ms 8000] [--existing-output replace|reject] [--config glyphscramble.config.ts]
+  glyphscramble static --input dist --output dist-protected [--public-base-path /] [--font-timeout-ms 8000] [--concurrency 8] [--existing-output replace|reject] [--config glyphscramble.config.ts]
 
 GlyphScramble raises the cost of bulk DOM scraping. It is not DRM and does not
 stop headless browsers, OCR, font analysis, plaintext APIs, feeds, or metadata.
@@ -319,6 +319,7 @@ async function main(): Promise<void> {
       "static-output": { type: "string" },
       "public-base-path": { type: "string" },
       "font-timeout-ms": { type: "string" },
+      concurrency: { type: "string" },
       capacity: { type: "boolean", default: false },
       "target-rps": { type: "string" },
     },
@@ -397,6 +398,9 @@ async function main(): Promise<void> {
           : {}),
         ...(parsed.values["font-timeout-ms"]
           ? { fontLoadTimeoutMs: Number(parsed.values["font-timeout-ms"]) }
+          : {}),
+        ...(parsed.values.concurrency
+          ? { concurrency: Number(parsed.values.concurrency) }
           : {}),
         ...(parsed.values.seed ? { seed: parsed.values.seed } : {}),
       },
