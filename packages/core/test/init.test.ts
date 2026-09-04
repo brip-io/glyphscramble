@@ -155,6 +155,67 @@ describe("framework initializer", () => {
     ).toContain('import type { ResponseContext } from "@brip/glyphscramble"');
   });
 
+  it("creates a Nuxt config that installs the package module without boilerplate", async () => {
+    const cwd = await frameworkProject({ nuxt: "4.5.2" });
+    const result = await initProject({ cwd });
+    expect(result).toMatchObject({
+      framework: "nuxt",
+      packageName: "@brip/glyphscramble-nuxt",
+      created: ["glyphscramble.config.ts", "nuxt.config.ts"],
+      modified: [],
+      notes: [],
+    });
+    expect(await readFile(join(cwd, "nuxt.config.ts"), "utf8")).toContain(
+      'modules: ["@brip/glyphscramble-nuxt/module"]',
+    );
+    await expect(initProject({ cwd })).resolves.toMatchObject({
+      created: [],
+      modified: [],
+      existing: ["glyphscramble.config.ts", "nuxt.config.ts"],
+    });
+  });
+
+  it("patches an existing simple Nuxt modules array once", async () => {
+    const cwd = await frameworkProject({ nuxt: "4.5.2" });
+    const path = join(cwd, "nuxt.config.ts");
+    await writeFile(
+      path,
+      'export default defineNuxtConfig({\n  modules: ["@nuxt/test-utils/module"],\n  devtools: { enabled: false },\n});\n',
+    );
+    const first = await initProject({ cwd });
+    expect(first.modified).toEqual(["nuxt.config.ts"]);
+    const patched = await readFile(path, "utf8");
+    expect(patched).toContain('"@brip/glyphscramble-nuxt/module"');
+    expect(patched).toContain('"@nuxt/test-utils/module"');
+    const second = await initProject({ cwd });
+    expect(second.modified).toEqual([]);
+    expect(second.existing).toContain("nuxt.config.ts");
+  });
+
+  it("refuses a dynamic Nuxt config atomically and leaves middleware alone", async () => {
+    const cwd = await frameworkProject({ nuxt: "4.5.2" });
+    const path = join(cwd, "nuxt.config.ts");
+    const middlewarePath = join(cwd, "server", "middleware", "custom.ts");
+    const source =
+      "export default defineNuxtConfig(() => ({ modules: customModules }))\n";
+    await mkdir(join(middlewarePath, ".."), { recursive: true });
+    await writeFile(path, source);
+    await writeFile(
+      middlewarePath,
+      "export default defineEventHandler(() => {})\n",
+    );
+    await expect(initProject({ cwd })).rejects.toThrow(
+      /Add.*glyphscramble-nuxt\/module.*No files were changed/,
+    );
+    expect(await readFile(path, "utf8")).toBe(source);
+    expect(await readFile(middlewarePath, "utf8")).toContain(
+      "defineEventHandler",
+    );
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts"), "utf8"),
+    ).rejects.toThrow();
+  });
+
   it("creates a registered Vite plugin when no config exists", async () => {
     const cwd = await frameworkProject({ vite: "8.2.2" });
     const result = await initProject({ cwd });
