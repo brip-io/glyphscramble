@@ -93,7 +93,7 @@ Provide a real request-scoped context, request-time rendering, route-scoped cach
 
 Ship a proper Nuxt Kit module plus reactive Vue payload handling and Nitro integration.
 
-#### R09 · Svelte 5 and SvelteKit 2 · **M** · **Implemented (PR pending)**
+#### R09 · Svelte 5 and SvelteKit 2 · **M** · **Implemented in [PR #58](https://github.com/brip-io/glyphscramble/pull/58)**
 
 Ship typed, compiled Svelte artifacts and composable SvelteKit hooks/endpoints with navigation coverage.
 
