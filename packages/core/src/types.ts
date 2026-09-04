@@ -77,7 +77,15 @@ export interface GlyphConfig {
     generationQueueLimit?: number;
     /** Per-face generation deadline. */
     generationTimeoutMs?: number;
-    /** Combined byte ceiling for ready and issued WOFF2 variants. */
+    /** Maximum default wait for the next prepared response variant. */
+    acquisitionTimeoutMs?: number;
+    /** Maximum protected responses waiting for a prepared variant. */
+    acquisitionQueueLimit?: number;
+    /** Recycle a persistent compression worker after this many jobs. */
+    workerRecycleAfter?: number;
+    /** Maximum graceful-drain wait before live variants are released. */
+    drainTimeoutMs?: number;
+    /** Combined byte ceiling for ready and issued WOFF2 variants and mappings. */
     cacheMaxBytes?: number;
   };
   /** Build-time delivery policy for the reusable static mapping fallback. */
@@ -89,6 +97,29 @@ export interface GlyphConfig {
     /** Static output never substitutes plaintext after a font failure. */
     fontFailure?: "generic-error";
   };
+}
+
+/**
+ * Publisher-facing configuration. Stable operational values are optional here
+ * and normalized by `defineGlyphConfig`; safety acknowledgements and font
+ * licensing remain explicit.
+ */
+export interface GlyphConfigInput extends Omit<
+  GlyphConfig,
+  "rotation" | "routePrefix" | "unsupported"
+> {
+  rotation?: {
+    scope?: "response";
+    keyId?: string;
+    secretEnv?: string;
+    previousKeys?: readonly {
+      id: string;
+      secretEnv: string;
+    }[];
+    tokenTtlSeconds?: number;
+  };
+  routePrefix?: `/${string}`;
+  unsupported?: "error";
 }
 
 declare const glyphPayloadBrand: unique symbol;
@@ -116,6 +147,8 @@ export interface GlyphPayload {
   readonly face: GlyphPayloadFace;
   readonly fontToken: string;
   readonly fontUrl: string;
+  /** Unix time in seconds after which this response mapping must not render. */
+  readonly expiresAt: number;
   readonly coverage: GlyphPayloadCoverage;
   readonly rotation: {
     readonly scope: "response";
@@ -133,12 +166,104 @@ export interface ScrambleOptions {
   cspNonce?: string;
 }
 
+export interface OptionalScrambleOptions extends ScrambleOptions {
+  /** Explicit per-block opt-in: omit unsupported content instead of throwing. */
+  unsupported: "omit";
+}
+
+export interface GlyphContentDiagnostic {
+  readonly code: "GLYPH_CONTENT_UNSUPPORTED";
+  readonly codepoint: string;
+  readonly normalization: "nfc" | "not-nfc";
+  readonly font: string;
+  readonly face: string;
+  readonly remediation: string;
+}
+
+export type GlyphProtectionResult =
+  | { readonly status: "protected"; readonly payload: GlyphPayload }
+  | { readonly status: "omitted"; readonly error: GlyphContentDiagnostic };
+
 export interface ResponseContext {
-  readonly token: string;
   /** True only after at least one protected payload has been emitted. */
   readonly used: boolean;
   usage(): ResponseUsage;
   scramble(text: string, options: ScrambleOptions): GlyphPayload;
+  /** Wait briefly for a prepared one-use variant, then fail closed. */
+  scrambleAsync(
+    text: string,
+    options: ScrambleOptions,
+    acquisition?: GlyphAcquisitionOptions,
+  ): Promise<GlyphPayload>;
+  /** Explicit optional-block boundary. Omitted results never contain plaintext. */
+  protect(
+    text: string,
+    options: OptionalScrambleOptions,
+  ): GlyphProtectionResult;
+  /** Async optional-block boundary with the same no-plaintext result contract. */
+  protectAsync(
+    text: string,
+    options: OptionalScrambleOptions,
+    acquisition?: GlyphAcquisitionOptions,
+  ): Promise<GlyphProtectionResult>;
+}
+
+export interface GlyphAcquisitionOptions {
+  /** Overrides runtime.acquisitionTimeoutMs for this protected response. */
+  readonly timeoutMs?: number;
+  /** Cancels a queued wait when the originating request is abandoned. */
+  readonly signal?: AbortSignal;
+}
+
+export interface GlyphDrainOptions {
+  /** Overrides runtime.drainTimeoutMs. */
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export type GlyphRuntimeEventCode =
+  | "pool-depth"
+  | "acquisition-wait"
+  | "pool-exhausted"
+  | "pool-recovered"
+  | "generation-failed"
+  | "generation-timeout"
+  | "variant-expired"
+  | "drain-started"
+  | "drain-complete";
+
+/** Aggregate-only operational event. It never contains content or token data. */
+export interface GlyphRuntimeEvent {
+  readonly code: GlyphRuntimeEventCode;
+  readonly timestamp: number;
+  readonly readyVariants: number;
+  readonly activeVariants: number;
+  readonly queueDepth: number;
+  readonly waitingRequests: number;
+  readonly durationMs?: number;
+  readonly errorClass?: string;
+}
+
+export type GlyphRuntimeEventHandler = (event: GlyphRuntimeEvent) => void;
+
+export interface GlyphCapacityReport {
+  readonly faceCount: number;
+  /** Logical CPU parallelism visible to this process. */
+  readonly hostParallelism: number;
+  readonly generationConcurrency: number;
+  readonly readyBurst: number;
+  readonly cacheMaxBytes: number;
+  readonly estimatedVariantBytes: number;
+  readonly cacheLimitedResponses: number;
+  readonly tokenTtlSeconds: number;
+  readonly measuredFaceGenerationP95Ms: number;
+  readonly sustainableResponsesPerSecond: number;
+  readonly sustainableResponsesPerTtl: number;
+  readonly estimatedBytesAtSustainableRate: number;
+  readonly targetResponsesPerSecond?: number;
+  readonly targetFitsGeneration?: boolean;
+  readonly targetFitsCache?: boolean;
+  readonly guidance: readonly string[];
 }
 
 export interface ResponseUsage {
@@ -159,6 +284,9 @@ export interface GlyphEngineMetrics {
   readonly generationTimeouts: number;
   readonly generationCancellations: number;
   readonly generationOverloads: number;
+  readonly acquisitionWaits: number;
+  readonly acquisitionTimeouts: number;
+  readonly acquisitionCancellations: number;
   readonly expiredVariants: number;
   readonly capacityDrops: number;
   readonly readyVariants: number;
@@ -166,6 +294,10 @@ export interface GlyphEngineMetrics {
   readonly cacheBytes: number;
   readonly queueDepth: number;
   readonly activeGenerators: number;
+  readonly waitingRequests: number;
+  readonly draining: boolean;
+  readonly workerRestarts: number;
+  readonly estimatedVariantBytes: number;
   readonly generationMilliseconds: {
     readonly count: number;
     readonly total: number;
@@ -173,6 +305,8 @@ export interface GlyphEngineMetrics {
     readonly p50: number;
     readonly p95: number;
     readonly p99: number;
+    /** Bounded recent raw samples for capacity analysis and CI evidence. */
+    readonly samples: readonly number[];
   };
 }
 
@@ -236,16 +370,19 @@ export interface PreparedFontFamilyMetadata {
 
 export interface GlyphLockfile {
   version: 2;
-  toolVersion: "0.1.0-beta.0";
+  toolVersion: string;
   unicodeVersion: "17.0.0";
   generatedAt: string;
   fonts: Record<string, PreparedFontFamilyMetadata>;
 }
 
 export interface GlyphEngine {
-  beginResponse(): ResponseContext;
+  beginResponse(acquisition?: GlyphAcquisitionOptions): ResponseContext;
   fontResponse(request: Request): Promise<Response>;
   metrics(): GlyphEngineMetrics;
+  capacityReport(targetResponsesPerSecond?: number): GlyphCapacityReport;
+  /** Stop new leases, retain issued fonts until expiry/deadline, then close. */
+  drain(options?: GlyphDrainOptions): Promise<void>;
   close(): Promise<void>;
 }
 

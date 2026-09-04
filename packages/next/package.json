@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
     }
   },
   "files": [
@@ -28,10 +32,17 @@
   },
   "dependencies": {
     "@brip/glyphscramble": "workspace:^",
-    "@brip/glyphscramble-react": "workspace:^"
+    "@brip/glyphscramble-react": "workspace:^",
+    "server-only": "0.0.1"
   },
   "peerDependencies": {
     "next": ">=16 <17",
     "react": ">=19 <20"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   }
 }

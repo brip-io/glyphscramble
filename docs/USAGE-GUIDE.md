@@ -40,6 +40,38 @@ If a selector matches zero or several CSS faces, preparation fails and lists the
 
 `prepare` validates the SPDX expression and copies the license or notice bytes to `.glyphscramble/licenses`. Static builds copy those notices beside generated assets. This preserves notices; it does not establish that the font license permits modification or redistribution. Review the font license yourself.
 
+## Unsupported content
+
+The default is intentionally strict: `scramble()` and `scrambleAsync()` throw a
+`GlyphContentError` before leasing a font variant when text is not NFC or the
+selected face has no Unicode-safe mapping. The error names only the code point,
+normalization state, configured family, and face; it never echoes the source
+text. Normalize publisher content with `text.normalize("NFC")`, then add the
+required code point to the configured coverage and prepare a licensed source
+face that actually contains it.
+
+For a genuinely optional high-value block, opt in at that call site with
+`protect()` or `protectAsync()`. The result is discriminated and an omitted
+result contains only safe diagnostics—never the input:
+
+```ts
+const result = await context.protectAsync(excerpt, {
+  font: "body",
+  unsupported: "omit",
+});
+
+if (result.status === "omitted") {
+  return renderGenericStatus("Protected block unavailable.");
+}
+return renderGlyphPayload(result.payload);
+```
+
+React server code can use `protectGlyphBlock()` or
+`protectGlyphBlockAsync()` from `@brip/glyphscramble-react/server`. Do not put
+the source text in the fallback, logs, RSC props, hydration state, or error
+telemetry. Omission is explicit per block because using it globally can conceal
+coverage mistakes; required content should keep the default throwing behavior.
+
 ## SEO
 
 Search crawlers receive encoded Unicode values. Even when the browser paints the right outlines, those values do not become meaningful indexable words. Keep canonical titles, descriptions, headings, internal-link context, structured data, and enough unprotected summary copy for discovery. Protected blocks should usually be `noindex` or live behind authentication.
@@ -79,7 +111,7 @@ build manifest.
 
 ## Caching
 
-Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. `ResponseContext.used` remains false until `scramble()` succeeds, so post-render middleware preserves an unprotected response's original cache policy. The matching font is private and immutable only for its remaining token lifetime; `max-age` shrinks on every request. Its bytes stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
+Per-response payloads make the containing HTML/RSC/JSON dynamic and `private, no-store`. `ResponseContext.used` remains false until `scramble()` succeeds, so post-render middleware preserves an unprotected response's original cache policy. The matching font is private and immutable only for its remaining token lifetime; `max-age` shrinks on every request. Its bytes and compact encode mapping stay in the issuing engine's bounded cache and are never evicted while that token remains valid; when active variants consume the byte ceiling, new protected responses fail closed until capacity expires. Size `cacheMaxBytes` from the generated WOFF2 size plus mapping storage, peak protected-response rate, and `tokenTtlSeconds`. A mostly static page should isolate the protected block behind a small dynamic server boundary rather than disabling caching for the whole site.
 
 ## Runtime secrets and rotation
 
@@ -106,4 +138,12 @@ This means the protected block is not WCAG-conformant. Limit it to opted-in, non
 
 Protected elements stay hidden until the shared runtime confirms that the exact generated face loaded and was applied. Duplicate blocks share a reference-counted registration; updates and unmounts abort stale work and release timers, rules, and faces. A timeout, CSP/font error, process restart, wrong-instance route, or exhausted variant pool produces a visible generic error, never plaintext. Monitor the engine's content-free counters and timings in your own application without sending content or mapping data to BRIP.
 
-The v2 wire payload is data-only and capped at 1 MiB. It contains no CSS and is validated after serialization before the browser uses it. Generated font URLs are root-relative and same-origin. See [Client payload and font lifecycle](CLIENT-RUNTIME.md) for the vanilla API and strict-CSP configuration. Prefer a per-response nonce (`style-src` with that nonce and `style-src-attr 'none'`); the no-nonce fallback needs `style-src-attr 'unsafe-inline'`.
+The v2 wire payload is data-only and capped at 1 MiB on both emission and
+consumption. Coverage is capped at 1,024 canonical ranges of at most 32 UTF-8
+bytes each, so preparation rejects a face that the browser would refuse. It
+contains no CSS and is validated after serialization before the browser uses
+it. Generated font URLs are root-relative and same-origin. See [Client payload
+and font lifecycle](CLIENT-RUNTIME.md) for the vanilla API and strict-CSP
+configuration. Prefer a per-response nonce (`style-src` with that nonce and
+`style-src-attr 'none'`); the no-nonce fallback needs `style-src-attr
+'unsafe-inline'`.

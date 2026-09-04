@@ -35,6 +35,8 @@ Replace the Nuxt stub with a typed Nuxt Kit module and provide reactive Vue beha
 7. Client navigation and parallel Nitro requests MUST not reuse contexts or tokens.
 8. `init` MUST edit or report the required `nuxt.config` module entry accurately and never claim skipped integration succeeded.
 9. A real Nuxt 4 fixture MUST build and run in CI against the declared Vue peer range.
+10. A streamed/lazy Nitro fixture MUST prove `context.used` is finalized before headers commit; when the preset cannot observe body-time scrambling, the integration MUST require explicit route-scoped protection instead of guessing.
+11. Vue/Nuxt components MUST expose the shared R18 timeout and localized generic-error options.
 
 ## Design
 
@@ -58,6 +60,7 @@ The Vue component uses a watcher tied to R06's mount handle and destroys prior s
 - Vue mount/update/unmount unit and browser tests.
 - Navigation, streaming, concurrent request, token expiry, and font failure E2E.
 - Protected versus ordinary route cache assertions.
+- A delayed streamed render that scrambles after middleware return and asserts `private, no-store` before the first byte.
 - Initializer tests with existing `nuxt.config` and server middleware.
 
 ## Risks

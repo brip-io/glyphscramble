@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - examples/*
 
 allowBuilds:
   esbuild: false
@@ -14,3 +15,6 @@ ignoredBuiltDependencies:
   - esbuild
 
 confirmModulesPurge: false
+
+minimumReleaseAgeExclude:
+  - astro@7.3.1

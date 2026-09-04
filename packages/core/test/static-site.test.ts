@@ -144,7 +144,7 @@ describe("static build planner and publisher", () => {
     expect(JSON.stringify(first.manifest)).not.toContain("stable-static-seed");
     expect(first.manifest).toMatchObject({
       version: 2,
-      algorithm: "glyphscramble-static-v2",
+      algorithm: "glyphscramble-static-v3",
       publicBasePath: "/",
       fonts: ["body"],
       transformedFiles: ["index.html"],

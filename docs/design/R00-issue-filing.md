@@ -22,12 +22,20 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 | R13 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
 | R14 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
 | R15 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
+| R16 | [#33](https://github.com/brip-io/glyphscramble/issues/33) |
+| R17 | [#34](https://github.com/brip-io/glyphscramble/issues/34) |
+| R18 | [#35](https://github.com/brip-io/glyphscramble/issues/35) |
+| R19 | [#36](https://github.com/brip-io/glyphscramble/issues/36) |
+| R20 | [#37](https://github.com/brip-io/glyphscramble/issues/37) |
 
 ## Repository metadata
 
 The milestone uses the repository labels `design`, `parent`, `priority:P0`, `priority:P1`, `size:M`, and `size:L`. R00 carries `parent`; every issue carries `design`, exactly one priority, exactly one size, and the beta-readiness milestone.
 
-R01-R06 and R11 are implemented on `main`. R07 is the active dependency-ordered adapter issue; R15 follows the final adapter contracts and precedes public documentation/release qualification.
+R01-R07, R10-R11, and R16-R17 are implemented on `main`. R08-R09 are the
+remaining framework adapters. R20 is the next review-ordered operator-
+hardening issue; R15 follows the adapters' final contracts and precedes public
+documentation/release qualification.
 
 ## Verification
 

@@ -42,6 +42,15 @@ describe("bounded remote input", () => {
       assertRemoteDestination(new URL("https://[64:ff9b::7f00:1]/font.woff2")),
     ).rejects.toThrow(/denied address/);
     await expect(
+      assertRemoteDestination(new URL("https://[::c0a8:1]/font.woff2")),
+    ).rejects.toThrow(/denied address/);
+    await expect(
+      assertRemoteDestination(new URL("https://[::ffff:c0a8:1]/font.woff2")),
+    ).rejects.toThrow(/denied address/);
+    await expect(
+      assertRemoteDestination(new URL("https://[::ffff:808:808]/font.woff2")),
+    ).resolves.toBeUndefined();
+    await expect(
       assertRemoteDestination(new URL("https://fonts.internal/font.woff2")),
     ).rejects.toThrow(/hostname is denied/);
     await expect(
@@ -72,6 +81,22 @@ describe("bounded remote input", () => {
       }),
     ).rejects.toThrow(/denied address/);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies redirects without Location before applying the redirect bound", async () => {
+    for (const status of [302, 304])
+      await expect(
+        fetchBounded("https://public.example/font.woff2", {
+          accept: "font/woff2",
+          config: config({ maxRedirects: 0 }),
+          fetcher: async () => new Response(null, { status }),
+          kind: "font",
+          resolver: publicResolver,
+          userAgent: "GlyphScramble test",
+        }),
+      ).rejects.toThrow(
+        new RegExp(`redirect ${status} without a Location header`),
+      );
   });
 
   it("bounds DNS resolution within the hop deadline", async () => {

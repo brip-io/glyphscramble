@@ -29,7 +29,9 @@ export async function createNuxtGlyphs(
         )
       )
         return engine.fontResponse(event.request);
-      const responseContext = engine.beginResponse();
+      const responseContext = engine.beginResponse({
+        signal: event.request.signal,
+      });
       event.context.glyphscramble = responseContext;
       const response = await next();
       return new Response(response.body, {

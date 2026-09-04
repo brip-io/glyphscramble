@@ -109,6 +109,10 @@ JSR and GitHub Packages are reconsidered only when measured demand justifies a s
 - Compare each tarball against its `files` allowlist and reject source maps, fixtures, local paths, credentials, or undeclared executables.
 - Verify the tag, GitHub Release, package versions, npm dist-tags, digests, provenance, and SBOM in a post-publication read-only job.
 - Document a deprecation/rollback procedure. Published npm versions are immutable; a bad version is deprecated with a reason and replaced by a new patch rather than silently altered.
+- Enter and verify Changesets prerelease mode before versioning; beta tags MUST retain the prerelease suffix and publish only to the `beta` dist-tag.
+- Use one enforced Node floor across `engines`, CI, README, contributing guidance, CLI execution, and consumer fixtures.
+- Move generation-only Unicode data to root development dependencies so consumers do not install the roughly 33 MB UCD source package.
+- Remove stale package/worktree references from repository configuration and reject new orphaned ignore/Changesets entries.
 
 ## Complexity budget and success metrics
 
@@ -125,6 +129,7 @@ JSR and GitHub Packages are reconsidered only when measured demand justifies a s
 - Normalized public config input and generated minimal configs.
 - Cross-framework adapter/initializer rubric and reusable conformance fixtures.
 - Guided and non-interactive CLI initialization, package-manager detection, dry-run, idempotency, and actionable diagnostics.
+- CLI `--version`, config discovery, up-front scalar parsing, optional verbose aggregate diagnostics, side-effect-free benchmark mode, and server-only misuse checks.
 - Canonical npm/GitHub/CDN channel policy and complete package metadata.
 - OIDC trusted publication, beta dist-tag policy, SBOM/checksums, post-publication verification, and rollback runbook.
 - R13 onboarding, install tabs, compatibility/status, troubleshooting, and distribution reference pages.
@@ -138,6 +143,7 @@ JSR and GitHub Packages are reconsidered only when measured demand justifies a s
 - `npm pack --dry-run`, publint, `arethetypeswrong`, SBOM, licence, export-map, provenance configuration, and secret/source-map scans gate release.
 - A release rehearsal publishes to an isolated test package/tag, verifies `beta` without changing `latest`, downloads through npm and both documented CDNs, compares digests, and exercises deprecation/rollback without deleting artifacts.
 - Documentation tests compile one canonical example behind every package-manager tab and crawl every package/release/docs link.
+- CI checks generated Unicode drift, type-aware TypeScript promises, and Svelte/Astro/Vue source linting; duplicate builds and superseded runs are removed through explicit job contracts/concurrency.
 
 ## Risks
 

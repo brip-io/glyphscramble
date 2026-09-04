@@ -5,10 +5,10 @@
     "a": {
       "id": "runtime-a",
       "label": "Response A",
-      "encodedText": "Jicawaicaiv nabaynle cabanfab cakjoanyva yllabb.",
+      "encodedText": "Nbjokobjobx dozoedmq jozoduoz jovtsodexo emmozz.",
       "family": "GlyphScrambleDemo-runtime-a",
       "fontFile": "/demo-fixtures/runtime-a.woff2",
-      "fontIdentity": "874771be9274af048984d7a9c728cc754cfc1de766690c1ac25cac9693308d33",
+      "fontIdentity": "0e91931b628ce729ff88641e5f55b8fd339be2fe931adc9dc51f85458c83c06e",
       "token": "response token (redacted)",
       "fontUrl": "/_glyphscramble/font/[token]/body%40default.woff2",
       "documentCache": "private, no-store",
@@ -17,10 +17,10 @@
     "b": {
       "id": "runtime-b",
       "label": "Response B",
-      "encodedText": "Amoshsmosml gsrsigku osrsgasr ospzesgils ikksrr.",
+      "encodedText": "Hjiyoyjiyjr byuywbxg iyuyblyu iyqpcybwry wxxyuu.",
       "family": "GlyphScrambleDemo-runtime-b",
       "fontFile": "/demo-fixtures/runtime-b.woff2",
-      "fontIdentity": "2e7ff2ebbd2952093073466b750c5c7465fc4e4d77452b77b07f768ce4cf0fee",
+      "fontIdentity": "eaedee9167c237b2ed2ed03520d993f5c2dc735861b337f00ceb23a8e0c40b43",
       "token": "response token (redacted)",
       "fontUrl": "/_glyphscramble/font/[token]/body%40default.woff2",
       "documentCache": "private, no-store",
@@ -31,26 +31,26 @@
     "a": {
       "id": "static-a",
       "label": "Build A",
-      "encodedText": "Xauzezauzao mzkzqmxf uzkzmdzk uzrctzmqoz qxxzkk.",
-      "family": "GlyphScrambleStatic-body-f0523796da913f12",
+      "encodedText": "Lmbhuhmbhmv ohzhroti bhzhokhz bhxcwhorvh rtthzz.",
+      "family": "GlyphScrambleStatic-body-c4d6163bdf89ea65",
       "fontFile": "/demo-fixtures/static-a.woff2",
-      "fontIdentity": "4d7aaac00e426cdf4ba25a3d5c8833089d1f63986fc271de98801607346c7b6f",
-      "fontUrl": "/_glyphscramble/62068f787b17b3f7d9ee7c6dbcdc5190782a80302b2c30697fcec8150187d637/body.4d7aaac00e426cdf4ba25a3d5c8833089d1f63986fc271de98801607346c7b6f.woff2",
+      "fontIdentity": "f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b",
+      "fontUrl": "/_glyphscramble/7f7f2356534169399cfbee473aba6ef3b4adc430bff522642739750045214042/body.f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "62068f787b17b3f7d9ee7c6dbcdc5190782a80302b2c30697fcec8150187d637"
+      "buildId": "7f7f2356534169399cfbee473aba6ef3b4adc430bff522642739750045214042"
     },
     "b": {
       "id": "static-b",
       "label": "Build B",
-      "encodedText": "Ncwueucwuch sumuqsbo wumuskum wuxtvusqhu qbbumm.",
-      "family": "GlyphScrambleStatic-body-aa2c6fa8f3196513",
+      "encodedText": "Blcftflcflr jfyfzjwg cfyfjbfy cfhnsfjzrf zwwfyy.",
+      "family": "GlyphScrambleStatic-body-739ad2e1c6459f29",
       "fontFile": "/demo-fixtures/static-b.woff2",
-      "fontIdentity": "1d77f69aafc5a0c730842a4b3a9b0182aa46d1e86eb6af8e582c8f107856a23a",
-      "fontUrl": "/_glyphscramble/401ecc18253e99953de6e1907c82d6a391d34a06dc1c30f12eed28a9e9383669/body.1d77f69aafc5a0c730842a4b3a9b0182aa46d1e86eb6af8e582c8f107856a23a.woff2",
+      "fontIdentity": "c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5",
+      "fontUrl": "/_glyphscramble/fb6c060dd8383be2adef1d09f8f378ed67c16ae34da859b17e151efa14fee84c/body.c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "401ecc18253e99953de6e1907c82d6a391d34a06dc1c30f12eed28a9e9383669"
+      "buildId": "fb6c060dd8383be2adef1d09f8f378ed67c16ae34da859b17e151efa14fee84c"
     }
   }
 }

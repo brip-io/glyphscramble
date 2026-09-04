@@ -4,6 +4,7 @@ import {
   glyphCspDirectives,
   mountGlyphPayload,
 } from "../src/browser.js";
+import { MAX_TIMER_DELAY_MS } from "../src/limits.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -162,6 +163,7 @@ function payload(suffix = "0123456789abcdef") {
     },
     fontToken,
     fontUrl: `/_glyphscramble/font/${fontToken}/body%40regular.woff2`,
+    expiresAt: Math.floor(Date.now() / 1_000) + 60,
     coverage: {
       identity: suffix.repeat(4),
       ranges: ["U+0020-007E"],
@@ -234,6 +236,9 @@ describe("GlyphPayload validation", () => {
     changed((value) => {
       value.encodedText = "\ud800";
     }),
+    changed((value) => {
+      value.expiresAt = 0;
+    }),
   ])("rejects malformed or executable serialized fields", (value) => {
     expect(() => assertGlyphPayload(value)).toThrow(TypeError);
   });
@@ -251,6 +256,22 @@ describe("GlyphPayload validation", () => {
     });
     expect(() => mountGlyphPayload(env.element(), value)).toThrow(/css/);
     expect(FakeFontFace.created).toHaveLength(0);
+  });
+
+  it("rejects timeout and expiry delays beyond the platform timer ceiling", async () => {
+    const env = environment();
+    expect(() =>
+      mountGlyphPayload(env.element(), payload(), {
+        timeoutMs: MAX_TIMER_DELAY_MS + 1,
+      }),
+    ).toThrow(/2147483647/);
+
+    const farFuture = payload();
+    farFuture.expiresAt =
+      Math.floor((Date.now() + MAX_TIMER_DELAY_MS + 60_000) / 1_000) + 1;
+    const mount = mountGlyphPayload(env.element(), farFuture);
+    await expect(mount.ready).rejects.toThrow(/2147483647/);
+    mount.destroy();
   });
 });
 
@@ -334,6 +355,26 @@ describe("font lifecycle", () => {
     expect(element.dataset.glyphscramble).toBe("error");
     expect(env.fonts.deleted).toHaveLength(1);
     expect(env.styles[0]?.removed).toBe(true);
+  });
+
+  it("fails closed when a payload expires after loading", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const env = environment();
+    const element = env.element();
+    const value = payload();
+    value.expiresAt = Math.floor(Date.now() / 1_000) + 1;
+    const mount = mountGlyphPayload(element, value, {
+      errorText: "Protected block unavailable.",
+    });
+
+    await expect(mount.ready).resolves.toBe("ready");
+    expect(element.dataset.glyphscramble).toBe("ready");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(element.textContent).toBe("Protected block unavailable.");
+    expect(element.dataset.glyphscramble).toBe("error");
+    expect(element.getAttribute("aria-hidden")).toBe("true");
+    expect(env.fonts.deleted).toHaveLength(1);
   });
 
   it("fails when the exact registered face is not returned", async () => {

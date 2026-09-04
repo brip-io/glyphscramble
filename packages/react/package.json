@@ -31,7 +31,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^"
+    "@brip/glyphscramble": "workspace:^",
+    "server-only": "0.0.1"
   },
   "peerDependencies": {
     "react": ">=18 <20"

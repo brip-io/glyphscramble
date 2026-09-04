@@ -31,6 +31,13 @@ npx glyphscramble static --input dist --output dist-protected
 npx glyphscramble doctor --static-output dist-protected
 ```
 
+In Vite 7 or 8, `glyphscrambleStatic(config)` can own this two-tree flow from
+the normal `vite build` command. It captures the user's final `outDir`, directs
+Vite into `.glyphscramble/vite-input`, then publishes the protected tree to the
+original output. `base` supplies `publicBasePath` when it is root-relative.
+Astro static builds use the CLI after `astro build`; the repository example
+keeps its Astro input and protected publication in separate directories.
+
 The publisher stages and verifies a complete sibling tree before replacing the
 destination. Upload that tree as one release. Do not merge it into an existing
 output directory: an old and new manifest in one tree is deliberately rejected

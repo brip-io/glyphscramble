@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
+import { MAX_TIMER_DELAY_MS } from "../src/limits.js";
 import type { GlyphConfig } from "../src/types.js";
 
 function config(runtime: GlyphConfig["runtime"]): GlyphConfig {
@@ -23,6 +24,29 @@ function config(runtime: GlyphConfig["runtime"]): GlyphConfig {
 }
 
 describe("runtime configuration", () => {
+  it("normalizes safe defaults while keeping font licensing and accessibility explicit", () => {
+    expect(
+      defineGlyphConfig({
+        fonts: {
+          body: {
+            source: { kind: "file", path: "./body.ttf" },
+            license: { spdx: "OFL-1.1", file: "./OFL.txt" },
+          },
+        },
+        accessibilityRiskAcknowledged: true,
+      }),
+    ).toMatchObject({
+      rotation: {
+        scope: "response",
+        keyId: "current",
+        secretEnv: "GLYPHSCRAMBLE_SECRET",
+        tokenTtlSeconds: 600,
+      },
+      routePrefix: "/_glyphscramble",
+      unsupported: "error",
+    });
+  });
+
   it("requires a serialization-safe root-relative route prefix", () => {
     const value = config(undefined);
     for (const routePrefix of [
@@ -47,6 +71,10 @@ describe("runtime configuration", () => {
           generationConcurrency: 2,
           generationQueueLimit: 16,
           generationTimeoutMs: 5_000,
+          acquisitionTimeoutMs: 50,
+          acquisitionQueueLimit: 128,
+          workerRecycleAfter: 256,
+          drainTimeoutMs: 30_000,
           cacheMaxBytes: 32 * 1024 * 1024,
         }),
       ),
@@ -103,6 +131,43 @@ describe("runtime configuration", () => {
         config({ variantMode: "window" } as unknown as GlyphConfig["runtime"]),
       ),
     ).toThrow(/response-pool/);
+  });
+
+  it("accepts the platform timer ceiling and rejects larger delays", () => {
+    expect(() =>
+      defineGlyphConfig(
+        config({
+          generationTimeoutMs: MAX_TIMER_DELAY_MS,
+          acquisitionTimeoutMs: MAX_TIMER_DELAY_MS,
+          drainTimeoutMs: MAX_TIMER_DELAY_MS,
+        }),
+      ),
+    ).not.toThrow();
+    for (const key of [
+      "generationTimeoutMs",
+      "acquisitionTimeoutMs",
+      "drainTimeoutMs",
+    ] as const)
+      expect(() =>
+        defineGlyphConfig(config({ [key]: MAX_TIMER_DELAY_MS + 1 })),
+      ).toThrow(/2147483647/);
+
+    const value = config(undefined);
+    expect(() =>
+      defineGlyphConfig({
+        ...value,
+        remote: {
+          timeoutMs: MAX_TIMER_DELAY_MS,
+          totalTimeoutMs: MAX_TIMER_DELAY_MS,
+        },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      defineGlyphConfig({
+        ...value,
+        remote: { timeoutMs: MAX_TIMER_DELAY_MS + 1 },
+      }),
+    ).toThrow(/2147483647/);
   });
 
   it("validates bounded token rotation metadata", () => {

@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildSfnt,
   buildStaticSite,
+  compactEncodeMapping,
   createGlyphEngine,
   createPermutation,
   defineGlyphConfig,
@@ -62,6 +63,9 @@ function metrics() {
     generationTimeouts: 0,
     generationCancellations: 0,
     generationOverloads: 0,
+    acquisitionWaits: 0,
+    acquisitionTimeouts: 0,
+    acquisitionCancellations: 0,
     expiredVariants: 0,
     capacityDrops: 0,
     readyVariants: 2,
@@ -69,6 +73,10 @@ function metrics() {
     cacheBytes: 0,
     queueDepth: 0,
     activeGenerators: 0,
+    waitingRequests: 0,
+    draining: false,
+    workerRestarts: 0,
+    estimatedVariantBytes: 0,
     generationMilliseconds: {
       count: 0,
       total: 0,
@@ -76,6 +84,7 @@ function metrics() {
       p50: 0,
       p95: 0,
       p99: 0,
+      samples: [],
     },
   };
 }
@@ -95,6 +104,7 @@ async function runtimeFixtures(config, cwd) {
     },
   ];
   const fonts = new Map();
+  const mappings = new Map();
 
   for (const lease of leases) {
     const permutation = createPermutation(
@@ -105,6 +115,7 @@ async function runtimeFixtures(config, cwd) {
     const patched = buildSfnt(
       remapCmap(parseSfnt(prepared.sfnt), permutation.decode),
     );
+    mappings.set(lease.id, compactEncodeMapping(permutation.encode));
     fonts.set(lease.id, await toWoff2(parseSfnt(patched)));
   }
 
@@ -116,6 +127,19 @@ async function runtimeFixtures(config, cwd) {
       if (!lease) throw new Error("Demo variant pool exhausted.");
       return lease;
     },
+    async acquireAsync() {
+      return provider.acquire();
+    },
+    mapping(lease, requestedFace) {
+      const knownLease = leases.find((item) => item.id === lease.id);
+      if (
+        !knownLease ||
+        knownLease.seed !== lease.seed ||
+        requestedFace !== faceId
+      )
+        return undefined;
+      return mappings.get(lease.id);
+    },
     font(variantId, requestedFace, expectedSeed) {
       const lease = leases.find((item) => item.id === variantId);
       if (!lease || lease.seed !== expectedSeed || requestedFace !== faceId)
@@ -123,6 +147,31 @@ async function runtimeFixtures(config, cwd) {
       return fonts.get(variantId);
     },
     metrics,
+    capacityReport(tokenTtlSeconds, targetResponsesPerSecond) {
+      return {
+        faceCount: 1,
+        hostParallelism: 1,
+        generationConcurrency: 1,
+        readyBurst: leases.length,
+        cacheMaxBytes: 0,
+        estimatedVariantBytes: 0,
+        cacheLimitedResponses: leases.length,
+        tokenTtlSeconds,
+        measuredFaceGenerationP95Ms: 0,
+        sustainableResponsesPerSecond: leases.length,
+        sustainableResponsesPerTtl: leases.length * tokenTtlSeconds,
+        estimatedBytesAtSustainableRate: 0,
+        ...(targetResponsesPerSecond === undefined
+          ? {}
+          : {
+              targetResponsesPerSecond,
+              targetFitsGeneration: true,
+              targetFitsCache: true,
+            }),
+        guidance: [],
+      };
+    },
+    async drain() {},
     async close() {},
   };
 

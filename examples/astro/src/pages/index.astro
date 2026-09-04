@@ -1,0 +1,29 @@
+---
+import GlyphScramble from "@brip/glyphscramble-astro/GlyphScramble.astro";
+
+const context = Astro.locals.glyphscramble;
+if (!context) throw new Error("GlyphScramble middleware is not installed.");
+const payload = await context.scrambleAsync("Astro protected value", {
+  font: "body",
+  lang: "en",
+});
+Astro.response.headers.set(
+  "Content-Security-Policy",
+  "default-src 'self'; font-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'",
+);
+---
+
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Astro GlyphScramble</title></head>
+  <body>
+    <main>
+      <h1>Indexable Astro heading</h1>
+      <GlyphScramble
+        payload={payload}
+        fontTimeoutMs={4000}
+        errorText="Protected Astro content unavailable."
+      />
+    </main>
+  </body>
+</html>

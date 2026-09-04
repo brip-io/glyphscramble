@@ -14,17 +14,19 @@ publisher is ready to move from scraping friction to licensed delivery.
 pnpm --filter @brip/glyphscramble-demo dev
 ```
 
-The `predev` and `prebuild` scripts compile the core package and generate four
-real public demo fixtures: two isolated runtime responses and two static builds.
-The browser visualization uses their actual encoded Unicode and generated WOFF2
-files.
+The `predev` script compiles the core package before generating four real public
+demo fixtures: two isolated runtime responses and two static builds. The browser
+visualization uses their actual encoded Unicode and generated WOFF2 files.
 
 ## Static output
 
 ```bash
-pnpm --filter @brip/glyphscramble-demo build
+pnpm --filter @brip/glyphscramble-demo... build
 ```
 
-The deployable static artifact is written to `apps/docs/out`. Production DNS,
-headers, CSP, cache rules, and deployment credentials remain a brip
-infrastructure decision and are intentionally not embedded in this repository.
+The dependency-inclusive filter builds the core package first, then generates
+the demo fixtures and site without rebuilding core alongside its other
+dependents. The deployable static artifact is written to `apps/docs/out`.
+Production DNS, headers, CSP, cache rules, and deployment credentials remain a
+brip infrastructure decision and are intentionally not embedded in this
+repository.

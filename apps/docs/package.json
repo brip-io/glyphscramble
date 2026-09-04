@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare:demo": "pnpm --filter @brip/glyphscramble build && node scripts/generate-demo-fixtures.mjs",
-    "predev": "pnpm prepare:demo",
+    "prepare:demo": "node scripts/generate-demo-fixtures.mjs",
+    "predev": "pnpm --filter @brip/glyphscramble build && pnpm prepare:demo",
     "dev": "next dev",
     "prebuild": "pnpm prepare:demo",
     "build": "next build",

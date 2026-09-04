@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import type { build as EsbuildBuild } from "esbuild";
 
 const require = createRequire(
   join(process.cwd(), "packages/core/package.json"),
 );
+const { build } = require("esbuild") as { build: typeof EsbuildBuild };
 const interPath =
   require.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2");
 const runtimePath = join(process.cwd(), "packages/core/dist/browser.js");
@@ -14,12 +16,16 @@ let runtimeSource: string;
 
 test.beforeAll(async () => {
   fontBytes = await readFile(interPath);
-  runtimeSource = (await readFile(runtimePath, "utf8")).replaceAll(
-    "export ",
-    "",
-  );
-  runtimeSource +=
-    "\nwindow.GlyphRuntime={assertGlyphPayload,glyphCspDirectives,mountGlyphPayload};\n";
+  const bundled = await build({
+    entryPoints: [runtimePath],
+    bundle: true,
+    format: "iife",
+    globalName: "GlyphRuntime",
+    platform: "browser",
+    target: "es2022",
+    write: false,
+  });
+  runtimeSource = bundled.outputFiles[0]!.text;
 });
 
 function payload(suffix = "0123456789abcdef") {
@@ -38,6 +44,7 @@ function payload(suffix = "0123456789abcdef") {
     },
     fontToken,
     fontUrl: `/_glyphscramble/font/${fontToken}/body%40regular.woff2`,
+    expiresAt: Math.floor(Date.now() / 1_000) + 60,
     coverage: { identity: suffix.repeat(4), ranges: ["U+0020-007E"] },
     rotation: {
       scope: "response",

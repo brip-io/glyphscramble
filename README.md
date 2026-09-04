@@ -11,13 +11,12 @@ It is not DRM. A headless browser, OCR system, downloaded-font analyzer, glyph-o
 Apply GlyphScramble narrowly to high-value blocks where lower scrape throughput is worth the tradeoff: premium excerpts, proprietary research tables, selectively revealed market intelligence, or opted-in previews. Keep navigation, headings, forms, prices required to transact, legal text, and the main SEO surface ordinary HTML.
 
 ```tsx
-// Server Component: plaintext never crosses into the client component.
-import { createGlyphPayload } from "@brip/glyphscramble-react/server";
-import { GlyphScramble } from "@brip/glyphscramble-react";
+// App Router Server Component: plaintext never crosses into the Client Component.
+import { GlyphScramble } from "@brip/glyphscramble-next";
 import { glyphs } from "../glyphscramble.next";
 
-export default function PremiumExcerpt({ copy }: { copy: string }) {
-  const payload = createGlyphPayload(glyphs.beginResponse(), copy, {
+export default async function PremiumExcerpt({ copy }: { copy: string }) {
+  const payload = await glyphs.scramble(copy, {
     font: "body",
     lang: "en",
   });
@@ -34,11 +33,19 @@ with the pinned pnpm 11 release requires Node 22.13 or newer.
 
 ```bash
 pnpm add @brip/glyphscramble @brip/glyphscramble-next @brip/glyphscramble-react
-npx glyphscramble init
-npx glyphscramble prepare
+pnpm exec glyphscramble init
+pnpm exec glyphscramble prepare
 ```
 
 `init` detects Next, Nuxt, SvelteKit, Astro, or Vite and writes one config plus a small integration scaffold. It never contacts BRIP. `prepare` is the only phase that resolves remote fonts; runtime requests use locked local artifacts.
+
+For Next 16, the initializer supports App Router projects rooted at either
+`app/` or `src/app/`. It generates a server helper and
+`%5Fglyphscramble/font/[token]/[face]/route.ts`: the encoded folder name is
+required because a literal leading underscore is a private Next folder, while
+the public URL remains `/_glyphscramble/...`. No Proxy is required. Keep the
+font Route Handler on Next's default Node runtime; Cache Components rejects
+route-level `runtime` overrides and Edge is unsupported.
 
 ```ts
 import { defineGlyphConfig } from "@brip/glyphscramble";
@@ -74,6 +81,10 @@ export default defineGlyphConfig({
     generationConcurrency: 2,
     generationQueueLimit: 64,
     generationTimeoutMs: 10_000,
+    acquisitionTimeoutMs: 50,
+    acquisitionQueueLimit: 128,
+    workerRecycleAfter: 256,
+    drainTimeoutMs: 30_000,
     cacheMaxBytes: 64 * 1024 * 1024,
   },
   static: {
@@ -87,14 +98,29 @@ export default defineGlyphConfig({
 });
 ```
 
-The production runtime prepares one-use WOFF2 variants in worker threads before
-protected responses need them. The first `scramble()` call (or explicit token
-read) consumes a variant exactly once; an unused response context consumes
-nothing. If demand outruns the bounded pool or active tokens fill the byte budget,
-it throws before plaintext is emitted. A process restart invalidates live font
-tokens, so keep HTML and its font route on the same stateful engine instance and
-size the cache for generated font bytes × responses within the token TTL. There
-is no implicit time-window fallback.
+The production runtime prepares one-use WOFF2 variants in persistent worker
+threads before protected responses need them. The first `scrambleAsync()` call
+waits briefly for an imminent variant and consumes it exactly once;
+`scramble()` is the immediate fail-fast path. An unused response context
+consumes nothing. Bounded queue, timeout, cancellation, preflight byte, and
+post-generation byte checks all fail before plaintext is emitted. A process
+restart invalidates live font tokens, so keep HTML and its font route on the
+same stateful engine instance and size the cache for generated font bytes plus
+retained mapping storage × responses within the token TTL. The
+Next adapter deduplicates page and Route Handler module instances inside one
+Node process. Multi-process, serverless, and horizontally scaled Next delivery
+still require request affinity or an external `FontVariantProvider`; the beta
+must not be deployed across isolated instances without it. There is no implicit
+time-window fallback. See [Runtime capacity and shutdown](docs/RUNTIME-CAPACITY.md)
+for sizing, aggregate events, and graceful drain.
+
+Unsupported content fails before a response variant is leased. Required blocks
+use `scramble()`/`scrambleAsync()` and receive an actionable
+`GlyphContentError`; optional blocks can explicitly use
+`protect(..., { unsupported: "omit" })` (also available as `glyphs.protect()`
+in Next) and render a generic status when the result is `omitted`. The omitted
+result contains no source text. See
+[Unsupported content](docs/USAGE-GUIDE.md#unsupported-content).
 
 Generate production secrets with `openssl rand -base64 48`. To rotate without
 invalidating live documents, deploy a new `keyId` and current secret while
@@ -105,8 +131,9 @@ required at startup and must contain at least 32 characters.
 `ResponseContext.used` and `usage()` report whether rendering emitted a payload
 and which prepared faces it authorized. Astro, Nuxt, and SvelteKit preserve an
 ordinary response's cache policy and apply `private, no-store` only when used.
-Next remains an explicitly route-scoped contract until R07 because Proxy cannot
-observe downstream rendering.
+Next invokes its request-time boundary only when a Server Component requests a
+payload, so unprotected routes retain their ordinary cache behavior. Proxy
+cannot observe downstream rendering and is not part of the integration.
 
 CSS sources that contain more than one `@font-face` require explicit named selectors, so a remote stylesheet cannot silently change which weight, style, stretch, or Unicode subset is used. Select a non-default face with `{ font: "body", face: "bold" }`.
 
@@ -169,6 +196,13 @@ CSP, cache-header, accessibility, and atomic-publish guidance.
 
 Static mode has excellent CDN behavior but weaker resistance: every visitor and every page in that build shares a downloadable mapping. It must never be described as per-response rotation.
 
+Vite users can register `glyphscrambleStatic(config)` directly in the normal
+`plugins` array. It derives the final directory and root-relative public base
+from Vite's resolved configuration, stages a fresh unprotected build internally,
+and atomically publishes only the verified protected tree. Astro static users
+run the same compiler after `astro build`. Both modes reject protected hydrated
+islands, state, or client bundles.
+
 ## Tradeoffs
 
 | Concern                | Per-response SSR                                                          | Static per-build                                 | Practical guidance                                                                          |
@@ -189,9 +223,10 @@ Read [Choosing what to protect](docs/USAGE-GUIDE.md) before integration, [the cl
 glyphscramble init        framework detection and scaffold
 glyphscramble prepare     resolve, normalize, inspect, and lock fonts
 glyphscramble inspect     report tables, coverage, format, axes, and color data
-glyphscramble doctor      find client risks or verify a complete static output tree
-glyphscramble benchmark   measure pool startup, generation, encoding, token validation, and font responses
+glyphscramble doctor      find client risks, verify static output, or check runtime capacity
+glyphscramble benchmark   measure pool startup, sustainable rate, encoding, token validation, and font responses
 glyphscramble static      post-process a static build
+glyphscramble --version   print the package-derived CLI version
 ```
 
 ## Packages

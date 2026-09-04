@@ -24,7 +24,9 @@ export async function createGlyphHandle(
   return async ({ event, resolve }) => {
     if (event.url.pathname.startsWith(`${config.routePrefix}/font/`))
       return engine.fontResponse(event.request);
-    const responseContext = engine.beginResponse();
+    const responseContext = engine.beginResponse({
+      signal: event.request.signal,
+    });
     event.locals.glyphscramble = responseContext;
     const response = await resolve(event);
     return new Response(response.body, {

@@ -18,6 +18,9 @@ import {
   parseCoverage,
 } from "./coverage.js";
 import { validateGlyphConfig } from "./config.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
+import { assertCoverageWireBounds } from "./limits.js";
+import { asGlyphFontError } from "./font-error.js";
 import { extractFontMetadata } from "./font-metadata.js";
 import {
   DEFAULT_FONT_PARSE_LIMITS,
@@ -43,10 +46,8 @@ import type {
 } from "./types.js";
 
 const DEFAULT_NORMALIZED_BYTES = 2 * 1024 * 1024;
-const GLYPH_USER_AGENT =
-  "GlyphScramble/0.1 (+https://github.com/brip-io/glyphscramble)";
-const GOOGLE_FONTS_USER_AGENT =
-  "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36 GlyphScramble/0.1";
+const GLYPH_USER_AGENT = `GlyphScramble/${PACKAGE_VERSION} (+https://github.com/brip-io/glyphscramble)`;
+const GOOGLE_FONTS_USER_AGENT = `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36 GlyphScramble/${PACKAGE_VERSION}`;
 
 export interface PreparedFont {
   /** Logical configured family id. */
@@ -431,6 +432,7 @@ function metadata(
       `Font ${familyId}.${faceId} coverage does not contain any source codepoints.`,
     );
   const coverage = summarizeCoverage(codepoints);
+  assertCoverageWireBounds(coverage, `Font ${familyId}.${faceId} coverage`);
   const lockedSourceDescriptors = {
     ...extracted.descriptors,
     ...(sourceDescriptors ?? {}),
@@ -480,13 +482,17 @@ export async function inspectFont(
   input: Uint8Array,
   id = "font",
 ): Promise<PreparedFont> {
-  const normalized = await normalizeFont(input);
-  return {
-    id,
-    faceId: "default",
-    sfnt: normalized.sfnt,
-    metadata: metadata(id, "default", normalized, input),
-  };
+  try {
+    const normalized = await normalizeFont(input);
+    return {
+      id,
+      faceId: "default",
+      sfnt: normalized.sfnt,
+      metadata: metadata(id, "default", normalized, input),
+    };
+  } catch (error) {
+    throw asGlyphFontError(`${id}.default`, error);
+  }
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -541,7 +547,7 @@ export async function prepareGlyphFonts(
   const staging = await mkdtemp(`${outputDir}.staging-`);
   const lock: GlyphLockfile = {
     version: 2,
-    toolVersion: "0.1.0-beta.0",
+    toolVersion: PACKAGE_VERSION,
     unicodeVersion: "17.0.0",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     fonts: {},
@@ -552,7 +558,9 @@ export async function prepareGlyphFonts(
     await mkdir(resolve(staging, "licenses"), { recursive: true });
     for (const [familyId, configFont] of Object.entries(config.fonts)) {
       const notice = new Uint8Array(
-        await readFile(resolve(cwd, configFont.license.file)),
+        await readFile(
+          /* turbopackIgnore: true */ resolve(cwd, configFont.license.file),
+        ),
       );
       const noticeFile = `licenses/${familyId}.LICENSE.txt`;
       await writeFile(resolve(staging, noticeFile), notice);
@@ -587,35 +595,39 @@ export async function prepareGlyphFonts(
       };
       await mkdir(resolve(staging, "fonts", familyId), { recursive: true });
       for (const resolvedFace of resolvedFamily.faces) {
-        const hardLimit = Math.max(
-          DEFAULT_FONT_PARSE_LIMITS.maxOutputBytes,
-          config.maxNormalizedBytes ?? 0,
-        );
-        const normalized = await normalizeFont(resolvedFace.bytes, hardLimit);
-        const limit = config.maxNormalizedBytes ?? DEFAULT_NORMALIZED_BYTES;
-        if (
-          normalized.sfnt.length > limit &&
-          !resolvedFace.requestedCoverage?.length &&
-          !configFont.allowLargeFont
-        )
-          throw new Error(
-            `Font ${familyId}.${resolvedFace.id} is ${normalized.sfnt.length} bytes after normalization; limit is ${limit}. Set effective coverage or allowLargeFont.`,
+        try {
+          const hardLimit = Math.max(
+            DEFAULT_FONT_PARSE_LIMITS.maxOutputBytes,
+            config.maxNormalizedBytes ?? 0,
           );
-        const face = metadata(
-          familyId,
-          resolvedFace.id,
-          normalized,
-          resolvedFace.bytes,
-          resolvedFace.sourceUrl,
-          resolvedFace.sourceDescriptors,
-          resolvedFace.descriptorOverrides,
-          resolvedFace.requestedCoverage,
-        );
-        family.faces[resolvedFace.id] = face;
-        await writeFile(
-          resolve(staging, "fonts", familyId, `${resolvedFace.id}.sfnt`),
-          normalized.sfnt,
-        );
+          const normalized = await normalizeFont(resolvedFace.bytes, hardLimit);
+          const limit = config.maxNormalizedBytes ?? DEFAULT_NORMALIZED_BYTES;
+          if (
+            normalized.sfnt.length > limit &&
+            !resolvedFace.requestedCoverage?.length &&
+            !configFont.allowLargeFont
+          )
+            throw new Error(
+              `Font ${familyId}.${resolvedFace.id} is ${normalized.sfnt.length} bytes after normalization; limit is ${limit}. Set effective coverage or allowLargeFont.`,
+            );
+          const face = metadata(
+            familyId,
+            resolvedFace.id,
+            normalized,
+            resolvedFace.bytes,
+            resolvedFace.sourceUrl,
+            resolvedFace.sourceDescriptors,
+            resolvedFace.descriptorOverrides,
+            resolvedFace.requestedCoverage,
+          );
+          family.faces[resolvedFace.id] = face;
+          await writeFile(
+            resolve(staging, "fonts", familyId, `${resolvedFace.id}.sfnt`),
+            normalized.sfnt,
+          );
+        } catch (error) {
+          throw asGlyphFontError(`${familyId}.${resolvedFace.id}`, error);
+        }
       }
       if (!family.faces[family.defaultFace])
         throw new Error(
@@ -647,6 +659,22 @@ async function readLock(base: string): Promise<GlyphLockfile> {
   return parsed as GlyphLockfile;
 }
 
+async function readPreparedFace(
+  base: string,
+  id: string,
+  faceId: string,
+  entry: FontFaceMetadata,
+): Promise<PreparedFont> {
+  const sfnt = new Uint8Array(
+    await readFile(resolve(base, "fonts", id, `${faceId}.sfnt`)),
+  );
+  if (sha256(sfnt) !== entry.sha256)
+    throw new Error(
+      `Prepared font ${id}.${faceId} does not match its lockfile.`,
+    );
+  return { id, faceId, sfnt, metadata: entry };
+}
+
 export async function loadPreparedFont(
   id: string,
   cwd = process.cwd(),
@@ -665,14 +693,7 @@ export async function loadPreparedFont(
     throw new Error(
       `Face ${id}.${selectedFace} is not present in glyphscramble.lock.json.`,
     );
-  const sfnt = new Uint8Array(
-    await readFile(resolve(base, "fonts", id, `${selectedFace}.sfnt`)),
-  );
-  if (sha256(sfnt) !== entry.sha256)
-    throw new Error(
-      `Prepared font ${id}.${selectedFace} does not match its lockfile.`,
-    );
-  return { id, faceId: selectedFace, sfnt, metadata: entry };
+  return readPreparedFace(base, id, selectedFace, entry);
 }
 
 export async function loadPreparedFonts(
@@ -687,10 +708,35 @@ export async function loadPreparedFonts(
       `Font ${id} is not present in glyphscramble.lock.json. Run glyphscramble prepare.`,
     );
   return Promise.all(
-    Object.keys(family.faces).map((faceId) =>
-      loadPreparedFont(id, cwd, faceId),
+    Object.entries(family.faces).map(([faceId, entry]) =>
+      readPreparedFace(base, id, faceId, entry),
     ),
   );
+}
+
+/** Load every configured family through one lockfile read and one read per face. */
+export async function loadPreparedFontFamilies(
+  ids: readonly string[],
+  cwd = process.cwd(),
+): Promise<ReadonlyMap<string, readonly PreparedFont[]>> {
+  const base = resolve(cwd, ".glyphscramble");
+  const lock = await readLock(base);
+  const families = await Promise.all(
+    ids.map(async (id) => {
+      const family = lock.fonts[id];
+      if (!family)
+        throw new Error(
+          `Font ${id} is not present in glyphscramble.lock.json. Run glyphscramble prepare.`,
+        );
+      const faces = await Promise.all(
+        Object.entries(family.faces).map(([faceId, entry]) =>
+          readPreparedFace(base, id, faceId, entry),
+        ),
+      );
+      return [id, faces] as const;
+    }),
+  );
+  return new Map(families);
 }
 
 export async function toWoff2(font: SfntFont): Promise<Uint8Array> {

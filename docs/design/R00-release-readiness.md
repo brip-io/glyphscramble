@@ -3,7 +3,7 @@
 > **Size:** L · **Priority:** P0 · **Status:** In progress · **GitHub issue:** [#1](https://github.com/brip-io/glyphscramble/issues/1)
 > **Owner:** BRIP · **Reviewers:** runtime, framework, accessibility, security, and counsel/IP
 
-> **This is a parent project.** It is delivered through fifteen independently mergeable child issues. This document owns architecture, ordering, and release gates; each child owns its implementation and tests.
+> **This is a parent project.** It is delivered through twenty independently mergeable child issues. This document owns architecture, ordering, and release gates; each child owns its implementation and tests.
 
 ## Objective
 
@@ -32,7 +32,8 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 7. Font notices and license metadata MUST accompany redistributed generated artifacts.
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
-10. Public release remains blocked on R13 documentation, R14 demo evidence, R15 onboarding/distribution evidence, counsel/IP approval, and all R12 release gates.
+10. Public release remains blocked on the open R13-R15 and R18-R19 work,
+    counsel/IP approval, and all R12 release gates.
 
 ## Milestones and issue breakdown
 
@@ -84,7 +85,7 @@ Replace arbitrary CSS injection with a validated wire contract and leak-free, ca
 
 ### Release C — Qualified framework adapters
 
-#### R07 · React and Next 16 · **M**
+#### R07 · React and Next 16 · **M** · **Implemented in [PR #39](https://github.com/brip-io/glyphscramble/pull/39)**
 
 Provide a real request-scoped context, request-time rendering, route-scoped cache controls, streaming/RSC support, and safe initializer composition.
 
@@ -96,7 +97,7 @@ Ship a proper Nuxt Kit module plus reactive Vue payload handling and Nitro integ
 
 Ship typed, compiled Svelte artifacts and composable SvelteKit hooks/endpoints with navigation coverage.
 
-#### R10 · Astro 7, Vite, and vanilla · **M**
+#### R10 · Astro 7, Vite, and vanilla · **M** · **Implemented in [PR #41](https://github.com/brip-io/glyphscramble/pull/41), corrected by [PR #42](https://github.com/brip-io/glyphscramble/pull/42)**
 
 Ship typed Astro middleware/components, a functional Vite integration, explicit non-hydrated static constraints, and generic Fetch/Node examples.
 
@@ -122,6 +123,26 @@ Normalize safe defaults, enforce one cross-framework usability rubric, make init
 
 **Exit criterion:** an unfamiliar developer reaches a verified protected block through the same short workflow in every qualified framework, while every release channel resolves to one auditable version without duplicate registries or long-lived publish credentials.
 
+#### R16 · Permutation and request-path efficiency · **M** · **Implemented in [PR #44](https://github.com/brip-io/glyphscramble/pull/44), corrected by [PR #45](https://github.com/brip-io/glyphscramble/pull/45)**
+
+Retain generation-time mappings on variants, replace per-swap HMAC with an unbiased keystream, and make request encoding proportional to protected text rather than font repertoire.
+
+#### R17 · Runtime capacity, lifecycle, and observability · **M** · **Implemented in [PR #47](https://github.com/brip-io/glyphscramble/pull/47)**
+
+Add bounded async acquisition, scalable expiry, persistent workers, graceful drain, diagnostics, stable benchmark methodology, and an evidence-based WOFF 1.0 spike.
+
+#### R18 · Multi-face payload and client efficiency · **M**
+
+Keep authorization stable across faces, deduplicate descriptors/downloads, and make equivalent client payload updates lifecycle no-ops.
+
+#### R19 · Static compiler scale and diagnostics · **M**
+
+Make static traversal near-linear, move text failures into contextual planning, and introduce bounded deterministic I/O concurrency.
+
+#### R20 · Core contract and operator hardening · **M** · **Implemented in [PR #49](https://github.com/brip-io/glyphscramble/pull/49)**
+
+Align client/server bounds, cap timers, improve font/content/remote errors, correct token lifecycle/log guidance, and derive lockfile version from the package.
+
 #### R12 · Cross-browser qualification and release gates · **M**
 
 Exercise the complete real-font, script, browser, leakage, performance, packaging, and release matrix and prevent publication when any required evidence is missing.
@@ -141,6 +162,10 @@ R06 ─┬────────────────▶ adapters ├─▶
 R02 ───▶ R03
 R03/R05 ───────────────────────▶ R14
 R07-R10 ───────────────────────▶ R15 ─▶ R13/R12
+R11 ─▶ R16 ─▶ R17 ────────────────▶ R12
+R06/R16 ─▶ R18 ───────────────────▶ R12
+R02/R03 ─▶ R19 ───────────────────▶ R12
+R04-R06/R11 ─▶ R20 ───────────────▶ R12
 ```
 
 Hard orderings:
@@ -152,6 +177,8 @@ Hard orderings:
 - R02 and R03 precede R10 because Vite/Astro static support must expose only the corrected static compiler.
 - R13 consumes final adapter behavior and R14 consumes the static/request/client contracts; both precede R12 so release qualification tests public claims and evidence rather than inventing them.
 - R15 consumes every adapter's public shape, feeds the final R13 quickstarts, and supplies R12's distribution and onboarding evidence.
+- R16 precedes R17 so capacity measurements exclude avoidable request-path permutation work; R18 consumes the retained mapping/face model.
+- R19 follows static safety/delivery, while R20 follows the final font, request, client, and parser boundaries.
 - Every child precedes R12; R12 validates rather than invents missing functionality.
 
 ## Release policy
@@ -180,7 +207,12 @@ Hard orderings:
 | R13 | [Developer documentation website](R13-documentation-website.md)                       |    M |       P1 | [#28](https://github.com/brip-io/glyphscramble/issues/28) |
 | R14 | [Raw-agent and human-rendering conceptual demo](R14-agent-human-demo.md)              |    M |       P1 | [#29](https://github.com/brip-io/glyphscramble/issues/29) |
 | R15 | [Developer experience and distribution](R15-developer-experience-distribution.md)     |    M |       P1 | [#31](https://github.com/brip-io/glyphscramble/issues/31) |
+| R16 | [Permutation and request-path efficiency](R16-permutation-request-path.md)            |    M |       P0 | [#33](https://github.com/brip-io/glyphscramble/issues/33) |
+| R17 | [Runtime capacity, lifecycle, and observability](R17-runtime-capacity-lifecycle.md)   |    M |       P0 | [#34](https://github.com/brip-io/glyphscramble/issues/34) |
+| R18 | [Multi-face payload and client efficiency](R18-multiface-payload-efficiency.md)       |    M |       P1 | [#35](https://github.com/brip-io/glyphscramble/issues/35) |
+| R19 | [Static compiler scale and diagnostics](R19-static-scale-diagnostics.md)              |    M |       P1 | [#36](https://github.com/brip-io/glyphscramble/issues/36) |
+| R20 | [Core contract and operator hardening](R20-core-operator-hardening.md)                |    M |       P1 | [#37](https://github.com/brip-io/glyphscramble/issues/37) |
 
 ## Completion definition
 
-R00 closes only when all fifteen child issues are complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.
+R00 closes only when all twenty child issues are complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.
