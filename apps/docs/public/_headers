@@ -1,0 +1,36 @@
+# Cloudflare header rules for the static export.
+# https://developers.cloudflare.com/pages/configuration/headers/
+#
+# Cloudflare already serves static assets as
+#   Cache-Control: public, max-age=0, must-revalidate   (plus an ETag)
+# which is the correct default for this site. The rules below only add what
+# that default does not cover.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+
+# Next.js fingerprints everything under /_next/static, so a new build always
+# produces new filenames. Safe to cache indefinitely.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Deliberately NOT immutable. The demo fixture fonts have stable, unhashed
+# filenames, but their bytes change whenever `prepare:demo` regenerates them
+# against a new core build or a new upstream Inter release. The encoded text
+# that pairs with each font is baked into the HTML at build time, so a stale
+# font served against fresh text renders the demo as garbage. This rule
+# restates the platform default so a future blanket woff2 rule cannot
+# silently take it away.
+/demo-fixtures/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Preview deployments serve the production canonical URLs and sitemap
+# (metadataBase in app/layout.tsx is a hardcoded absolute origin), so keep
+# every *.pages.dev host out of search results.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
