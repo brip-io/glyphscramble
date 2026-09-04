@@ -135,7 +135,7 @@ Add bounded async acquisition, scalable expiry, persistent workers, graceful dra
 
 Keep authorization stable across faces, deduplicate descriptors/downloads, and make equivalent client payload updates lifecycle no-ops.
 
-#### R19 · Static compiler scale and diagnostics · **M** · **Implemented (PR pending)**
+#### R19 · Static compiler scale and diagnostics · **M** · **Implemented in [PR #59](https://github.com/brip-io/glyphscramble/pull/59)**
 
 Make static traversal near-linear, move text failures into contextual planning, and introduce bounded deterministic I/O concurrency.
 

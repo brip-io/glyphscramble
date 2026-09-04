@@ -1,6 +1,6 @@
 # [R19] Static compiler scale and diagnostics
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#36](https://github.com/brip-io/glyphscramble/issues/36)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #59](https://github.com/brip-io/glyphscramble/pull/59) · **GitHub issue:** [#36](https://github.com/brip-io/glyphscramble/issues/36)
 > **Blocked by:** R02 and R03 · **Blocks:** R12 static qualification
 
 ## Objective
@@ -92,3 +92,6 @@ Wide/deep static fixtures scale within documented budgets, known text failures s
   mutation, injected I/O failure, localized failure output, and plaintext
   restoration. The wide/deep gates are each capped at three seconds; those
   fixture sizes are documented as beta ceilings rather than unlimited scale.
+
+[PR #59](https://github.com/brip-io/glyphscramble/pull/59) carries the
+implementation, public migration metadata, and qualification evidence.
