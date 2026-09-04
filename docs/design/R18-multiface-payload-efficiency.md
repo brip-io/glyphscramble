@@ -1,6 +1,6 @@
 # [R18] Multi-face payload and client efficiency
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** In progress · **GitHub issue:** [#35](https://github.com/brip-io/glyphscramble/issues/35)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #53](https://github.com/brip-io/glyphscramble/pull/53) · **GitHub issue:** [#35](https://github.com/brip-io/glyphscramble/issues/35)
 > **Blocked by:** R06 and R16 · **Blocks:** R12 payload/browser qualification
 
 ## Objective
