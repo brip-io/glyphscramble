@@ -38,7 +38,7 @@ The 2026-09-03 review confirmed that `ensureIssued()` replaces the token wheneve
 
 Evaluate two compatible mechanisms: `beginResponse({ fonts/faces })` predeclaration, and family-wide authorization on first use. Prefer the smallest authorization that remains stable before bytes escape. Introduce a response face manifest keyed by immutable face identity; payload blocks reference that key plus encoded text. Client adapters derive a scalar semantic identity from URL, encoded text, descriptors, expiry, language, and nonce rather than JavaScript object identity.
 
-### Chosen implementation
+## Implementation notes
 
 `beginResponse()` fixes its authorization scope at construction. The convenient
 default is every prepared face in the bounded engine configuration; routes can
@@ -62,6 +62,15 @@ document registry retains settled zero-reference faces only until token expiry,
 evicts least-recently-used idle entries under pressure, and removes failed or
 abandoned loads eagerly. This covers temporary framework remounts without an
 unbounded font/style cache.
+
+[PR #53](https://github.com/brip-io/glyphscramble/pull/53) merged these
+contracts with a minor Changeset and a payload-v3 migration guide. CI passed
+DCO, Node 22.13/24 validation and runtime benchmarks, the packed
+Astro/Vite/Node and Next consumers, and Chromium/Firefox/WebKit browser tests.
+The regular/bold/regular browser fixture observes one request per unique face;
+the engine fixture also proves one stable token across multiple faces and
+families, narrowed-scope rejection before leasing, and a repeated-block wire
+size below 75% of the equivalent v2 payload.
 
 ## Scope and deliverables
 

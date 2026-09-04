@@ -32,10 +32,10 @@ The complete release-readiness backlog has been filed. Do not rerun the original
 
 The milestone uses the repository labels `design`, `parent`, `priority:P0`, `priority:P1`, `size:M`, and `size:L`. R00 carries `parent`; every issue carries `design`, exactly one priority, exactly one size, and the beta-readiness milestone.
 
-R01-R07, R10-R11, and R16-R17 are implemented on `main`. R08-R09 are the
-remaining framework adapters. R20 is the next review-ordered operator-
-hardening issue; R15 follows the adapters' final contracts and precedes public
-documentation/release qualification.
+R01-R07, R10-R11, R16-R18, and R20 are implemented on `main`. R08-R09 are the
+remaining framework adapters and R19 owns the remaining static-scale work. R15
+follows the adapters' final contracts; R13-R14 and R12 close public
+documentation, demo, and release qualification.
 
 ## Verification
 
