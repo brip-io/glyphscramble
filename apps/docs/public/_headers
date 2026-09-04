@@ -1,5 +1,5 @@
 # Cloudflare header rules for the static export.
-# https://developers.cloudflare.com/pages/configuration/headers/
+# https://developers.cloudflare.com/workers/static-assets/headers/
 #
 # Cloudflare already serves static assets as
 #   Cache-Control: public, max-age=0, must-revalidate   (plus an ETag)
@@ -26,11 +26,11 @@
 /demo-fixtures/*
   Cache-Control: public, max-age=0, must-revalidate
 
-# Preview deployments serve the production canonical URLs and sitemap
-# (metadataBase in app/layout.tsx is a hardcoded absolute origin), so keep
-# every *.pages.dev host out of search results.
-https://:project.pages.dev/*
-  X-Robots-Tag: noindex
-
-https://:version.:project.pages.dev/*
+# The workers.dev route and every version preview serve the production
+# canonical URLs and sitemap (metadataBase in app/layout.tsx is a hardcoded
+# absolute origin), so keep them out of search results. Both the plain route
+# (<worker>.<subdomain>.workers.dev) and previews
+# (<version>-<worker>.<subdomain>.workers.dev) are two labels deep, so one
+# rule covers both.
+https://:worker.:subdomain.workers.dev/*
   X-Robots-Tag: noindex

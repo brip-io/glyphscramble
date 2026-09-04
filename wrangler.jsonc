@@ -1,0 +1,20 @@
+{
+  // Static-assets-only Worker for the GlyphScramble site.
+  //
+  // There is deliberately no "main" entry point: with only an "assets" block,
+  // Cloudflare serves files straight from apps/docs/out and runs no code. The
+  // site is a Next.js static export (apps/docs/next.config.ts sets
+  // output: "export"), so there is nothing to run.
+  //
+  // This file contains no credentials. Deploys use Cloudflare's Git
+  // integration, so no API token exists in this repository.
+  "name": "glyphscramble",
+  "compatibility_date": "2026-09-04",
+  "assets": {
+    "directory": "./apps/docs/out",
+    // The export writes folder index files (demo/index.html) and a root
+    // 404.html, matching trailingSlash: true in the Next config.
+    "html_handling": "force-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+}
