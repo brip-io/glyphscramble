@@ -1,6 +1,6 @@
 # [R13] Developer documentation website
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#28](https://github.com/brip-io/glyphscramble/issues/28)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #62](https://github.com/brip-io/glyphscramble/pull/62) · **GitHub issue:** [#28](https://github.com/brip-io/glyphscramble/issues/28)
 > **Blocked by:** none; final framework quickstarts consume R03, R05-R10, and R15 · **Blocks:** R12 public beta
 
 ## Objective
