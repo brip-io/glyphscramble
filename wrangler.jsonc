@@ -2,9 +2,15 @@
   // Cloudflare Workers configuration for the GlyphScramble public site.
   // https://developers.cloudflare.com/workers/static-assets/
   //
+  // This sits at the repository root rather than beside the site in apps/docs
+  // because Workers Builds resolves the Worker name against the configuration
+  // file in the build's root directory, and the build has to run from the root
+  // for the pnpm workspace filter to resolve.
+  //
   // There is deliberately no "main" entry point. Without one, no Worker script
-  // runs: Cloudflare serves the ./out export as static assets and nothing else.
-  // The site is a Next.js static export, so it needs no server-side runtime.
+  // runs: Cloudflare serves the apps/docs/out export as static assets and
+  // nothing else. The site is a Next.js static export, so it needs no
+  // server-side runtime.
   //
   // Nothing here is sensitive. The account ID is supplied by Workers Builds at
   // build time and the deploy credential never leaves Cloudflare, so this file
@@ -12,6 +18,6 @@
   "name": "glyphscramble",
   "compatibility_date": "2026-09-05",
   "assets": {
-    "directory": "./out",
+    "directory": "./apps/docs/out",
   },
 }
