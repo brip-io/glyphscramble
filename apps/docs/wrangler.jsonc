@@ -1,0 +1,17 @@
+{
+  // Cloudflare Workers configuration for the GlyphScramble public site.
+  // https://developers.cloudflare.com/workers/static-assets/
+  //
+  // There is deliberately no "main" entry point. Without one, no Worker script
+  // runs: Cloudflare serves the ./out export as static assets and nothing else.
+  // The site is a Next.js static export, so it needs no server-side runtime.
+  //
+  // Nothing here is sensitive. The account ID is supplied by Workers Builds at
+  // build time and the deploy credential never leaves Cloudflare, so this file
+  // is safe to keep in a public repository.
+  "name": "glyphscramble",
+  "compatibility_date": "2026-09-05",
+  "assets": {
+    "directory": "./out",
+  },
+}

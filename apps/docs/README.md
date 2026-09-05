@@ -32,21 +32,34 @@ dependents. The deployable static artifact is written to `apps/docs/out`.
 
 The site is a pure static export — `next.config.ts` sets `output: "export"`, so
 the build emits plain files and needs no SSR runtime, adapter, or server code.
-It is deployed with Cloudflare Pages using Cloudflare's Git integration, which
-pulls from GitHub directly. That keeps a deploy credential out of this public
-repository entirely: there is no `CLOUDFLARE_API_TOKEN` in the Actions secrets
-and no wrangler workflow to leak one. Pages' Git integration also declines to
-build pull requests from forks, so untrusted contributor code never runs in the
-build environment.
+It is deployed as a Cloudflare Worker with static assets, using Cloudflare's
+Git integration, which pulls from GitHub directly. That keeps a deploy
+credential out of this public repository entirely: there is no
+`CLOUDFLARE_API_TOKEN` in the Actions secrets and no GitHub Actions workflow to
+leak one.
+
+`wrangler.jsonc` lives in this package, beside the site it deploys, rather than
+at the repository root -- the root belongs to a library monorepo that publishes
+nine npm packages, not to a Cloudflare application. It has no `main` entry
+point, so no Worker script runs and no server-side code is deployed: Cloudflare
+serves the `out/` export as static assets and nothing else. Workers Static Assets is
+Cloudflare's recommended target for new projects; Pages remains supported but
+no longer receives new features.
 
 Project settings, configured in the Cloudflare dashboard rather than committed
 here:
 
-| Setting          | Value                                             |
-| ---------------- | ------------------------------------------------- |
-| Root directory   | repository root (required for the pnpm workspace) |
-| Build command    | `pnpm --filter @brip/glyphscramble-demo... build` |
-| Output directory | `apps/docs/out`                                   |
+| Setting        | Value                                                   |
+| -------------- | ------------------------------------------------------- |
+| Root directory | repository root (required for the pnpm workspace)       |
+| Build command  | `pnpm --filter @brip/glyphscramble-demo... build`       |
+| Deploy command | `npx wrangler deploy --config apps/docs/wrangler.jsonc` |
+
+The build still runs from the repository root, because the pnpm filter needs
+the workspace, so the deploy command names the config explicitly. The asset
+directory is set by `assets.directory` in `wrangler.jsonc` -- resolved relative
+to that file -- not as a dashboard output directory. The `name` there must keep matching the Worker it
+deploys to, or `wrangler deploy` silently creates a second Worker beside it.
 
 Two things the repository does pin, because they are correctness rather than
 infrastructure preference:
@@ -57,9 +70,9 @@ infrastructure preference:
   can drift away from anything CI has tested.
 - `public/_headers` is copied into `out/` by the export and read by Cloudflare.
   It fingerprint-caches `/_next/static/*`, adds baseline security headers, and
-  marks `*.pages.dev` preview hosts `noindex` so they cannot compete with the
-  production domain in search results — previews serve the same hardcoded
-  canonical URLs and sitemap. It also deliberately holds `/demo-fixtures/*` at
+  marks every `*.workers.dev` host `noindex` so it cannot compete with the
+  production domain in search results — the workers.dev route and preview URLs
+  both serve the same hardcoded canonical URLs and sitemap. It also deliberately holds `/demo-fixtures/*` at
   the revalidating default: those WOFF2 files have stable, unhashed names but
   changing bytes, and a stale font paired with freshly encoded text renders the
   demo as garbage.
