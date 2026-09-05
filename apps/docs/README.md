@@ -38,9 +38,10 @@ credential out of this public repository entirely: there is no
 `CLOUDFLARE_API_TOKEN` in the Actions secrets and no GitHub Actions workflow to
 leak one.
 
-`wrangler.jsonc` lives in this package, beside the site it deploys, rather than
-at the repository root -- the root belongs to a library monorepo that publishes
-nine npm packages, not to a Cloudflare application. It has no `main` entry
+`wrangler.jsonc` sits at the repository root rather than beside the site here.
+Workers Builds resolves the Worker name against the configuration file in the
+build's root directory, and the build has to run from the root for the pnpm
+workspace filter to resolve, so the two have to agree. It has no `main` entry
 point, so no Worker script runs and no server-side code is deployed: Cloudflare
 serves the `out/` export as static assets and nothing else. Workers Static Assets is
 Cloudflare's recommended target for new projects; Pages remains supported but
@@ -49,11 +50,11 @@ no longer receives new features.
 Project settings, configured in the Cloudflare dashboard rather than committed
 here:
 
-| Setting        | Value                                                   |
-| -------------- | ------------------------------------------------------- |
-| Root directory | repository root (required for the pnpm workspace)       |
-| Build command  | `pnpm build:site`                                       |
-| Deploy command | `npx wrangler deploy --config apps/docs/wrangler.jsonc` |
+| Setting        | Value                                             |
+| -------------- | ------------------------------------------------- |
+| Root directory | repository root (required for the pnpm workspace) |
+| Build command  | `pnpm build:site`                                 |
+| Deploy command | `npx wrangler deploy` (the default)               |
 
 Set the build variable `SKIP_DEPENDENCY_INSTALL=1` alongside them. Cloudflare
 otherwise installs the whole workspace before the build command runs, which
@@ -67,10 +68,8 @@ Keeping the install inside a repository script rather than the dashboard means
 it is versioned and reviewable with the rest of the build, and the dashboard
 holds one short command.
 
-The build still runs from the repository root, because the pnpm filter needs
-the workspace, so the deploy command names the config explicitly. The asset
-directory is set by `assets.directory` in `wrangler.jsonc` -- resolved relative
-to that file -- not as a dashboard output directory. The `name` there must keep matching the Worker it
+The asset directory is set by `assets.directory` in `wrangler.jsonc` --
+resolved relative to that file -- not as a dashboard output directory. The `name` there must keep matching the Worker it
 deploys to, or `wrangler deploy` silently creates a second Worker beside it.
 
 Two things the repository does pin, because they are correctness rather than
