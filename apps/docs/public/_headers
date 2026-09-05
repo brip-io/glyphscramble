@@ -26,11 +26,12 @@
 /demo-fixtures/*
   Cache-Control: public, max-age=0, must-revalidate
 
-# Preview deployments serve the production canonical URLs and sitemap
-# (metadataBase in app/layout.tsx is a hardcoded absolute origin), so keep
-# every *.pages.dev host out of search results.
-https://:project.pages.dev/*
-  X-Robots-Tag: noindex
-
-https://:version.:project.pages.dev/*
+# Every workers.dev host serves the production canonical URLs and sitemap
+# (metadataBase in app/layout.tsx is a hardcoded absolute origin), so keep them
+# all out of search results. Both the production workers.dev route
+# (<worker>.<subdomain>.workers.dev) and preview URLs
+# (<version>-<worker>.<subdomain>.workers.dev) have two labels ahead of
+# workers.dev, so one rule covers both. Placeholders stop at the period, so
+# this cannot match the custom domain.
+https://:worker.:subdomain.workers.dev/*
   X-Robots-Tag: noindex
