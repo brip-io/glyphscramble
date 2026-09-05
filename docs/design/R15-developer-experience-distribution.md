@@ -1,6 +1,6 @@
 # [R15] Developer experience and distribution
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#31](https://github.com/brip-io/glyphscramble/issues/31)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #60](https://github.com/brip-io/glyphscramble/pull/60) · **GitHub issue:** [#31](https://github.com/brip-io/glyphscramble/issues/31)
 > **Blocked by:** R07-R10 package contracts · **Blocks:** R12 public beta and R13 final quickstarts
 
 ## Objective
@@ -133,6 +133,29 @@ JSR and GitHub Packages are reconsidered only when measured demand justifies a s
 - Canonical npm/GitHub/CDN channel policy and complete package metadata.
 - OIDC trusted publication, beta dist-tag policy, SBOM/checksums, post-publication verification, and rollback runbook.
 - R13 onboarding, install tabs, compatibility/status, troubleshooting, and distribution reference pages.
+
+## Implementation notes
+
+[PR #60](https://github.com/brip-io/glyphscramble/pull/60) merged the guided,
+transactional initializer; minimal normalized configuration; actionable
+`doctor`; read-only benchmark path; complete metadata and package readmes for
+all nine packages; browser-loader integrity manifest; and canonical npm,
+GitHub Release, and loader-only CDN guidance.
+
+The release path now packs and inspects the exact artifacts it will publish,
+generates checksums plus an SPDX SBOM, verifies package quality and the
+post-publication registry state, uses Changesets beta mode, and authenticates
+to npm with GitHub OIDC rather than a persistent npm token. A release remains
+a rehearsal while R12 has not supplied a qualification-manifest digest; the
+artifact inventory records that absence explicitly instead of implying public
+release readiness.
+
+CI passed DCO, Node 22.13/24 validation and benchmarks, browser tests, packed
+Next/Nuxt/SvelteKit/Astro/Vite/Node consumers, and fresh npm, pnpm, Yarn 4, and
+Bun installs of all nine package tarballs. The repository discovery topics
+were also aligned with the package metadata. R13 still owns the full public
+documentation site and its final quickstarts; R12 still owns the qualification
+evidence and public-release gate.
 
 ## Testing strategy
 

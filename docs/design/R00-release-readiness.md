@@ -32,8 +32,8 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 7. Font notices and license metadata MUST accompany redistributed generated artifacts.
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
-10. Public release remains blocked on the open R13-R15 and R19 work,
-    counsel/IP approval, and all R12 release gates.
+10. Public release remains blocked on the open R13-R14 work, counsel/IP
+    approval, and all R12 release gates.
 
 ## Milestones and issue breakdown
 
@@ -117,7 +117,7 @@ Use real generated artifacts to animate the raw-fetch, human-rendering, rotation
 
 **Exit criterion:** the demo proves different encoded responses render identically, distinguishes static per-build reuse, exposes the recoverability boundary, and passes no-motion, no-JS, failure, browser, accessibility, claim, and performance gates.
 
-#### R15 · Developer experience and distribution · **M**
+#### R15 · Developer experience and distribution · **M** · **Implemented in [PR #60](https://github.com/brip-io/glyphscramble/pull/60)**
 
 Normalize safe defaults, enforce one cross-framework usability rubric, make initialization guided and automation-friendly, and publish through canonical npm, immutable GitHub Release, provenance/SBOM, and loader-only CDN channels.
 
