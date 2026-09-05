@@ -13,8 +13,10 @@ describe("WOFF2 worker publication", () => {
     ) as { exports?: Record<string, unknown> };
 
     expect(source).not.toMatch(/\beval\s*:/);
-    expect(manifest.exports?.["./woff2-worker"]).toBe(
-      "./dist/woff2-worker.mjs",
-    );
+    expect(manifest.exports?.["./woff2-worker"]).toEqual({
+      types: "./dist/woff2-worker.d.ts",
+      import: "./dist/woff2-worker.mjs",
+      default: "./dist/woff2-worker.mjs",
+    });
   });
 });

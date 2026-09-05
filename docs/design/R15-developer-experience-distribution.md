@@ -1,6 +1,6 @@
 # [R15] Developer experience and distribution
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#31](https://github.com/brip-io/glyphscramble/issues/31)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented (PR pending) · **GitHub issue:** [#31](https://github.com/brip-io/glyphscramble/issues/31)
 > **Blocked by:** R07-R10 package contracts · **Blocks:** R12 public beta and R13 final quickstarts
 
 ## Objective

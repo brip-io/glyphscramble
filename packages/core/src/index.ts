@@ -1,5 +1,21 @@
 export { defineGlyphConfig, validateGlyphConfig } from "./config.js";
-export { loadGlyphConfig } from "./config-loader.js";
+export { discoverGlyphConfigPath, loadGlyphConfig } from "./config-loader.js";
+export { doctorProject } from "./doctor.js";
+export {
+  configTemplate,
+  detectFramework,
+  detectPackageManager,
+  initProject,
+} from "./init.js";
+export type {
+  GlyphDeliveryMode,
+  GlyphFramework,
+  GlyphPackageManager,
+  InitCommand,
+  InitCommandRunner,
+  InitProjectOptions,
+  InitResult,
+} from "./init.js";
 export { PACKAGE_VERSION } from "./generated/version.js";
 export {
   GLYPH_CONTENT_REPAIR_URL,

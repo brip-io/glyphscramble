@@ -2,6 +2,23 @@
   "name": "@brip/glyphscramble-react",
   "version": "0.1.0-beta.0",
   "description": "React components for GlyphScramble payloads.",
+  "keywords": [
+    "anti-scraping",
+    "font",
+    "react",
+    "unicode",
+    "woff2"
+  ],
+  "author": "BRIP Engineering <eng@brip.io> (https://brip.io)",
+  "homepage": "https://github.com/brip-io/glyphscramble#readme",
+  "bugs": {
+    "url": "https://github.com/brip-io/glyphscramble/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brip-io/glyphscramble.git",
+    "directory": "packages/react"
+  },
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,7 +33,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "engines": {
     "node": ">=22"

@@ -12,7 +12,7 @@
     "build": "pnpm -r build",
     "benchmark:runtime": "pnpm build && node scripts/benchmark-runtime.mjs",
     "prototype:woff1": "pnpm --filter @brip/glyphscramble build && node scripts/woff1-prototype.mjs",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:package-version",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:package-version && pnpm test:package-quality && pnpm test:distribution",
     "clean": "pnpm -r clean",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -23,6 +23,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:package-version": "node scripts/verify-package-version.mjs",
+    "test:package-quality": "node scripts/verify-package-quality.mjs",
+    "test:distribution": "node scripts/prepare-release-artifacts.mjs",
     "test:e2e": "playwright test",
     "test:next": "playwright test --config playwright.next.config.ts",
     "test:nuxt": "playwright test --config playwright.nuxt.config.ts",
@@ -36,12 +38,15 @@
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^2.29.7",
     "@eslint/js": "^9.35.0",
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.18.3",
+    "@unicode/unicode-17.0.0": "^1.6.17",
     "eslint": "^9.35.0",
     "prettier": "^3.6.2",
+    "publint": "^0.3.24",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
     "vitest": "^3.2.4"

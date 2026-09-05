@@ -2,7 +2,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadGlyphConfig } from "../src/config-loader.js";
+import {
+  discoverGlyphConfigPath,
+  loadGlyphConfig,
+} from "../src/config-loader.js";
 
 const roots: string[] = [];
 
@@ -13,6 +16,28 @@ afterEach(async () => {
 });
 
 describe("config loader", () => {
+  it("discovers JavaScript configs created for JavaScript-native projects", async () => {
+    const root = await mkdtemp(join(tmpdir(), "glyphscramble-config-"));
+    roots.push(root);
+    const path = join(root, "glyphscramble.config.mjs");
+    await writeFile(path, "export default {};\n");
+
+    expect(discoverGlyphConfigPath(root)).toBe(path);
+  });
+
+  it("rejects ambiguous implicit config discovery", async () => {
+    const root = await mkdtemp(join(tmpdir(), "glyphscramble-config-"));
+    roots.push(root);
+    await Promise.all([
+      writeFile(join(root, "glyphscramble.config.ts"), "export default {};\n"),
+      writeFile(join(root, "glyphscramble.config.mjs"), "export default {};\n"),
+    ]);
+
+    expect(() => discoverGlyphConfigPath(root)).toThrow(
+      /Multiple GlyphScramble configs/,
+    );
+  });
+
   it("loads TypeScript syntax without relying on host Node type stripping", async () => {
     const root = await mkdtemp(join(tmpdir(), "glyphscramble-config-"));
     roots.push(root);

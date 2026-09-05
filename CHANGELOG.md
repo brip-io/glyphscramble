@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Make first use guided and atomic across npm, pnpm, Yarn, and Bun; reduce the generated config to explicit font/licence/accessibility choices; add complete package metadata, clean tarball and browser-integrity evidence, and replace token publication with an immutable-action, OIDC-only beta release path.
 - Make static planning near-linear on wide documents, fail normalization and coverage errors before staging with file/DOM/font context, reuse validated parse trees while independently verifying output through a version 3 manifest, and publish deterministically through bounded I/O with localized failure contracts and documented beta scale ceilings.
 - Replace the Svelte/SvelteKit stubs with packaged Svelte 5 artifacts, a real typed SvelteKit 2 handle, safe existing-hook composition, selective and route-scoped streaming cache controls, and a production adapter-node consumer that verifies rotation, lifecycle cleanup, and plaintext-leakage boundaries.
 - Replace the Nuxt stub with a Nuxt Kit module that installs a typed request context, font route, component, selective cache handling, explicit streaming-route policy, collision-safe initializer support, and a qualified Nuxt 4/Vue 3 browser consumer while refusing unsupported edge/serverless presets.

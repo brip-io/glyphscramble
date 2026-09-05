@@ -31,13 +31,30 @@ Client components accept only a branded `GlyphPayload`; the public client API ha
 Node 22 or 24 is supported by the published packages. Repository development
 with the pinned pnpm 11 release requires Node 22.13 or newer.
 
+Run the initializer with your package manager. It previews changes, asks for
+the font licence and accessibility acknowledgement, installs the detected
+framework adapter, and prepares the font locally:
+
 ```bash
-pnpm add @brip/glyphscramble @brip/glyphscramble-next @brip/glyphscramble-react
-pnpm exec glyphscramble init
-pnpm exec glyphscramble prepare
+# npm (canonical)
+npx @brip/glyphscramble init
+
+# pnpm / Yarn / Bun
+pnpm dlx @brip/glyphscramble init
+yarn dlx @brip/glyphscramble init
+bunx @brip/glyphscramble init
 ```
 
-`init` detects Next, Nuxt, SvelteKit, Astro, or Vite and writes one config plus a small integration scaffold. It never contacts BRIP. `prepare` is the only phase that resolves remote fonts; runtime requests use locked local artifacts.
+`init` detects Next, Nuxt, SvelteKit, Astro, or Vite and writes one config plus
+at most three integration files. It never contacts BRIP. Font resolution runs
+locally during initialization/build; runtime requests use locked local
+artifacts. Automation must pass every safety choice explicitly, for example:
+
+```bash
+npx @brip/glyphscramble init --yes --framework next --mode response \
+  --font ./fonts/body.woff2 --license-spdx OFL-1.1 \
+  --license-file ./licenses/OFL.txt --acknowledge-accessibility-risk
+```
 
 For Next 16, the initializer supports App Router projects rooted at either
 `app/` or `src/app/`. It generates a server helper and
@@ -53,51 +70,18 @@ import { defineGlyphConfig } from "@brip/glyphscramble";
 export default defineGlyphConfig({
   fonts: {
     body: {
-      source: {
-        kind: "google-css",
-        url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700",
-      },
+      source: { kind: "file", path: "./fonts/body.woff2" },
       license: { spdx: "OFL-1.1", file: "./licenses/OFL.txt" },
-      faces: {
-        regular: { family: "Inter", weight: 400, coverage: ["U+0000-00FF"] },
-        bold: { family: "Inter", weight: 700, coverage: ["U+0000-00FF"] },
-      },
-      defaultFace: "regular",
     },
   },
-  rotation: {
-    scope: "response",
-    keyId: "2026-09",
-    secretEnv: "GLYPHSCRAMBLE_SECRET",
-    previousKeys: [
-      { id: "2026-08", secretEnv: "GLYPHSCRAMBLE_SECRET_PREVIOUS" },
-    ],
-    tokenTtlSeconds: 600,
-  },
-  runtime: {
-    variantMode: "response-pool",
-    poolLowWatermark: 2,
-    poolHighWatermark: 4,
-    generationConcurrency: 2,
-    generationQueueLimit: 64,
-    generationTimeoutMs: 10_000,
-    acquisitionTimeoutMs: 50,
-    acquisitionQueueLimit: 128,
-    workerRecycleAfter: 256,
-    drainTimeoutMs: 30_000,
-    cacheMaxBytes: 64 * 1024 * 1024,
-  },
-  static: {
-    publicBasePath: "/docs",
-    fontLoadTimeoutMs: 8_000,
-    fontFailure: "generic-error",
-    errorText: "Protected content could not be displayed.",
-  },
-  routePrefix: "/_glyphscramble",
-  unsupported: "error",
   accessibilityRiskAcknowledged: true,
 });
 ```
+
+The omitted rotation, route, failure, remote-fetch, pool, and static settings
+use bounded safe defaults. Add them only when deployment measurements require
+it; the complete contracts live in [runtime capacity](docs/RUNTIME-CAPACITY.md),
+[font sources](docs/FONT-SOURCES.md), and [static deployment](docs/STATIC-DEPLOYMENT.md).
 
 The production runtime prepares one-use WOFF2 variants in persistent worker
 threads before protected responses need them. The first `scrambleAsync()` call
@@ -157,8 +141,8 @@ block to protect:
 Then post-process into a separate directory:
 
 ```bash
-npx glyphscramble prepare
-npx glyphscramble static --input dist --output dist-protected --concurrency 8
+npm exec glyphscramble -- prepare
+npm exec glyphscramble -- static --input dist --output dist-protected --concurrency 8
 ```
 
 The command scans the untouched source first, stages a fresh sibling tree, and
@@ -194,7 +178,7 @@ deterministic CI only.
 Verify the complete publication before upload or after download:
 
 ```bash
-npx glyphscramble doctor --static-output dist-protected
+npm exec glyphscramble -- doctor --static-output dist-protected
 ```
 
 The verifier independently reparses HTML and rejects missing or modified
@@ -241,6 +225,11 @@ glyphscramble --version   print the package-derived CLI version
 ## Packages
 
 Core, React, Next, Vue, Nuxt, Svelte, SvelteKit, Astro, and Vite packages share one validated, data-only `GlyphPayload` wire contract and font lifecycle. See [Framework integration](docs/FRAMEWORKS.md).
+
+npm is the canonical binary channel. GitHub Releases carry source and release
+evidence; version-pinned CDNs expose only the payload loader. See
+[Distribution and releases](docs/DISTRIBUTION.md) for install commands,
+integrity, provenance, channels, and rollback.
 
 ## When blocking becomes licensing
 

@@ -13,7 +13,8 @@ The `response-pool` runtime is intentionally stateful. Do not create a new engin
 
 ## React and Next 16
 
-Run `glyphscramble init` in an App Router project, prepare the configured font,
+Run `npx @brip/glyphscramble init` in an App Router project; it installs the
+adapter and prepares the configured font,
 then call the generated process-level helper from an async Server Component:
 
 ```tsx
@@ -58,8 +59,7 @@ module to a conventional `nuxt.config`:
 
 ```bash
 pnpm add @brip/glyphscramble @brip/glyphscramble-vue @brip/glyphscramble-nuxt
-pnpm exec glyphscramble init
-pnpm exec glyphscramble prepare
+pnpm dlx @brip/glyphscramble init
 ```
 
 The module registers the component, Nitro request plugin, typed request
@@ -134,8 +134,7 @@ the server hook:
 
 ```bash
 pnpm add @brip/glyphscramble @brip/glyphscramble-svelte @brip/glyphscramble-sveltekit
-pnpm exec glyphscramble init
-pnpm exec glyphscramble prepare
+pnpm dlx @brip/glyphscramble init
 ```
 
 If `src/hooks.server.ts` already exists, `init` leaves it untouched and prints
@@ -218,7 +217,8 @@ separate [static deployment](STATIC-DEPLOYMENT.md) workflow.
 
 ## Astro 7
 
-Run `glyphscramble init`, then use the generated middleware and locals type.
+Run `npx @brip/glyphscramble init`, then use the generated middleware and
+locals type.
 The middleware is typed against Astro's real `MiddlewareHandler` API and owns
 one engine plus one response context per rendered route:
 

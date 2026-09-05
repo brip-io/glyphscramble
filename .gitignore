@@ -8,8 +8,6 @@ test-results/
 .DS_Store
 *.log
 *.tsbuildinfo
-packages/demo/.next/
-packages/demo/.output/
 examples/next/.glyphscramble/
 examples/next/.next/
 examples/nuxt/.glyphscramble/

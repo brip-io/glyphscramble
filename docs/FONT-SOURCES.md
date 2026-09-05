@@ -59,8 +59,8 @@ pyftsubset copy-of-input.ttf --unicodes=U+0000-00FF --flavor=woff2 --output-file
 Then inspect and prepare the resulting copy again:
 
 ```bash
-npx glyphscramble inspect subset.woff2
-npx glyphscramble prepare
+npm exec glyphscramble -- inspect subset.woff2
+npm exec glyphscramble -- prepare
 ```
 
 A repaired file is still untrusted input and must pass the same checks. Confirm

@@ -27,9 +27,9 @@ not accepted in this field. Route them through the same public origin if a CDN
 stores the bytes elsewhere.
 
 ```bash
-npx glyphscramble prepare
-npx glyphscramble static --input dist --output dist-protected --concurrency 8
-npx glyphscramble doctor --static-output dist-protected
+npm exec glyphscramble -- prepare
+npm exec glyphscramble -- static --input dist --output dist-protected --concurrency 8
+npm exec glyphscramble -- doctor --static-output dist-protected
 ```
 
 `errorText` localizes the generic visible failure status and is capped at 512

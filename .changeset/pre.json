@@ -1,0 +1,23 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@brip/glyphscramble-demo": "0.0.0",
+    "@brip/glyphscramble-example-astro": "0.0.0",
+    "@brip/glyphscramble-example-next": "0.0.0",
+    "@brip/glyphscramble-example-node-fetch": "0.0.0",
+    "@brip/glyphscramble-example-nuxt": "0.0.0",
+    "@brip/glyphscramble-example-sveltekit": "0.0.0",
+    "@brip/glyphscramble-example-vite-static": "0.0.0",
+    "@brip/glyphscramble": "0.1.0-beta.0",
+    "@brip/glyphscramble-astro": "0.1.0-beta.0",
+    "@brip/glyphscramble-next": "0.1.0-beta.0",
+    "@brip/glyphscramble-nuxt": "0.1.0-beta.0",
+    "@brip/glyphscramble-react": "0.1.0-beta.0",
+    "@brip/glyphscramble-svelte": "0.1.0-beta.0",
+    "@brip/glyphscramble-sveltekit": "0.1.0-beta.0",
+    "@brip/glyphscramble-vite": "0.1.0-beta.0",
+    "@brip/glyphscramble-vue": "0.1.0-beta.0"
+  },
+  "changesets": []
+}

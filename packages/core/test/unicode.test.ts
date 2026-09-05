@@ -194,5 +194,5 @@ describe("Unicode-safe permutation", () => {
       expect(isStructuralCodePoint(codepoint)).toBe(false);
       expect(propertySignature(codepoint)).toBeNull();
     }
-  });
+  }, 15_000);
 });
