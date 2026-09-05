@@ -33,7 +33,8 @@ The approved product claim remains: **GlyphScramble raises the cost of bulk DOM 
 8. Performance claims MUST measure the complete request path, including permutation, cmap patching, and compression.
 9. No adapter may be called supported until a consumer fixture builds and passes navigation and failure tests against the declared peer range.
 10. Public release remains blocked on the open R13-R14 work, counsel/IP
-    approval, and all R12 release gates.
+    approval, all R12 release gates, and the separate
+    [DIST-RELEASE package-delivery track](DIST-RELEASE-package-release-delivery.md).
 
 ## Milestones and issue breakdown
 
@@ -166,6 +167,8 @@ R11 ─▶ R16 ─▶ R17 ────────────────▶ R1
 R06/R16 ─▶ R18 ───────────────────▶ R12
 R02/R03 ─▶ R19 ───────────────────▶ R12
 R04-R06/R11 ─▶ R20 ───────────────▶ R12
+R15 ─▶ DIST-RELEASE ─────────────────▶ public beta
+R12/R13/R14/counsel ─────────────────▶ public beta
 ```
 
 Hard orderings:
@@ -180,6 +183,7 @@ Hard orderings:
 - R16 precedes R17 so capacity measurements exclude avoidable request-path permutation work; R18 consumes the retained mapping/face model.
 - R19 follows static safety/delivery, while R20 follows the final font, request, client, and parser boundaries.
 - Every child precedes R12; R12 validates rather than invents missing functionality.
+- DIST-RELEASE is a post-R15 delivery track rather than a twenty-first R00 child. It owns live npm bootstrap, staged trusted publication, public-registry qualification, and release operations; R00 cannot close until that track is complete.
 
 ## Release policy
 
@@ -215,4 +219,4 @@ Hard orderings:
 
 ## Completion definition
 
-R00 closes only when all twenty child issues are complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.
+R00 closes only when all twenty child issues and the separate DIST-RELEASE track are complete, the release-gate workflow is green on Node 22 and 24, the counsel/IP gate is recorded, and public documentation matches observed behavior without future-tense qualification hidden behind a beta label.

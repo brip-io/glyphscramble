@@ -2,7 +2,7 @@
 
 ## Active release-readiness track
 
-The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and twenty independently mergeable child issues. Public npm release is blocked until R12 and counsel/IP approval.
+The initial beta scaffold below is a proof of concept, not a qualified public beta. The release-readiness review is tracked by the L-sized parent [`R00`](R00-release-readiness.md) and twenty independently mergeable child issues. A post-R15 live-registry audit is tracked separately by [`DIST-RELEASE`](DIST-RELEASE-package-release-delivery.md). Public npm release is blocked until R12, R13, R14, DIST-RELEASE, and counsel/IP approval are complete.
 
 R01-R11 and R15-R20 are implemented. Issue state and
 implementation evidence remain canonical in each linked design.
@@ -46,6 +46,25 @@ R11 ─▶ R16 ─▶ R17 ────────────────▶ R1
 R06/R16 ─▶ R18 ───────────────────▶ R12
 R02/R03 ─▶ R19 ───────────────────▶ R12
 R04-R06/R11 ─▶ R20 ───────────────▶ R12
+```
+
+## Package release delivery track
+
+R15 implemented the package, onboarding, artifact, and channel foundations. The separate L-sized [`DIST-RELEASE`](DIST-RELEASE-package-release-delivery.md) parent records the remaining work required to create the npm packages, make beta commands resolve, lock routine releases to staged OIDC, qualify real registry consumers, and rehearse recovery. It does not reopen R15 or bypass R12's technical qualification gate.
+
+| ID                       | Issue / design                                                                                    | Size | Priority | GitHub issue                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------- | ---: | -------: | --------------------------------------------------------- |
+| **DIST-RELEASE**         | [Package release delivery (parent)](DIST-RELEASE-package-release-delivery.md)                     |    L |       P0 | [#65](https://github.com/brip-io/glyphscramble/issues/65) |
+| **DIST-INSTALL-DX**      | [Prerelease installation and channel-safe onboarding](DIST-INSTALL-DX-channel-safe-onboarding.md) |    S |       P0 | [#68](https://github.com/brip-io/glyphscramble/issues/68) |
+| **DIST-NPM-BOOTSTRAP**   | [Bootstrap the `@brip` npm packages](DIST-NPM-BOOTSTRAP-package-bootstrap.md)                     |    S |       P0 | [#66](https://github.com/brip-io/glyphscramble/issues/66) |
+| **DIST-TRUSTED-RELEASE** | [Protected OIDC and staged release pipeline](DIST-TRUSTED-RELEASE-staged-oidc-pipeline.md)        |    M |       P0 | [#69](https://github.com/brip-io/glyphscramble/issues/69) |
+| **DIST-REGISTRY-E2E**    | [Public-registry consumer qualification](DIST-REGISTRY-E2E-consumer-qualification.md)             |    M |       P0 | [#67](https://github.com/brip-io/glyphscramble/issues/67) |
+| **DIST-OPERATIONS**      | [Release, recovery, and rollback operations](DIST-OPERATIONS-release-runbook.md)                  |    S |       P0 | [#70](https://github.com/brip-io/glyphscramble/issues/70) |
+
+```text
+DIST-INSTALL-DX ─▶ DIST-NPM-BOOTSTRAP ─▶ DIST-TRUSTED-RELEASE
+                           │                       │
+                           └───────────────────────┴─▶ DIST-REGISTRY-E2E ─▶ DIST-OPERATIONS
 ```
 
 See [`R00 issue filing`](R00-issue-filing.md) for the GitHub metadata and exact commands to run after `gh` authentication is restored.

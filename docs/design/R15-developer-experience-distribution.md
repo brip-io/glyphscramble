@@ -157,6 +157,14 @@ were also aligned with the package metadata. R13 still owns the full public
 documentation site and its final quickstarts; R12 still owns the qualification
 evidence and public-release gate.
 
+A 2026-09-05 live-registry audit found that the nine package records do not yet
+exist, beta-facing commands can resolve through the wrong dist-tag, the GitHub
+`npm` environment is not configured, and real public-registry consumers have
+not run. The separate
+[DIST-RELEASE track](DIST-RELEASE-package-release-delivery.md) owns that
+post-implementation delivery work without reopening this issue's shipped DX
+and packaging scope.
+
 ## Testing strategy
 
 - Table-driven config tests prove defaults and explicit safety requirements.
@@ -181,6 +189,7 @@ evidence and public-release gate.
 - R07-R10 implement the framework-specific behavior measured by the shared usability rubric.
 - R13 publishes the generated onboarding, compatibility, and channel documentation.
 - R12 consumes the packed-consumer, provenance, SBOM, dist-tag, and post-publication evidence and remains the final release gate.
+- DIST-RELEASE takes the implemented R15 artifacts through one-time npm bootstrap, permanent staged OIDC publication, live-registry consumer qualification, and operator rehearsal.
 
 ## Exit criteria
 
