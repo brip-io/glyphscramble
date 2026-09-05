@@ -1,0 +1,56 @@
+{
+  "groups": [
+    {
+      "label": "Start",
+      "pages": ["get-started", "choose-content", "how-it-works"]
+    },
+    {
+      "label": "Delivery",
+      "pages": ["delivery/per-response", "delivery/static"]
+    },
+    {
+      "label": "Frameworks",
+      "pages": [
+        "frameworks/fetch-node",
+        "frameworks/react",
+        "frameworks/next",
+        "frameworks/vue",
+        "frameworks/nuxt",
+        "frameworks/svelte",
+        "frameworks/sveltekit",
+        "frameworks/astro",
+        "frameworks/vite"
+      ]
+    },
+    {
+      "label": "Reference",
+      "pages": [
+        "reference/configuration",
+        "reference/cli",
+        "reference/glyph-payload",
+        "reference/compatibility"
+      ]
+    },
+    {
+      "label": "Operations",
+      "pages": [
+        "operations/caching-cdn",
+        "operations/csp-cors",
+        "operations/troubleshooting"
+      ]
+    },
+    {
+      "label": "Responsible use",
+      "pages": [
+        "responsible-use/threat-model",
+        "responsible-use/accessibility",
+        "responsible-use/seo-discovery",
+        "responsible-use/fonts-licensing"
+      ]
+    },
+    {
+      "label": "Project",
+      "pages": ["release-notes"]
+    }
+  ]
+}

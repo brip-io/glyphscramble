@@ -1,96 +1,105 @@
+import {
+  ArrowRightIcon,
+  CodeIcon,
+  ShieldCheckIcon,
+} from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
+import { CopyCommand } from "../../components/copy-command";
+import { getDocGroups } from "../../src/docs/content";
 
 export const metadata: Metadata = {
   title: "Documentation",
   description:
-    "Install GlyphScramble and protect one appropriate content block.",
+    "Choose a suitable content block and delivery mode, then integrate GlyphScramble with a supported framework.",
+  alternates: { canonical: "/docs/" },
 };
 
-const frameworks = [
-  ["Next.js", "Per response", "@brip/glyphscramble-next"],
-  ["React", "Client renderer", "@brip/glyphscramble-react"],
-  ["Astro", "SSR and static", "@brip/glyphscramble-astro"],
-  ["Vue / Nuxt", "Per response", "@brip/glyphscramble-nuxt"],
-  ["SvelteKit", "Per response", "@brip/glyphscramble-sveltekit"],
-  ["Vite", "Server primitives and static", "@brip/glyphscramble-vite"],
-] as const;
-
 export default function DocsPage() {
+  const groups = getDocGroups();
   return (
-    <div className="inner-page shell docs-layout">
-      <aside className="docs-sidebar" aria-label="Documentation sections">
-        <strong>Start</strong>
-        <a href="#install">Install</a>
-        <a href="#first-block">First block</a>
-        <a href="#frameworks">Frameworks</a>
-        <a href="/responsible-use/">Responsible use</a>
-      </aside>
-      <article className="docs-content">
-        <header className="page-intro docs-intro">
-          <h1>Protect one appropriate block.</h1>
+    <article className="docs-home">
+      <header className="docs-home-hero">
+        <p className="docs-kicker">Developer documentation</p>
+        <h1>Protect the block, not the whole page.</h1>
+        <p>
+          Choose an appropriate content boundary, then add response-specific or
+          per-build scraping friction without hiding the trade-offs.
+        </p>
+        <div className="docs-home-actions">
+          <a className="button button-primary" href="/docs/get-started/">
+            Get started
+            <ArrowRightIcon aria-hidden="true" size={17} />
+          </a>
+          <a className="button button-secondary" href="/docs/choose-content/">
+            Choose content first
+          </a>
+        </div>
+      </header>
+
+      <section className="docs-command" aria-labelledby="docs-command-title">
+        <div>
+          <CodeIcon aria-hidden="true" size={22} />
+          <h2 id="docs-command-title">Initialize from your application root</h2>
           <p>
-            Start with optional, high-value content. Keep discovery,
-            accessibility, navigation, and transactions outside the boundary.
+            The guided initializer detects the framework and installs one
+            adapter.
           </p>
-        </header>
+        </div>
+        <CopyCommand commands={["npx @brip/glyphscramble init"]} />
+      </section>
 
-        <section id="install" className="doc-section">
-          <h2>Install</h2>
-          <pre>
-            <code>
-              pnpm add @brip/glyphscramble @brip/glyphscramble-next
-              @brip/glyphscramble-react
-            </code>
-          </pre>
-          <pre>
-            <code>npx glyphscramble init{"\n"}npx glyphscramble prepare</code>
-          </pre>
-        </section>
-
-        <section id="first-block" className="doc-section">
-          <h2>Your first protected block</h2>
+      <section className="docs-mode-choice" aria-labelledby="docs-mode-title">
+        <div>
+          <ShieldCheckIcon aria-hidden="true" size={24} />
+          <h2 id="docs-mode-title">
+            Choose the delivery model before the framework.
+          </h2>
           <p>
-            Create the payload in a Server Component so plaintext never crosses
-            into client code.
+            Rotation and cache behavior are deployment decisions, not UI-library
+            details.
           </p>
-          <pre>
-            <code>{`import { createGlyphPayload } from "@brip/glyphscramble-react/server";
-import { GlyphScramble } from "@brip/glyphscramble-react";
-import { glyphs } from "../glyphscramble.next";
+        </div>
+        <div className="docs-mode-links">
+          <a href="/docs/delivery/per-response/">
+            <strong>Per response</strong>
+            <span>
+              Fresh mapping, private dynamic document, stateful font service.
+            </span>
+            <ArrowRightIcon aria-hidden="true" size={17} />
+          </a>
+          <a href="/docs/delivery/static/">
+            <strong>Static build</strong>
+            <span>
+              Per-build mapping, immutable assets, globally cacheable output.
+            </span>
+            <ArrowRightIcon aria-hidden="true" size={17} />
+          </a>
+        </div>
+      </section>
 
-export default function PremiumExcerpt({ copy }: { copy: string }) {
-  const payload = createGlyphPayload(glyphs.beginResponse(), copy, {
-    font: "body",
-    lang: "en",
-  });
-  return <GlyphScramble payload={payload} />;
-}`}</code>
-          </pre>
-        </section>
-
-        <section id="frameworks" className="doc-section">
-          <h2>Framework packages</h2>
-          <div className="framework-list">
-            {frameworks.map(([name, mode, packageName]) => (
-              <div key={name}>
-                <strong>{name}</strong>
-                <span>{mode}</span>
-                <code>{packageName}</code>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <aside className="doc-callout">
-          <strong>Beta boundary</strong>
-          <p>
-            GlyphScramble raises scraping cost. It is not DRM and must not hold
-            essential, regulated, safety-critical, or accessibility-dependent
-            content.
-          </p>
-          <a href="/responsible-use/">Read the responsible-use guide</a>
-        </aside>
-      </article>
-    </div>
+      <section
+        className="docs-directory"
+        aria-labelledby="docs-directory-title"
+      >
+        <h2 id="docs-directory-title">Browse by task</h2>
+        <div className="docs-directory-grid">
+          {groups.map((group) => (
+            <section key={group.label}>
+              <h3>{group.label}</h3>
+              <ul>
+                {group.pages.map((page) => (
+                  <li key={page.slug}>
+                    <a href={`/docs/${page.slug}/`}>
+                      <span>{page.title}</span>
+                      <small>{page.description}</small>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </section>
+    </article>
   );
 }

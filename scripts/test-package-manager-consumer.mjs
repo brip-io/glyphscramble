@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
+const repositoryRoot = resolve(import.meta.dirname, "..");
 const manager = process.argv[2];
 const artifacts = resolve(process.argv[3] ?? "release-artifacts");
 if (!["npm", "pnpm", "yarn", "bun"].includes(manager))
@@ -52,6 +53,13 @@ try {
     );
   if (manager === "yarn")
     await writeFile(join(root, ".yarnrc.yml"), "nodeLinker: node-modules\n");
+  await writeFile(
+    join(root, "core-quickstart.ts"),
+    await readFile(
+      join(repositoryRoot, "apps/docs/examples/core-quickstart.ts"),
+      "utf8",
+    ),
+  );
   const installs = {
     npm: ["npm", ["install", "--ignore-scripts", "--legacy-peer-deps"]],
     pnpm: [
@@ -93,8 +101,30 @@ try {
     throw new Error(
       `${manager} consumer could not import the core public entry point.`,
     );
+  const tsc = join(
+    repositoryRoot,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "tsc.cmd" : "tsc",
+  );
+  await execute(
+    tsc,
+    [
+      "--noEmit",
+      "--strict",
+      "--skipLibCheck",
+      "--module",
+      "NodeNext",
+      "--moduleResolution",
+      "NodeNext",
+      "--target",
+      "ES2022",
+      "core-quickstart.ts",
+    ],
+    { cwd: root },
+  );
   process.stdout.write(
-    `${manager} installed all ${inventory.packages.length} packed packages at ${inventory.version}.\n`,
+    `${manager} installed all ${inventory.packages.length} packed packages and compiled the docs quickstart at ${inventory.version}.\n`,
   );
 } finally {
   await rm(root, { recursive: true, force: true });

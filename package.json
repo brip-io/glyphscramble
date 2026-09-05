@@ -13,6 +13,7 @@
     "benchmark:runtime": "pnpm build && node scripts/benchmark-runtime.mjs",
     "prototype:woff1": "pnpm --filter @brip/glyphscramble build && node scripts/woff1-prototype.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:package-version && pnpm test:package-quality && pnpm test:distribution",
+    "check:docs": "pnpm --filter @brip/glyphscramble-demo build && pnpm --filter @brip/glyphscramble-demo check:docs",
     "clean": "pnpm -r clean",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -27,6 +28,7 @@
     "test:distribution": "node scripts/prepare-release-artifacts.mjs",
     "test:e2e": "playwright test",
     "test:next": "playwright test --config playwright.next.config.ts",
+    "test:docs": "pnpm check:docs && playwright test --config playwright.docs.config.ts",
     "test:nuxt": "playwright test --config playwright.nuxt.config.ts",
     "test:sveltekit": "playwright test --config playwright.sveltekit.config.ts",
     "test:r10": "pnpm build:r10-fixtures && playwright test --config playwright.r10.config.ts",
@@ -39,6 +41,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
+    "@axe-core/playwright": "^4.13.0",
     "@changesets/cli": "^2.29.7",
     "@eslint/js": "^9.35.0",
     "@playwright/test": "^1.55.0",
