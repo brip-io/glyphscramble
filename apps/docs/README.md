@@ -52,8 +52,20 @@ here:
 | Setting        | Value                                                   |
 | -------------- | ------------------------------------------------------- |
 | Root directory | repository root (required for the pnpm workspace)       |
-| Build command  | `pnpm --filter @brip/glyphscramble-demo... build`       |
+| Build command  | `pnpm build:site`                                       |
 | Deploy command | `npx wrangler deploy --config apps/docs/wrangler.jsonc` |
+
+Set the build variable `SKIP_DEPENDENCY_INSTALL=1` alongside them. Cloudflare
+otherwise installs the whole workspace before the build command runs, which
+pulls in Playwright and the Astro, Vite, Nuxt, SvelteKit, Vue, and Next
+packages that the site never imports. `build:site` does its own filtered
+install instead, so the deployment resolves only what `@brip/glyphscramble-demo`
+and its dependencies need -- locally that is 380 installed package directories
+rather than 1015.
+
+Keeping the install inside a repository script rather than the dashboard means
+it is versioned and reviewable with the rest of the build, and the dashboard
+holds one short command.
 
 The build still runs from the repository root, because the pnpm filter needs
 the workspace, so the deploy command names the config explicitly. The asset

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "build:site": "pnpm install --frozen-lockfile --filter @brip/glyphscramble-demo... && pnpm --filter @brip/glyphscramble-demo... build",
     "benchmark:runtime": "pnpm build && node scripts/benchmark-runtime.mjs",
     "prototype:woff1": "pnpm --filter @brip/glyphscramble build && node scripts/woff1-prototype.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:package-version && pnpm test:package-quality && pnpm test:distribution",
