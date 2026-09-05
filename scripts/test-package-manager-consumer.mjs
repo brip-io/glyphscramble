@@ -62,7 +62,17 @@ try {
     bun: ["bun", ["install", "--ignore-scripts"]],
   };
   const [command, args] = installs[manager];
-  await execute(command, args, { cwd: root });
+  await execute(command, args, {
+    cwd: root,
+    env: {
+      ...process.env,
+      // Yarn defaults to immutable installs in public-PR CI, but this
+      // disposable consumer deliberately starts without a lockfile.
+      ...(manager === "yarn"
+        ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
+        : {}),
+    },
+  });
 
   for (const item of inventory.packages) {
     const installed = JSON.parse(
