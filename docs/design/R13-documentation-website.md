@@ -1,6 +1,6 @@
 # [R13] Developer documentation website
 
-> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#28](https://github.com/brip-io/glyphscramble/issues/28)
+> **Parent:** [R00](R00-release-readiness.md) · **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #62](https://github.com/brip-io/glyphscramble/pull/62) · **GitHub issue:** [#28](https://github.com/brip-io/glyphscramble/issues/28)
 > **Blocked by:** none; final framework quickstarts consume R03, R05-R10, and R15 · **Blocks:** R12 public beta
 
 ## Objective
@@ -255,3 +255,12 @@ The site records no new user events. Operational observability is build/deploy s
 ## Exit criteria
 
 A fresh developer can select a safe content block, choose the correct mode, and run a qualified integration from the public site; every page, link, example, claim, Markdown/LLM artifact, SEO directive, accessibility check, and performance budget passes in CI; preview output remains noindex; and no runtime telemetry, hosted dependency, misleading protection claim, or unqualified framework recommendation ships.
+
+## Implementation evidence
+
+- The Next.js 16 static export renders all 26 registered task pages, canonical metadata, breadcrumb structured data, a production 404, responsive navigation, local keyboard search, previous/next reading order, copy controls, and BRIP's documentation-only licensing handoff.
+- The build emits checked Markdown twins, `docs.md`, `llms.txt`, `llms-full.txt`, a content-addressed search index, a support manifest, generated CLI help, and the package compatibility matrix from one ordered registry and canonical Markdown corpus.
+- `check:docs` validates page and artifact inventory, frontmatter, package-local public symbols, generated-reference drift, TypeScript example syntax, source kinds, internal links and fragments, sitemap coverage, positioning and adoption warnings, LLM corpus size, compressed JavaScript, and Cloudflare rule and line limits.
+- The canonical core quickstart is embedded from a TypeScript fixture and compiles against the packed packages in every package-manager consumer job. Existing framework consumer suites continue to qualify adapter behavior.
+- Route-scoped SHA-256 policies keep Next's static inline payloads compatible with a strict CSP without `unsafe-inline`; the longest generated header is checked below a conservative 1,900-character budget and the full file below Cloudflare Pages' 100-rule limit.
+- Playwright exercises Chromium, Firefox, and WebKit for static/no-JavaScript reading, keyboard search and navigation, mobile modal focus, copy, Axe accessibility, reduced motion, 320 CSS-pixel reflow, layout shift, canonical and agent outputs, 404 behavior, no third-party requests, no cookies, and runtime CSP errors.

@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "packageVersion": "0.1.0-beta.0",
+  "registrySha256": "3faa2092abbc687d53dfa45453e797390e99e5fa372c84eb74cbf6bc45cceb0e",
+  "corpusSha256": "3988a67dfa0644354d3717399b05ee752e6190e0a4f0202affeb3a8d0b09558f",
+  "searchIndex": "/search-index.5d4b38716b67.json",
+  "pages": [
+    {
+      "slug": "get-started",
+      "status": "available"
+    },
+    {
+      "slug": "choose-content",
+      "status": "available"
+    },
+    {
+      "slug": "how-it-works",
+      "status": "available"
+    },
+    {
+      "slug": "delivery/per-response",
+      "status": "available"
+    },
+    {
+      "slug": "delivery/static",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/fetch-node",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/react",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/next",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/vue",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/nuxt",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/svelte",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/sveltekit",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/astro",
+      "status": "available"
+    },
+    {
+      "slug": "frameworks/vite",
+      "status": "available"
+    },
+    {
+      "slug": "reference/configuration",
+      "status": "available"
+    },
+    {
+      "slug": "reference/cli",
+      "status": "available"
+    },
+    {
+      "slug": "reference/glyph-payload",
+      "status": "available"
+    },
+    {
+      "slug": "reference/compatibility",
+      "status": "available"
+    },
+    {
+      "slug": "operations/caching-cdn",
+      "status": "available"
+    },
+    {
+      "slug": "operations/csp-cors",
+      "status": "available"
+    },
+    {
+      "slug": "operations/troubleshooting",
+      "status": "available"
+    },
+    {
+      "slug": "responsible-use/threat-model",
+      "status": "available"
+    },
+    {
+      "slug": "responsible-use/accessibility",
+      "status": "available"
+    },
+    {
+      "slug": "responsible-use/seo-discovery",
+      "status": "available"
+    },
+    {
+      "slug": "responsible-use/fonts-licensing",
+      "status": "available"
+    },
+    {
+      "slug": "release-notes",
+      "status": "available"
+    }
+  ]
+}

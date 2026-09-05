@@ -4,11 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare:docs": "node scripts/generate-doc-artifacts.mjs",
     "prepare:demo": "node scripts/generate-demo-fixtures.mjs",
-    "predev": "pnpm --filter @brip/glyphscramble build && pnpm prepare:demo",
+    "predev": "pnpm --filter @brip/glyphscramble build && pnpm prepare:demo && pnpm prepare:docs",
     "dev": "next dev",
-    "prebuild": "pnpm prepare:demo",
+    "prebuild": "pnpm prepare:demo && pnpm prepare:docs",
     "build": "next build",
+    "postbuild": "node scripts/finalize-static-headers.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
@@ -16,9 +19,16 @@
     "@brip/glyphscramble": "workspace:^",
     "@fontsource-variable/instrument-sans": "^5.2.8",
     "@phosphor-icons/react": "^2.1.10",
+    "gray-matter": "^4.0.3",
     "next": "^16.1.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.5",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.4.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

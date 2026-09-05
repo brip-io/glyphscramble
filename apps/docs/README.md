@@ -1,8 +1,8 @@
 # GlyphScramble public site
 
 This private workspace package builds the public GlyphScramble product site,
-interactive demo, and documentation. The canonical production host is planned
-as `glyphscramble.brip.io`.
+interactive demo, and task-oriented documentation. The canonical production
+host is `glyphscramble.brip.io`.
 
 The site is owned by the public GlyphScramble repository. brip's main website
 and editorial channels promote it and receive the commercial handoff when a
@@ -16,7 +16,31 @@ pnpm --filter @brip/glyphscramble-demo dev
 
 The `predev` script compiles the core package before generating four real public
 demo fixtures: two isolated runtime responses and two static builds. The browser
-visualization uses their actual encoded Unicode and generated WOFF2 files.
+visualization uses their actual encoded Unicode and generated WOFF2 files. It
+also generates the local search index and agent-readable documentation outputs.
+
+## Documentation authoring
+
+Canonical prose lives in `apps/docs/content`. Add each page exactly once to
+`src/docs/docs-order.json`; that registry drives routes, navigation, reading
+order, the sitemap, search, Markdown twins, and both LLM indexes. Frontmatter
+declares the implementation status, delivery mode, reviewed package version,
+packages, and public symbols behind the page.
+
+Run the complete documentation contract after changing prose or public APIs:
+
+```bash
+pnpm check:docs
+pnpm test:docs
+```
+
+The build fails on orphaned pages, invalid links or heading fragments, unknown
+packages or symbols, unresolved generated reference tokens, missing adoption
+warnings, stale machine-readable inventories, JavaScript budget regressions,
+and Cloudflare header-limit violations. Playwright checks the built static site
+in Chromium, Firefox, and WebKit, including Axe accessibility, keyboard search,
+the mobile navigation dialog, no-JavaScript reading, CSP, and third-party
+request isolation.
 
 ## Static output
 
@@ -58,12 +82,11 @@ infrastructure preference:
 - `public/_headers` is copied into `out/` by the export and read by Cloudflare.
   It fingerprint-caches `/_next/static/*`, adds baseline security headers, and
   marks `*.pages.dev` preview hosts `noindex` so they cannot compete with the
-  production domain in search results — previews serve the same hardcoded
-  canonical URLs and sitemap. It also deliberately holds `/demo-fixtures/*` at
-  the revalidating default: those WOFF2 files have stable, unhashed names but
-  changing bytes, and a stale font paired with freshly encoded text renders the
-  demo as garbage.
+  production domain in search results. A post-build step hashes each route's
+  inline Next.js payload into a strict route-scoped CSP. This keeps every rule
+  below Cloudflare Pages' 2,000-character line limit without allowing unsafe
+  inline scripts. `/demo-fixtures/*`, Markdown, and agent indexes retain stable
+  paths and therefore revalidate instead of using immutable caching.
 
-Production DNS, Content-Security-Policy, and deployment credentials remain a
-brip infrastructure decision and are intentionally not embedded in this
-repository.
+Production DNS and deployment credentials remain a BRIP infrastructure
+decision and are intentionally not embedded in this repository.

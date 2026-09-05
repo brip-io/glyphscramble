@@ -184,9 +184,9 @@ export default function HomePage() {
             <div className="bridge-actions">
               <a
                 className="button button-light"
-                href="https://brip.io/?utm_source=glyphscramble&utm_medium=oss&utm_campaign=project-bridge"
+                href="https://brip.io/providers?utm_source=glyphscramble&utm_medium=oss&utm_campaign=project-bridge"
               >
-                Visit brip
+                Explore licensed delivery
                 <ArrowUpRightIcon aria-hidden="true" size={18} />
               </a>
               <a className="text-link-light" href="/responsible-use/">

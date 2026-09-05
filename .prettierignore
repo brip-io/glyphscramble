@@ -5,3 +5,9 @@ node_modules
 .pnpm-store
 pnpm-lock.yaml
 packages/core/src/generated
+apps/docs/public/docs
+apps/docs/public/docs.md
+apps/docs/public/docs-build.json
+apps/docs/public/llms.txt
+apps/docs/public/llms-full.txt
+apps/docs/public/search-index.*.json
