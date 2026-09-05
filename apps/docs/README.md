@@ -69,8 +69,26 @@ it is versioned and reviewable with the rest of the build, and the dashboard
 holds one short command.
 
 The asset directory is set by `assets.directory` in `wrangler.jsonc` --
-resolved relative to that file -- not as a dashboard output directory. The `name` there must keep matching the Worker it
-deploys to, or `wrangler deploy` silently creates a second Worker beside it.
+resolved relative to that file -- not as a dashboard output directory. The
+`name` there must keep matching the Worker it deploys to, or `wrangler deploy`
+silently creates a second Worker beside it.
+
+If non-production branch builds are enabled, they use a separate **preview
+deploy command**, defaulting to `npx wrangler versions upload`. It reads the
+same root configuration file, so it needs no flag either.
+
+### Connecting the repository
+
+Creating the Worker and connecting it to this repository are separate steps,
+and only the second one makes pushes build. A Worker provisioned through the
+Deploy to Cloudflare flow runs a single seed build at creation time; that build
+cannot be retried, and it does not establish a Git connection on its own. If
+pushes to `main` produce no build at all -- rather than a failing one -- the
+connection is what is missing, not the configuration in this repository.
+
+Connect it under **Settings > Builds > Connect**, with `main` as the production
+branch. The Worker name in the dashboard has to match `name` in the root
+`wrangler.jsonc` before this will succeed.
 
 Two things the repository does pin, because they are correctness rather than
 infrastructure preference:
