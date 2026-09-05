@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
+import { writeFile } from "node:fs/promises";
 
 import { build } from "esbuild";
 
@@ -13,3 +14,8 @@ await build({
   target: "node22",
   outfile: fileURLToPath(new URL("../dist/woff2-worker.mjs", import.meta.url)),
 });
+
+await writeFile(
+  fileURLToPath(new URL("../dist/woff2-worker.d.ts", import.meta.url)),
+  "export {};\n",
+);

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,6 +38,10 @@ try {
     join(packedRoot, "dist/browser.js"),
     "utf8",
   );
+  const browserBytes = await readFile(join(packedRoot, "dist/browser.js"));
+  const browserSri = JSON.parse(
+    await readFile(join(packedRoot, "dist/browser.sri.json"), "utf8"),
+  );
   const { stdout: cliOutput } = await execute(
     process.execPath,
     [join(core, "dist/cli.js"), "--version"],
@@ -54,6 +59,16 @@ try {
   if (/\b(?:import|export)\s[^;]*?\sfrom\s+["']\.\//u.test(browserRuntime))
     throw new Error(
       "Packed browser runtime contains a relative module dependency instead of one self-contained artifact.",
+    );
+  const expectedIntegrity = `sha384-${createHash("sha384").update(browserBytes).digest("base64")}`;
+  if (
+    browserSri.package !== manifest.name ||
+    browserSri.version !== manifest.version ||
+    browserSri.path !== "dist/browser.js" ||
+    browserSri.integrity !== expectedIntegrity
+  )
+    throw new Error(
+      "Packed browser SRI manifest does not match the published browser runtime.",
     );
   process.stdout.write(
     `Verified packed GlyphScramble version ${manifest.version}.\n`,

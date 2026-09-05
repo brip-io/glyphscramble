@@ -2,6 +2,24 @@
   "name": "@brip/glyphscramble",
   "version": "0.1.0-beta.0",
   "description": "Core engine and CLI for per-response glyph scrambling.",
+  "keywords": [
+    "anti-scraping",
+    "font",
+    "opentype",
+    "privacy",
+    "unicode",
+    "woff2"
+  ],
+  "author": "BRIP Engineering <eng@brip.io> (https://brip.io)",
+  "homepage": "https://github.com/brip-io/glyphscramble#readme",
+  "bugs": {
+    "url": "https://github.com/brip-io/glyphscramble/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brip-io/glyphscramble.git",
+    "directory": "packages/core"
+  },
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -17,7 +35,11 @@
       "types": "./dist/browser.d.ts",
       "import": "./dist/browser.js"
     },
-    "./woff2-worker": "./dist/woff2-worker.mjs",
+    "./woff2-worker": {
+      "types": "./dist/woff2-worker.d.ts",
+      "import": "./dist/woff2-worker.mjs",
+      "default": "./dist/woff2-worker.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -40,7 +62,6 @@
     "typecheck": "pnpm run check:version && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@unicode/unicode-17.0.0": "^1.6.17",
     "css-tree": "^3.2.1",
     "jiti": "^2.6.1",
     "parse5": "^8.0.0",

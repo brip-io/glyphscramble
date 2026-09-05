@@ -62,8 +62,8 @@ than evicting a still-valid token.
 Run both commands on hardware representative of production:
 
 ```bash
-npx glyphscramble benchmark --target-rps 10
-npx glyphscramble doctor --capacity --target-rps 10
+npm exec glyphscramble -- benchmark --target-rps 10
+npm exec glyphscramble -- doctor --capacity --target-rps 10
 ```
 
 The benchmark prints bounded raw timing samples plus p50/p95/p99 summaries.

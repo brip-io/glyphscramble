@@ -2,7 +2,11 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { initProject } from "../src/init.js";
+import {
+  detectPackageManager,
+  initProject as runInitProject,
+  type InitProjectOptions,
+} from "../src/init.js";
 
 const roots: string[] = [];
 
@@ -13,6 +17,11 @@ async function project(layout: "root" | "src" | "pages" = "root") {
     join(cwd, "package.json"),
     JSON.stringify({ dependencies: { next: "16.3.4" } }),
   );
+  await writeFile(join(cwd, "tsconfig.json"), "{}\n");
+  await mkdir(join(cwd, "fonts"));
+  await mkdir(join(cwd, "licenses"));
+  await writeFile(join(cwd, "fonts/body.woff2"), "font fixture");
+  await writeFile(join(cwd, "licenses/OFL.txt"), "license fixture");
   const directory =
     layout === "src"
       ? join(cwd, "src", "app")
@@ -27,7 +36,22 @@ async function frameworkProject(dependencies: Record<string, string>) {
   const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-init-"));
   roots.push(cwd);
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies }));
+  await writeFile(join(cwd, "tsconfig.json"), "{}\n");
+  await mkdir(join(cwd, "fonts"));
+  await mkdir(join(cwd, "licenses"));
+  await writeFile(join(cwd, "fonts/body.woff2"), "font fixture");
+  await writeFile(join(cwd, "licenses/OFL.txt"), "license fixture");
   return cwd;
+}
+
+async function initProject(options: InitProjectOptions = {}) {
+  return runInitProject({
+    font: "./fonts/body.woff2",
+    licenseSpdx: "OFL-1.1",
+    licenseFile: "./licenses/OFL.txt",
+    acknowledgeAccessibilityRisk: true,
+    ...options,
+  });
 }
 
 afterEach(async () => {
@@ -48,7 +72,7 @@ describe("framework initializer", () => {
         "glyphscramble.next.ts",
         "app/%5Fglyphscramble/font/[token]/[face]/route.ts",
       ],
-      notes: [],
+      notes: expect.arrayContaining([expect.stringMatching(/openssl rand/)]),
     });
     expect(
       await readFile(join(cwd, "glyphscramble.next.ts"), "utf8"),
@@ -80,7 +104,7 @@ describe("framework initializer", () => {
     ]);
     expect(
       await readFile(join(cwd, "src/glyphscramble.next.ts"), "utf8"),
-    ).toContain('config from "../glyphscramble.config"');
+    ).toContain('config from "../glyphscramble.config.ts"');
     expect(
       await readFile(
         join(cwd, "src/app/%5Fglyphscramble/font/[token]/[face]/route.ts"),
@@ -94,9 +118,11 @@ describe("framework initializer", () => {
     const proxyPath = join(cwd, "src/proxy.ts");
     await writeFile(proxyPath, "export function proxy() {}\n");
     const result = await initProject({ cwd });
-    expect(result.notes).toEqual([
-      "Left existing src/proxy.ts unchanged; Next's request-time rendering contract means GlyphScramble does not require Proxy.",
-    ]);
+    expect(result.notes).toEqual(
+      expect.arrayContaining([
+        "Left existing src/proxy.ts unchanged; Next's request-time rendering contract means GlyphScramble does not require Proxy.",
+      ]),
+    );
     expect(await readFile(proxyPath, "utf8")).toBe(
       "export function proxy() {}\n",
     );
@@ -163,7 +189,7 @@ describe("framework initializer", () => {
       packageName: "@brip/glyphscramble-nuxt",
       created: ["glyphscramble.config.ts", "nuxt.config.ts"],
       modified: [],
-      notes: [],
+      notes: expect.arrayContaining([expect.stringMatching(/openssl rand/)]),
     });
     expect(await readFile(join(cwd, "nuxt.config.ts"), "utf8")).toContain(
       'modules: ["@brip/glyphscramble-nuxt/module"]',
@@ -228,7 +254,7 @@ describe("framework initializer", () => {
         "src/glyphscramble.d.ts",
         "src/hooks.server.ts",
       ],
-      notes: [],
+      notes: expect.arrayContaining([expect.stringMatching(/openssl rand/)]),
     });
     expect(
       await readFile(join(cwd, "src/lib/server/glyphscramble.ts"), "utf8"),
@@ -322,5 +348,189 @@ describe("framework initializer", () => {
     await expect(
       readFile(join(cwd, "glyphscramble.config.ts"), "utf8"),
     ).rejects.toThrow();
+  });
+
+  it("requires font, license, and accessibility input for a new config", async () => {
+    const cwd = await frameworkProject({ next: "16.3.4" });
+    await mkdir(join(cwd, "app"));
+    await expect(
+      runInitProject({ cwd, framework: "next", mode: "response" }),
+    ).rejects.toThrow(
+      /--font, --license-spdx, --license-file, --acknowledge-accessibility-risk/,
+    );
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts")),
+    ).rejects.toThrow();
+  });
+
+  it("previews an atomic dry run without touching dependencies or files", async () => {
+    const cwd = await project();
+    let commands = 0;
+    const result = await initProject({
+      cwd,
+      mode: "response",
+      dryRun: true,
+      install: true,
+      commandRunner: async () => {
+        commands++;
+      },
+    });
+    expect(result).toMatchObject({
+      dryRun: true,
+      created: [],
+      modified: [],
+      installed: false,
+      prepared: false,
+      packageManager: "npm",
+      dependencies: ["@brip/glyphscramble", "@brip/glyphscramble-next"],
+    });
+    expect(result.planned.map((change) => change.action)).toEqual([
+      "create",
+      "create",
+      "create",
+    ]);
+    expect(commands).toBe(0);
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts")),
+    ).rejects.toThrow();
+  });
+
+  it("installs with the detected package manager before writing files", async () => {
+    const cwd = await project();
+    await writeFile(join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    const seen: Array<{ command: string; args: readonly string[] }> = [];
+    const result = await initProject({
+      cwd,
+      mode: "response",
+      install: true,
+      commandRunner: async (command) => {
+        await expect(
+          readFile(join(cwd, "glyphscramble.config.ts")),
+        ).rejects.toThrow();
+        seen.push(command);
+      },
+    });
+    expect(seen).toEqual([
+      {
+        command: "pnpm",
+        args: ["add", "@brip/glyphscramble", "@brip/glyphscramble-next"],
+        cwd,
+      },
+    ]);
+    expect(result).toMatchObject({ packageManager: "pnpm", installed: true });
+  });
+
+  it("leaves integration files untouched when dependency installation fails", async () => {
+    const cwd = await project();
+    await expect(
+      initProject({
+        cwd,
+        mode: "response",
+        install: true,
+        commandRunner: async () => {
+          throw new Error("offline fixture");
+        },
+      }),
+    ).rejects.toThrow(
+      /failed before integration files were written.*--no-install/i,
+    );
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts")),
+    ).rejects.toThrow();
+  });
+
+  it("detects a workspace lock and honors an explicit packageManager field", async () => {
+    const cwd = await frameworkProject({ vite: "8.2.2" });
+    await writeFile(join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    expect(detectPackageManager(cwd, {})).toEqual({
+      packageManager: "pnpm",
+      workspaceRoot: cwd,
+    });
+    expect(detectPackageManager(cwd, { packageManager: "yarn@4.9.2" })).toEqual(
+      { packageManager: "yarn", workspaceRoot: cwd },
+    );
+  });
+
+  it("detects a pnpm workspace root even before its first lockfile exists", async () => {
+    const workspace = await frameworkProject({});
+    await writeFile(
+      join(workspace, "pnpm-workspace.yaml"),
+      "packages:\n  - apps/*\n",
+    );
+    const cwd = join(workspace, "apps", "site");
+    await mkdir(cwd, { recursive: true });
+    await writeFile(join(cwd, "package.json"), JSON.stringify({}));
+
+    expect(detectPackageManager(cwd, {})).toEqual({
+      packageManager: "pnpm",
+      workspaceRoot: workspace,
+    });
+  });
+
+  it.each([
+    ["npm", "npm exec glyphscramble -- prepare"],
+    ["pnpm", "pnpm exec glyphscramble prepare"],
+    ["yarn", "yarn exec glyphscramble prepare"],
+    ["bun", "bun run glyphscramble prepare"],
+  ] as const)(
+    "uses the installed local CLI for %s follow-up commands",
+    async (packageManager, expected) => {
+      const cwd = await frameworkProject({ vite: "8.2.2" });
+      const result = await initProject({
+        cwd,
+        framework: "vite",
+        mode: "static",
+        packageManager,
+      });
+
+      expect(result.commands).toContain(expected);
+      expect(result.commands.join(" ")).not.toContain("bunx glyphscramble");
+    },
+  );
+
+  it("generates JavaScript-native files when TypeScript is absent", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-init-js-"));
+    roots.push(cwd);
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ dependencies: { next: "16.3.4" } }),
+    );
+    await mkdir(join(cwd, "app"));
+    await mkdir(join(cwd, "fonts"));
+    await mkdir(join(cwd, "licenses"));
+    await writeFile(join(cwd, "fonts/body.woff2"), "font fixture");
+    await writeFile(join(cwd, "licenses/OFL.txt"), "license fixture");
+    const result = await initProject({ cwd, mode: "response" });
+    expect(result).toMatchObject({ typescript: false });
+    expect(result.created).toEqual([
+      "glyphscramble.config.mjs",
+      "glyphscramble.next.mjs",
+      "app/%5Fglyphscramble/font/[token]/[face]/route.js",
+    ]);
+    expect(
+      await readFile(join(cwd, "glyphscramble.next.mjs"), "utf8"),
+    ).toContain('from "./glyphscramble.config.mjs"');
+  });
+
+  it("refuses unsupported delivery-mode downgrades", async () => {
+    const next = await project();
+    await expect(initProject({ cwd: next, mode: "static" })).rejects.toThrow(
+      /never silently downgrades/,
+    );
+    const vite = await frameworkProject({ vite: "8.2.2" });
+    await expect(initProject({ cwd: vite, mode: "response" })).rejects.toThrow(
+      /generic Node\/Fetch server boundary/,
+    );
+  });
+
+  it("keeps Astro static setup to one config and an explicit compiler flow", async () => {
+    const cwd = await frameworkProject({ astro: "7.3.1" });
+    const result = await initProject({ cwd, mode: "static" });
+    expect(result).toMatchObject({
+      mode: "static",
+      packageName: "@brip/glyphscramble",
+      created: ["glyphscramble.config.ts"],
+    });
+    expect(result.notes.join(" ")).toMatch(/rotates once per build/);
   });
 });
