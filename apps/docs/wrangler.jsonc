@@ -3,7 +3,7 @@
   // https://developers.cloudflare.com/workers/static-assets/
   //
   // There is deliberately no "main" entry point. Without one, no Worker script
-  // runs: Cloudflare serves apps/docs/out as static assets and nothing else.
+  // runs: Cloudflare serves the ./out export as static assets and nothing else.
   // The site is a Next.js static export, so it needs no server-side runtime.
   //
   // Nothing here is sensitive. The account ID is supplied by Workers Builds at
@@ -12,6 +12,6 @@
   "name": "glyphscramble",
   "compatibility_date": "2026-09-05",
   "assets": {
-    "directory": "./apps/docs/out",
+    "directory": "./out",
   },
 }

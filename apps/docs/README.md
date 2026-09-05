@@ -38,23 +38,27 @@ credential out of this public repository entirely: there is no
 `CLOUDFLARE_API_TOKEN` in the Actions secrets and no GitHub Actions workflow to
 leak one.
 
-`wrangler.jsonc` at the repository root has no `main` entry point, so no Worker
-script runs and no server-side code is deployed -- Cloudflare serves
-`apps/docs/out` as static assets and nothing else. Workers Static Assets is
+`wrangler.jsonc` lives in this package, beside the site it deploys, rather than
+at the repository root -- the root belongs to a library monorepo that publishes
+nine npm packages, not to a Cloudflare application. It has no `main` entry
+point, so no Worker script runs and no server-side code is deployed: Cloudflare
+serves the `out/` export as static assets and nothing else. Workers Static Assets is
 Cloudflare's recommended target for new projects; Pages remains supported but
 no longer receives new features.
 
 Project settings, configured in the Cloudflare dashboard rather than committed
 here:
 
-| Setting        | Value                                             |
-| -------------- | ------------------------------------------------- |
-| Root directory | repository root (required for the pnpm workspace) |
-| Build command  | `pnpm --filter @brip/glyphscramble-demo... build` |
-| Deploy command | `npx wrangler deploy`                             |
+| Setting        | Value                                                   |
+| -------------- | ------------------------------------------------------- |
+| Root directory | repository root (required for the pnpm workspace)       |
+| Build command  | `pnpm --filter @brip/glyphscramble-demo... build`       |
+| Deploy command | `npx wrangler deploy --config apps/docs/wrangler.jsonc` |
 
-The asset directory is set by `assets.directory` in `wrangler.jsonc`, not as a
-dashboard output directory. The `name` there must keep matching the Worker it
+The build still runs from the repository root, because the pnpm filter needs
+the workspace, so the deploy command names the config explicitly. The asset
+directory is set by `assets.directory` in `wrangler.jsonc` -- resolved relative
+to that file -- not as a dashboard output directory. The `name` there must keep matching the Worker it
 deploys to, or `wrangler deploy` silently creates a second Worker beside it.
 
 Two things the repository does pin, because they are correctness rather than
