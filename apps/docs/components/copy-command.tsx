@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useCopyToClipboard } from "../hooks/use-copy-to-clipboard";
 
 const defaultCommands = [
   "pnpm add @brip/glyphscramble @brip/glyphscramble-next @brip/glyphscramble-react",
@@ -12,13 +12,7 @@ export function CopyCommand({
 }: {
   commands?: readonly string[];
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copyCommands() {
-    await navigator.clipboard.writeText(commands.join("\n"));
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <div className="quickstart-command">
@@ -27,7 +21,7 @@ export function CopyCommand({
           <code key={command}>{command}</code>
         ))}
       </div>
-      <button type="button" onClick={copyCommands}>
+      <button type="button" onClick={() => copy(commands.join("\n"))}>
         {copied ? (
           <CheckIcon aria-hidden="true" size={16} />
         ) : (

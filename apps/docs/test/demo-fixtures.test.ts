@@ -33,6 +33,30 @@ describe("public demo fixtures", () => {
     expect(fixtures.static.a.buildId).not.toBe(fixtures.static.b.buildId);
   });
 
+  test("the alphabet partitions the prepared coverage exactly once", () => {
+    const { coverage, mapped, passthrough, unmappable } = fixtures.alphabet;
+    expect(coverage).toBe("U+0020-007E");
+
+    const partition = [...mapped, ...passthrough, ...unmappable].sort();
+    const expected = Array.from({ length: 0x7e - 0x20 + 1 }, (_, index) =>
+      String.fromCodePoint(0x20 + index),
+    ).sort();
+    expect(partition).toEqual(expected);
+  });
+
+  test("every fixture permutes the same code points", () => {
+    for (const fixture of [
+      fixtures.runtime.a,
+      fixtures.runtime.b,
+      fixtures.static.a,
+      fixtures.static.b,
+    ]) {
+      expect(Object.keys(fixture.encodeMap).join("")).toBe(
+        fixtures.alphabet.mapped,
+      );
+    }
+  });
+
   test("every displayed font identity matches the emitted WOFF2", async () => {
     for (const fixture of [
       fixtures.runtime.a,

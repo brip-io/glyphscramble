@@ -21,10 +21,14 @@ import {
   createGlyphEngine,
   createPermutation,
   defineGlyphConfig,
+  encodeText,
+  isStructuralCodePoint,
   loadPreparedFont,
   parseSfnt,
   prepareGlyphFonts,
+  propertySignature,
   remapCmap,
+  summarizeCoverage,
 } from "../../../packages/core/dist/index.js";
 import { toWoff2 } from "../../../packages/core/dist/font-pipeline.js";
 
@@ -49,6 +53,72 @@ function deterministicVariantId(label) {
     .digest()
     .subarray(0, 16)
     .toString("base64url");
+}
+
+/** Serializes a permutation into the plain lookup the demo page ships. */
+function serializeEncodeMap(encode) {
+  return Object.fromEntries(
+    [...encode]
+      .sort(([left], [right]) => left - right)
+      .map(([source, target]) => [
+        String.fromCodePoint(source),
+        String.fromCodePoint(target),
+      ]),
+  );
+}
+
+/**
+ * Splits the prepared coverage into the three outcomes the engine produces, so
+ * the page classifies typed characters from generated data rather than a copy
+ * of the Unicode rules.
+ */
+function coverageLabel(codepoints) {
+  return summarizeCoverage([...codepoints])
+    .map((range) => range.replace(/[0-9A-F]+/gu, (hex) => hex.padStart(4, "0")))
+    .join(", ");
+}
+
+function describeAlphabet(codepoints, permuted) {
+  const passthrough = [];
+  const unmappable = [];
+  const mapped = [];
+  for (const cp of [...codepoints].sort((left, right) => left - right)) {
+    if (permuted.has(cp)) mapped.push(cp);
+    else if (isStructuralCodePoint(cp)) passthrough.push(cp);
+    else unmappable.push(cp);
+  }
+  for (const cp of mapped) {
+    if (isStructuralCodePoint(cp) || !propertySignature(cp))
+      throw new Error(
+        `Coverage point U+${cp.toString(16).toUpperCase()} is both permuted and excluded.`,
+      );
+  }
+  const text = (values) => String.fromCodePoint(...values);
+  return {
+    coverage: coverageLabel(codepoints),
+    mapped: text(mapped),
+    passthrough: text(passthrough),
+    unmappable: text(unmappable),
+  };
+}
+
+/**
+ * Fails the build if a shipped lookup drifts from the bytes it claims to
+ * explain. Checks both directions: the permutation still encodes the fixture
+ * through the engine, and the plain lookup the page ships agrees with it.
+ */
+function assertEncodes(label, encode, encodeMap, encodedText) {
+  if (encodeText(sentence, compactEncodeMapping(encode)) !== encodedText)
+    throw new Error(
+      `Demo permutation ${label} no longer encodes its own fixture text.`,
+    );
+  const shipped = [...sentence]
+    .map((character) => encodeMap[character] ?? character)
+    .join("");
+  if (shipped !== encodedText)
+    throw new Error(
+      `Demo encode map ${label} does not agree with the engine encoder.`,
+    );
 }
 
 function metrics() {
@@ -105,6 +175,7 @@ async function runtimeFixtures(config, cwd) {
   ];
   const fonts = new Map();
   const mappings = new Map();
+  const permutations = new Map();
 
   for (const lease of leases) {
     const permutation = createPermutation(
@@ -116,6 +187,7 @@ async function runtimeFixtures(config, cwd) {
       remapCmap(parseSfnt(prepared.sfnt), permutation.decode),
     );
     mappings.set(lease.id, compactEncodeMapping(permutation.encode));
+    permutations.set(lease.id, permutation.encode);
     fonts.set(lease.id, await toWoff2(parseSfnt(patched)));
   }
 
@@ -185,6 +257,7 @@ async function runtimeFixtures(config, cwd) {
   try {
     const output = {};
     for (const [index, key] of ["a", "b"].entries()) {
+      const lease = leases[index];
       const context = engine.beginResponse();
       const payload = context.scramble(sentence, { font: "body", lang: "en" });
       const response = await engine.fontResponse(
@@ -197,10 +270,14 @@ async function runtimeFixtures(config, cwd) {
       const bytes = new Uint8Array(await response.arrayBuffer());
       const file = `/demo-fixtures/runtime-${key}.woff2`;
       await writeFile(join(publicDir, `runtime-${key}.woff2`), bytes);
+      const encode = permutations.get(lease.id);
+      const encodeMap = serializeEncodeMap(encode);
+      assertEncodes(`runtime-${key}`, encode, encodeMap, payload.encodedText);
       output[key] = {
         id: `runtime-${key}`,
         label: `Response ${key.toUpperCase()}`,
         encodedText: payload.encodedText,
+        encodeMap,
         family: `GlyphScrambleDemo-runtime-${key}`,
         fontFile: file,
         fontIdentity: sha256(bytes),
@@ -223,9 +300,10 @@ async function runtimeFixtures(config, cwd) {
   }
 }
 
-async function staticFixture(config, cwd, key) {
+async function staticFixture(config, cwd, codepoints, key) {
   const sourceDir = join(cwd, `static-source-${key}`);
   const outputDir = join(cwd, `static-output-${key}`);
+  const seed = deterministicSeed(`glyphscramble-public-static-${key}`);
   await mkdir(sourceDir, { recursive: true });
   await writeFile(
     join(sourceDir, "index.html"),
@@ -235,7 +313,7 @@ async function staticFixture(config, cwd, key) {
     cwd,
     inputDir: sourceDir,
     outputDir,
-    seed: deterministicSeed(`glyphscramble-public-static-${key}`),
+    seed,
     publicBasePath: "/",
   });
   const html = await readFile(join(outputDir, "index.html"), "utf8");
@@ -248,10 +326,16 @@ async function staticFixture(config, cwd, key) {
     throw new Error(`Static demo fixture ${key} is incomplete.`);
   const destination = `static-${key}.woff2`;
   await copyFile(join(outputDir, fontAsset.path), join(publicDir, destination));
+  // buildStaticSite keeps its permutation internal, so mirror how it derives
+  // one and let assertEncodes prove the reconstruction matches the build.
+  const { encode } = createPermutation(codepoints, seed, "static:body");
+  const encodeMap = serializeEncodeMap(encode);
+  assertEncodes(`static-${key}`, encode, encodeMap, encodedText);
   return {
     id: `static-${key}`,
     label: `Build ${key.toUpperCase()}`,
     encodedText,
+    encodeMap,
     family,
     fontFile: `/demo-fixtures/${destination}`,
     fontIdentity: fontAsset.sha256,
@@ -296,12 +380,38 @@ async function main() {
     });
 
     await prepareGlyphFonts(config, { cwd: scratch });
+    const { metadata } = await loadPreparedFont("body", scratch);
     const runtime = await runtimeFixtures(config, scratch);
-    const staticA = await staticFixture(config, scratch, "a");
-    const staticB = await staticFixture(config, scratch, "b");
+    const staticA = await staticFixture(
+      config,
+      scratch,
+      metadata.codepoints,
+      "a",
+    );
+    const staticB = await staticFixture(
+      config,
+      scratch,
+      metadata.codepoints,
+      "b",
+    );
+    const variants = [runtime.a, runtime.b, staticA, staticB];
+    const permuted = new Set(
+      Object.keys(runtime.a.encodeMap).map((character) =>
+        character.codePointAt(0),
+      ),
+    );
+    const alphabet = describeAlphabet(metadata.codepoints, permuted);
+    for (const variant of variants) {
+      const sources = Object.keys(variant.encodeMap).join("");
+      if (sources !== alphabet.mapped)
+        throw new Error(
+          `Demo fixture ${variant.id} permutes a different set of code points.`,
+        );
+    }
     const fixtures = {
       sentence,
       generatedWith: "@brip/glyphscramble 0.1.0-beta.0",
+      alphabet,
       runtime,
       static: { a: staticA, b: staticB },
     };

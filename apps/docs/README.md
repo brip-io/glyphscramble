@@ -18,6 +18,29 @@ The `predev` script compiles the core package before generating four real public
 demo fixtures: two isolated runtime responses and two static builds. The browser
 visualization uses their actual encoded Unicode and generated WOFF2 files.
 
+## Interactive demo encoding
+
+The demo lets a visitor type their own text. That works without regenerating
+anything because the prepared face covers all of `U+0020-007E` rather than just
+the sample sentence, so every fixture WOFF2 already renders arbitrary printable
+ASCII.
+
+`generate-demo-fixtures.mjs` therefore emits each fixture's `encodeMap` — the
+permutation as a plain character lookup — plus an `alphabet` block splitting the
+coverage into the three outcomes the engine produces: permuted characters,
+structural characters that pass through, and characters with no mapping at all.
+The generator refuses to write a fixture whose lookup disagrees with the
+engine's own `encodeText`, so the shipped tables cannot drift from the bytes
+they explain.
+
+`lib/glyph-encoding.ts` reimplements the per-character substitution for the
+browser. It deliberately does not import the core package: `unicode.ts` pulls in
+`node:crypto`, and the page needs no permutation generation, only the lookup.
+
+**This is a demo-only concession.** A real response ships `encodedText`, the
+font URL, and the coverage identity — `GlyphPayload` carries no mapping. The
+page says so under the editor; keep that disclosure if you change the copy.
+
 ## Static output
 
 ```bash
