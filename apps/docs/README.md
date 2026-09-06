@@ -79,16 +79,30 @@ same root configuration file, so it needs no flag either.
 
 ### Connecting the repository
 
-Creating the Worker and connecting it to this repository are separate steps,
-and only the second one makes pushes build. A Worker provisioned through the
-Deploy to Cloudflare flow runs a single seed build at creation time; that build
-cannot be retried, and it does not establish a Git connection on its own. If
-pushes to `main` produce no build at all -- rather than a failing one -- the
-connection is what is missing, not the configuration in this repository.
+Creating the Worker and pointing its builds at _this_ repository are separate
+steps, and only the second one makes pushes here build.
 
-Connect it under **Settings > Builds > Connect**, with `main` as the production
-branch. The Worker name in the dashboard has to match `name` in the root
-`wrangler.jsonc` before this will succeed.
+A Worker provisioned through the Deploy to Cloudflare flow does get a Git
+connection, but not to this repository. That flow clones the source repository
+into the operator's own GitHub account and wires Workers Builds to the clone, so
+the build trigger watches `<operator>/glyphscramble`, not `brip-io/glyphscramble`.
+Pushes here then produce no build at all -- not a failing one -- and the seed
+build the flow runs at creation time cannot be retried. If that is the state,
+the build settings in this repository are not what is wrong.
+
+Fix it on the existing Worker rather than by deleting and recreating it:
+**Settings > Builds** shows the connected repository, and reconnecting under
+**Connect** rebinds it to `brip-io/glyphscramble` with `main` as the production
+branch. Recreating the Worker through the deploy button instead just repeats the
+clone. The Worker name in the dashboard has to match `name` in the root
+`wrangler.jsonc` before the connection will succeed.
+
+Builds trigger on push events, not on pull requests. A pull request against
+`main` builds nothing by itself; merging it pushes to `main` and that is what
+builds. To get preview builds and preview-URL comments on pull requests, enable
+**Builds for non-production branches** under **Settings > Build > Branch
+control** -- every push to a non-production branch then runs the build command
+followed by the preview deploy command.
 
 Two things the repository does pin, because they are correctness rather than
 infrastructure preference:
