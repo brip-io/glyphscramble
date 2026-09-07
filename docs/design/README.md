@@ -67,6 +67,25 @@ DIST-INSTALL-DX ─▶ DIST-NPM-BOOTSTRAP ─▶ DIST-TRUSTED-RELEASE
                            └───────────────────────┴─▶ DIST-REGISTRY-E2E ─▶ DIST-OPERATIONS
 ```
 
+## Package and component instrumentation track
+
+[`DX-INSTRUMENTATION`](DX-INSTRUMENTATION.md) records the complete package, payload-renderer, existing-component boundary, and compiler-instrumentation architecture. Its release-A package work feeds DIST-INSTALL-DX; static and inert-response boundaries remain explicit about hydration, typography, SEO, caching, and accessibility limits. Compiler instrumentation is a deferred feasibility spike, not a beta support claim.
+
+| ID                       | Issue / design                                                                     | Size | Priority | GitHub issue                                              |
+| ------------------------ | ---------------------------------------------------------------------------------- | ---: | -------: | --------------------------------------------------------- |
+| **DX-INSTRUMENTATION**   | [Package and component instrumentation experience (parent)](DX-INSTRUMENTATION.md) |    L |       P1 | [#77](https://github.com/brip-io/glyphscramble/issues/77) |
+| **DX-PACKAGE-SURFACE**   | [Coherent package and installation contract](DX-PACKAGE-SURFACE.md)                |    M |       P0 | [#79](https://github.com/brip-io/glyphscramble/issues/79) |
+| **DX-PAYLOAD-RENDERERS** | [Explicit and consistent payload renderers](DX-PAYLOAD-RENDERERS.md)               |    S |       P1 | [#82](https://github.com/brip-io/glyphscramble/issues/82) |
+| **DX-STATIC-BOUNDARY**   | [Static existing-component boundary](DX-STATIC-BOUNDARY.md)                        |    M |       P1 | [#78](https://github.com/brip-io/glyphscramble/issues/78) |
+| **DX-RESPONSE-BOUNDARY** | [Per-response inert HTML boundary](DX-RESPONSE-BOUNDARY.md)                        |    M |       P1 | [#80](https://github.com/brip-io/glyphscramble/issues/80) |
+| **DX-COMPILER-SPIKE**    | [Server component instrumentation feasibility](DX-COMPILER-SPIKE.md)               |    M |       P1 | [#81](https://github.com/brip-io/glyphscramble/issues/81) |
+
+```text
+DX-PACKAGE-SURFACE ─▶ DX-PAYLOAD-RENDERERS ─▶ DX-STATIC-BOUNDARY
+          │                                            ├─▶ DX-RESPONSE-BOUNDARY
+          └─▶ DIST-INSTALL-DX                          └─▶ DX-COMPILER-SPIKE (deferred)
+```
+
 See [`R00 issue filing`](R00-issue-filing.md) for the GitHub metadata and exact commands to run after `gh` authentication is restored.
 
 The complete disposition of the 2026-09-03 repository review is recorded in [`R00 review triage`](R00-review-triage-2026-09-03.md); every numbered finding is fixed, assigned to an open designed issue, or rejected with evidence.

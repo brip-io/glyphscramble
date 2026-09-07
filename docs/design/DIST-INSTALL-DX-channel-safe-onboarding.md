@@ -1,7 +1,7 @@
 # [DIST-INSTALL-DX] Prerelease installation and channel-safe onboarding
 
 > **Parent:** [DIST-RELEASE](DIST-RELEASE-package-release-delivery.md) · **Size:** S · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#68](https://github.com/brip-io/glyphscramble/issues/68)
-> **Blocked by:** R15 package and initializer contracts · **Blocks:** DIST-NPM-BOOTSTRAP and DIST-REGISTRY-E2E
+> **Blocked by:** R15 and DX-PACKAGE-SURFACE · **Blocks:** DIST-NPM-BOOTSTRAP and DIST-REGISTRY-E2E
 
 ## Objective
 
@@ -11,9 +11,11 @@ Make every beta installation command resolve the intended prerelease and ensure 
 
 The release policy publishes prereleases only under npm's `beta` dist-tag and deliberately leaves `latest` unchanged. Current beta-facing README, distribution guide, package readmes, framework quickstarts, and CLI diagnostics contain unqualified commands such as `npx @brip/glyphscramble init`. Before a stable `latest` exists, those commands do not resolve. Hand-maintained variants also risk drifting across package managers and the R13 site.
 
+[DX-PACKAGE-SURFACE](DX-PACKAGE-SURFACE.md) owns the direct-dependency matrix, platform re-exports, lockstep beta versions, and minimal consumer fixtures. This issue consumes that matrix and remains the single owner of channel-sensitive command generation.
+
 ## Design
 
-Introduce one channel-aware install-command model with at least `beta`, exact version, and stable modes. It generates equivalent commands for npm/npx, pnpm/pnpm dlx, Yarn/yarn dlx, and Bun/bunx and can render both the core CLI command and framework-adapter dependency commands.
+Introduce one channel-aware install-command model with at least `beta`, exact version, and stable modes. It generates equivalent commands for npm/npx, pnpm/pnpm dlx, Yarn/yarn dlx, and Bun/bunx and renders both the core CLI command and the package sets defined by DX-PACKAGE-SURFACE.
 
 While the repository is in Changesets prerelease mode:
 
