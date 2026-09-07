@@ -16,6 +16,17 @@ export type {
   InitProjectOptions,
   InitResult,
 } from "./init.js";
+export {
+  GLYPH_INSTALLATION_PROFILES,
+  GLYPH_PACKAGE_NAMES,
+  GLYPH_PUBLIC_PACKAGE_NAMES,
+  glyphInstallationProfile,
+  glyphPackagesFor,
+} from "./package-surface.js";
+export type {
+  GlyphInstallationProfile,
+  GlyphPackageName,
+} from "./package-surface.js";
 export { PACKAGE_VERSION } from "./generated/version.js";
 export {
   GLYPH_CONTENT_REPAIR_URL,

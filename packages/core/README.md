@@ -16,5 +16,7 @@ guide](https://github.com/brip-io/glyphscramble#good-fit), then see the
 
 The `./runtime` export is a dependency-free browser loader for an
 already-issued `GlyphPayload`; it does not scramble plaintext by itself.
+`GLYPH_INSTALLATION_PROFILES` exposes the canonical minimal package set used by
+the initializer and release qualification.
 
 Apache-2.0. Font files retain their own licences and notices.

@@ -9,6 +9,8 @@ npx @brip/glyphscramble init
 
 The generated Node-runtime route and request-local helper keep plaintext out of
 Client Components and apply private caching only after protected output is
-used. Read the [Next.js guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#react-and-next-16).
+used. The adapter exports the React renderer and common payload/config types;
+applications do not install `@brip/glyphscramble-react` directly. Read the
+[Next.js guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#react-and-next-16).
 
 GlyphScramble raises the cost of bulk DOM scraping; it is not DRM. Apache-2.0.

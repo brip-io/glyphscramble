@@ -151,7 +151,7 @@ This means the protected block is not WCAG-conformant. Limit it to opted-in, non
 
 Protected elements stay hidden until the shared runtime confirms that the exact generated face loaded and was applied. Duplicate blocks share a reference-counted registration; updates and unmounts abort stale work and release timers, rules, and faces. A timeout, CSP/font error, process restart, wrong-instance route, or exhausted variant pool produces a visible generic error, never plaintext. Monitor the engine's content-free counters and timings in your own application without sending content or mapping data to BRIP.
 
-The v2 wire payload is data-only and capped at 1 MiB on both emission and
+The v3 wire payload is data-only and capped at 1 MiB on both emission and
 consumption. Coverage is capped at 1,024 canonical ranges of at most 32 UTF-8
 bytes each, so preparation rejects a face that the browser would refuse. It
 contains no CSS and is validated after serialization before the browser uses

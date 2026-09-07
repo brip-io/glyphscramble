@@ -54,8 +54,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^",
-    "@brip/glyphscramble-vue": "workspace:^",
+    "@brip/glyphscramble": "workspace:*",
+    "@brip/glyphscramble-vue": "workspace:*",
     "@nuxt/kit": "^4.5.2",
     "@nuxt/schema": "4.5.2",
     "h3": "^1.15.11"

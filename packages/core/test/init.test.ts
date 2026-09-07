@@ -178,7 +178,9 @@ describe("framework initializer", () => {
     expect(result.notes.join(" ")).toMatch(/bounded response buffer/);
     expect(
       await readFile(join(cwd, "src/glyphscramble.d.ts"), "utf8"),
-    ).toContain('import type { ResponseContext } from "@brip/glyphscramble"');
+    ).toContain(
+      'import type { ResponseContext } from "@brip/glyphscramble-astro"',
+    );
   });
 
   it("creates a Nuxt config that installs the package module without boilerplate", async () => {
@@ -394,6 +396,36 @@ describe("framework initializer", () => {
       readFile(join(cwd, "glyphscramble.config.ts")),
     ).rejects.toThrow();
   });
+
+  it.each([
+    ["next", "response", ["@brip/glyphscramble", "@brip/glyphscramble-next"]],
+    ["nuxt", "response", ["@brip/glyphscramble", "@brip/glyphscramble-nuxt"]],
+    [
+      "sveltekit",
+      "response",
+      ["@brip/glyphscramble", "@brip/glyphscramble-sveltekit"],
+    ],
+    ["astro", "response", ["@brip/glyphscramble", "@brip/glyphscramble-astro"]],
+    ["astro", "static", ["@brip/glyphscramble"]],
+    ["vite", "static", ["@brip/glyphscramble", "@brip/glyphscramble-vite"]],
+  ] as const)(
+    "uses the canonical %s/%s dependency profile during dry-run",
+    async (framework, mode, dependencies) => {
+      const frameworkDependencies = {
+        next: { next: "16.3.4" },
+        nuxt: { nuxt: "4.5.2" },
+        sveltekit: { "@sveltejs/kit": "2.70.3" },
+        astro: { astro: "7.3.1" },
+        vite: { vite: "8.2.2" },
+      } as const;
+      const cwd = await frameworkProject(frameworkDependencies[framework]);
+      if (framework === "next") await mkdir(join(cwd, "app"));
+      if (framework === "astro") await mkdir(join(cwd, "src"));
+      const result = await initProject({ cwd, framework, mode, dryRun: true });
+      expect(result.dependencies).toEqual(dependencies);
+      expect(result.packageName).toBe(dependencies.at(-1));
+    },
+  );
 
   it("installs with the detected package manager before writing files", async () => {
     const cwd = await project();

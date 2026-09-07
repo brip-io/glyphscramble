@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GlyphPayload } from "@brip/glyphscramble";
+import type { GlyphPayload } from "@brip/glyphscramble-nuxt";
 
 interface ProtectedPayloads {
   first: GlyphPayload;

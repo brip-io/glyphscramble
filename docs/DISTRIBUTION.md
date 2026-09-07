@@ -26,8 +26,24 @@ yarn add @brip/glyphscramble @brip/glyphscramble-sveltekit
 bun add @brip/glyphscramble @brip/glyphscramble-astro
 ```
 
-Vite static builds use `@brip/glyphscramble-vite`; generic Fetch/Node servers
-use the core package directly. See the [framework matrix](FRAMEWORKS.md).
+The canonical direct-dependency profiles are:
+
+| Profile        | Application                  | Direct GlyphScramble packages                          |
+| -------------- | ---------------------------- | ------------------------------------------------------ |
+| `generic-node` | Generic Fetch/Node server    | `@brip/glyphscramble`                                  |
+| `react`        | Plain React                  | `@brip/glyphscramble`, `@brip/glyphscramble-react`     |
+| `vue`          | Plain Vue                    | `@brip/glyphscramble`, `@brip/glyphscramble-vue`       |
+| `svelte`       | Plain Svelte                 | `@brip/glyphscramble`, `@brip/glyphscramble-svelte`    |
+| `next`         | Next App Router              | `@brip/glyphscramble`, `@brip/glyphscramble-next`      |
+| `nuxt`         | Nuxt                         | `@brip/glyphscramble`, `@brip/glyphscramble-nuxt`      |
+| `sveltekit`    | SvelteKit                    | `@brip/glyphscramble`, `@brip/glyphscramble-sveltekit` |
+| `astro`        | Astro SSR                    | `@brip/glyphscramble`, `@brip/glyphscramble-astro`     |
+| `astro-static` | Astro static post-build      | `@brip/glyphscramble`                                  |
+| `vite`         | Vite static/per-build plugin | `@brip/glyphscramble`, `@brip/glyphscramble-vite`      |
+
+The exported `GLYPH_INSTALLATION_PROFILES` value is the machine-readable source
+for this matrix, initializer output, release evidence, and clean consumer
+qualification. See the [framework matrix](FRAMEWORKS.md) for usage.
 
 ## npm and GitHub channels
 

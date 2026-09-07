@@ -1,4 +1,4 @@
-import type { ResponseContext } from "@brip/glyphscramble";
+import type { ResponseContext } from "@brip/glyphscramble-astro";
 
 declare global {
   namespace App {

@@ -58,3 +58,9 @@ export function GlyphScramble(props: GlyphScrambleProps) {
 }
 
 export type { GlyphScrambleProps } from "@brip/glyphscramble-react";
+export type {
+  GlyphConfig,
+  GlyphPayload,
+  GlyphResponseFace,
+  ResponseContext,
+} from "@brip/glyphscramble";

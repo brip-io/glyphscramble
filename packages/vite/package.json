@@ -45,7 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^"
+    "@brip/glyphscramble": "workspace:*"
   },
   "peerDependencies": {
     "vite": ">=7 <9"

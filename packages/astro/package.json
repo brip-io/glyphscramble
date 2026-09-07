@@ -47,7 +47,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && astro check --minimumSeverity error"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^"
+    "@brip/glyphscramble": "workspace:*"
   },
   "peerDependencies": {
     "astro": ">=7 <8"

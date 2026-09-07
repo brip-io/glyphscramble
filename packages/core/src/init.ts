@@ -6,9 +6,14 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { loadGlyphConfig } from "./config-loader.js";
 import { prepareGlyphFonts } from "./font-pipeline.js";
+import {
+  glyphPackagesFor,
+  type GlyphDeliveryMode,
+  type GlyphFramework,
+  type GlyphPackageName,
+} from "./package-surface.js";
 
-export type GlyphFramework = "next" | "nuxt" | "sveltekit" | "astro" | "vite";
-export type GlyphDeliveryMode = "response" | "static";
+export type { GlyphDeliveryMode, GlyphFramework } from "./package-surface.js";
 export type GlyphPackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
 export interface InitCommand {
@@ -35,8 +40,8 @@ export interface InitResult {
   readonly packageManager: GlyphPackageManager;
   readonly workspaceRoot: string;
   readonly typescript: boolean;
-  readonly packageName: string;
-  readonly dependencies: readonly string[];
+  readonly packageName: GlyphPackageName;
+  readonly dependencies: readonly GlyphPackageName[];
   readonly planned: readonly {
     path: string;
     action: "create" | "update";
@@ -477,7 +482,7 @@ export const glyphHandle = await createGlyphHandle(config);
   const types = managedArtifact(
     join(cwd, "src", "glyphscramble.d.ts"),
     "sveltekit-locals-v1",
-    `import type { ResponseContext } from "@brip/glyphscramble";
+    `import type { ResponseContext } from "@brip/glyphscramble-sveltekit";
 
 declare global {
   namespace App {
@@ -609,28 +614,24 @@ async function integrationTemplates(
   configFile: string,
 ): Promise<{
   artifacts: IntegrationArtifact[];
-  packageName: string;
   notes: string[];
 }> {
   switch (framework) {
     case "next": {
       const next = nextArtifacts(cwd, typescript, configFile);
       return {
-        packageName: "@brip/glyphscramble-next",
         artifacts: next.artifacts,
         notes: next.notes,
       };
     }
     case "nuxt":
       return {
-        packageName: "@brip/glyphscramble-nuxt",
         notes: [],
         artifacts: await nuxtArtifacts(cwd, typescript),
       };
     case "sveltekit": {
       const sveltekit = await svelteKitArtifacts(cwd, typescript);
       return {
-        packageName: "@brip/glyphscramble-sveltekit",
         notes: sveltekit.notes,
         artifacts: sveltekit.artifacts,
       };
@@ -638,14 +639,12 @@ async function integrationTemplates(
     case "astro":
       if (mode === "static")
         return {
-          packageName: "@brip/glyphscramble",
           notes: [
             "Astro static mode runs glyphscramble static after astro build; it rotates once per build and rejects hydrated protected blocks.",
           ],
           artifacts: [],
         };
       return {
-        packageName: "@brip/glyphscramble-astro",
         notes: [
           "Astro defaults to a bounded response buffer so lazy rendering can set selective cache headers safely; use explicit route-scoped streaming for large responses.",
         ],
@@ -660,7 +659,7 @@ async function integrationTemplates(
                 managedArtifact(
                   join(cwd, "src", "glyphscramble.d.ts"),
                   "astro-locals-v1",
-                  `import type { ResponseContext } from "@brip/glyphscramble";\n\ndeclare global {\n  namespace App {\n    interface Locals {\n      glyphscramble?: ResponseContext;\n    }\n  }\n}\n\nexport {};\n`,
+                  `import type { ResponseContext } from "@brip/glyphscramble-astro";\n\ndeclare global {\n  namespace App {\n    interface Locals {\n      glyphscramble?: ResponseContext;\n    }\n  }\n}\n\nexport {};\n`,
                 ),
               ]
             : []),
@@ -668,7 +667,6 @@ async function integrationTemplates(
       };
     default:
       return {
-        packageName: "@brip/glyphscramble-vite",
         notes: [
           "Vite output is static per-build protection: mappings are shared until the next build and hydrated blocks are rejected.",
         ],
@@ -820,10 +818,7 @@ export async function initProject(
     ...(pkg.dependencies as object),
     ...(pkg.devDependencies as object),
   } as Record<string, string>;
-  const desiredDependencies = [
-    "@brip/glyphscramble",
-    integration.packageName,
-  ].filter((value, index, values) => values.indexOf(value) === index);
+  const desiredDependencies = glyphPackagesFor(framework, mode);
   const dependencies = desiredDependencies.filter(
     (name) => !(name in manifestDependencies),
   );
@@ -852,7 +847,7 @@ export async function initProject(
       packageManager,
       workspaceRoot: detectedPackageManager.workspaceRoot,
       typescript,
-      packageName: integration.packageName,
+      packageName: desiredDependencies.at(-1)!,
       dependencies,
       planned,
       created,
@@ -914,7 +909,7 @@ export async function initProject(
     packageManager,
     workspaceRoot: detectedPackageManager.workspaceRoot,
     typescript,
-    packageName: integration.packageName,
+    packageName: desiredDependencies.at(-1)!,
     dependencies,
     planned,
     created,

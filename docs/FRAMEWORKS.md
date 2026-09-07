@@ -54,11 +54,11 @@ generated nor required and cannot decide cache policy after downstream render.
 
 ## Vue 3 and Nuxt 4
 
-Install the core, Vue, and Nuxt packages, then let the initializer add the
-module to a conventional `nuxt.config`:
+Install the core and Nuxt adapter, then let the initializer add the module to a
+conventional `nuxt.config`. The adapter owns and registers the Vue renderer:
 
 ```bash
-pnpm add @brip/glyphscramble @brip/glyphscramble-vue @brip/glyphscramble-nuxt
+pnpm add @brip/glyphscramble @brip/glyphscramble-nuxt
 pnpm dlx @brip/glyphscramble init
 ```
 
@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
 
 ```vue
 <script setup lang="ts">
-import type { GlyphPayload } from "@brip/glyphscramble";
+import type { GlyphPayload } from "@brip/glyphscramble-nuxt";
 
 const { data: payload } = await useFetch<GlyphPayload>("/api/premium");
 </script>
@@ -128,12 +128,12 @@ the later font request.
 
 ## Svelte 5 and SvelteKit 2
 
-Install the core, Svelte, and SvelteKit packages, then let the initializer create
-the process-level helper, locals augmentation, and (when no server hook exists)
-the server hook:
+Install the core and SvelteKit adapter, then let the initializer create the
+process-level helper, locals augmentation, and (when no server hook exists) the
+server hook. The adapter re-exports the Svelte renderer:
 
 ```bash
-pnpm add @brip/glyphscramble @brip/glyphscramble-svelte @brip/glyphscramble-sveltekit
+pnpm add @brip/glyphscramble @brip/glyphscramble-sveltekit
 pnpm dlx @brip/glyphscramble init
 ```
 
@@ -170,7 +170,7 @@ export const load: PageServerLoad = async (event) => {
 
 ```svelte
 <script lang="ts">
-  import { GlyphScramble } from "@brip/glyphscramble-svelte";
+  import { GlyphScramble } from "@brip/glyphscramble-sveltekit";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();

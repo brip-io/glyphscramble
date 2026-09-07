@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@brip/glyphscramble": "workspace:*",
-    "@brip/glyphscramble-svelte": "workspace:*",
     "@brip/glyphscramble-sveltekit": "workspace:*",
     "@fontsource-variable/inter": "5.3.0",
     "@sveltejs/adapter-node": "5.5.7",

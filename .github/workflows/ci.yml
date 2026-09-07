@@ -51,8 +51,6 @@ jobs:
         if: matrix.package-manager == 'bun'
         with:
           bun-version: 1.3.12
-      - if: matrix.package-manager == 'yarn'
-        run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: node scripts/prepare-release-artifacts.mjs --output release-artifacts

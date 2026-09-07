@@ -51,7 +51,7 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^"
+    "@brip/glyphscramble": "workspace:*"
   },
   "peerDependencies": {
     "svelte": ">=5 <6"

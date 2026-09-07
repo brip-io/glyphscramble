@@ -1,5 +1,5 @@
 import { getGlyphResponseContext } from "@brip/glyphscramble-sveltekit";
-import type { GlyphPayload } from "@brip/glyphscramble";
+import type { GlyphPayload } from "@brip/glyphscramble-sveltekit";
 import type { PageServerLoad } from "./$types";
 
 const STREAMED = "Delayed protected stream content.";
