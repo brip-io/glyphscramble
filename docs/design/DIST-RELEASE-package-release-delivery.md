@@ -73,16 +73,16 @@ The permanent workflow uses a GitHub-hosted runner, Node and npm versions that s
 ## Dependency order
 
 ```text
-DIST-INSTALL-DX ─▶ DIST-NPM-BOOTSTRAP ─▶ DIST-TRUSTED-RELEASE
-                           │                       │
-                           └───────────────────────┴─▶ DIST-REGISTRY-E2E
-                                                          │
-                                                          └─▶ DIST-OPERATIONS
+DX-PACKAGE-SURFACE ─▶ DIST-INSTALL-DX ─▶ DIST-NPM-BOOTSTRAP ─▶ DIST-TRUSTED-RELEASE
+                                                 │                       │
+                                                 └───────────────────────┴─▶ DIST-REGISTRY-E2E
+                                                                                │
+                                                                                └─▶ DIST-OPERATIONS
 
 R12 qualification + R13/R14 + counsel/IP ────────────────▶ first public beta
 ```
 
-The designs and dry-run tooling may merge before the public-release gate opens. Actual package publication remains blocked on R12, R13, R14, and recorded counsel/IP approval.
+The designs and dry-run tooling may merge before the public-release gate opens. [DX-PACKAGE-SURFACE](DX-PACKAGE-SURFACE.md) precedes DIST-INSTALL-DX so generated commands consume the final minimal dependency matrix and lockstep beta contract. Actual package publication remains blocked on R12, R13, R14, and recorded counsel/IP approval.
 
 ## Delivery phases
 
