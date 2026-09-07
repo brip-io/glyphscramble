@@ -1,3 +1,4 @@
+import { GLYPH_INSTALLATION_PROFILES } from "@brip/glyphscramble";
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
@@ -8,7 +9,7 @@ import {
   ShuffleAngularIcon,
 } from "@phosphor-icons/react/ssr";
 import { BripLockup } from "../components/brip-lockup";
-import { CopyCommand } from "../components/copy-command";
+import { InstallationConfigurator } from "../components/installation-configurator";
 import fixtureData from "../src/generated/demo-fixtures.json";
 
 const comparisonFixture = fixtureData.runtime.a;
@@ -147,23 +148,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section shell install-section">
-        <div>
-          <h2>Protect one appropriate block.</h2>
+      <section className="section shell installer-section" id="install">
+        <div className="installer-intro">
+          <h2>Build the install for your stack.</h2>
           <p>
-            Keep headings, navigation, forms, legal text, and essential content
-            ordinary HTML.
+            Choose a supported framework, delivery mode, and package manager.
+            The exact commands and next actions update below.
           </p>
         </div>
-        <div className="install-action">
-          <div className="install-command">
-            <CopyCommand />
-          </div>
-          <a className="install-link" href="/docs/">
-            Open the quickstart
-            <ArrowRightIcon aria-hidden="true" size={17} />
-          </a>
-        </div>
+        <InstallationConfigurator profiles={GLYPH_INSTALLATION_PROFILES} />
       </section>
 
       <section className="brip-bridge">
