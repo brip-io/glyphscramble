@@ -3,11 +3,13 @@ import {
   responseHeadersForContext,
   type GlyphConfig,
   type GlyphEngine,
+  type GlyphPayload,
   type GlyphResponseFace,
   type ResponseContext,
 } from "@brip/glyphscramble";
 
 export { GlyphScramble } from "@brip/glyphscramble-vue";
+export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
 
 export interface GlyphNitroEvent {
   request: Request;

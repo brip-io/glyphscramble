@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { GlyphPayload } from "@brip/glyphscramble";
-import { GlyphScramble } from "@brip/glyphscramble-next";
+import { GlyphScramble, type GlyphPayload } from "@brip/glyphscramble-next";
 
 export function ClonedPayload({ payload }: { payload: GlyphPayload }) {
   const [, setRenderCount] = useState(0);

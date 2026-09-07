@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GlyphScramble } from "@brip/glyphscramble-svelte";
+  import { GlyphScramble } from "@brip/glyphscramble-sveltekit";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();

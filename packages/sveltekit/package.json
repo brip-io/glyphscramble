@@ -45,8 +45,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^",
-    "@brip/glyphscramble-svelte": "workspace:^"
+    "@brip/glyphscramble": "workspace:*",
+    "@brip/glyphscramble-svelte": "workspace:*"
   },
   "peerDependencies": {
     "@sveltejs/kit": ">=2 <3",

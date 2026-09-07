@@ -49,8 +49,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^",
-    "@brip/glyphscramble-react": "workspace:^",
+    "@brip/glyphscramble": "workspace:*",
+    "@brip/glyphscramble-react": "workspace:*",
     "server-only": "0.0.1"
   },
   "peerDependencies": {

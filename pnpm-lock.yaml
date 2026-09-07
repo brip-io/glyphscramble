@@ -26,6 +26,9 @@ importers:
       '@unicode/unicode-17.0.0':
         specifier: ^1.6.17
         version: 1.6.17
+      '@yarnpkg/cli-dist':
+        specifier: 4.9.2
+        version: 4.9.2
       eslint:
         specifier: ^9.35.0
         version: 9.39.5(jiti@2.7.0)(supports-color@10.2.2)
@@ -167,9 +170,6 @@ importers:
       '@brip/glyphscramble':
         specifier: workspace:*
         version: link:../../packages/core
-      '@brip/glyphscramble-svelte':
-        specifier: workspace:*
-        version: link:../../packages/svelte
       '@brip/glyphscramble-sveltekit':
         specifier: workspace:*
         version: link:../../packages/sveltekit
@@ -217,7 +217,7 @@ importers:
   packages/astro:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
     devDependencies:
       '@astrojs/check':
@@ -267,10 +267,10 @@ importers:
   packages/next:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
       '@brip/glyphscramble-react':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../react
       server-only:
         specifier: 0.0.1
@@ -292,10 +292,10 @@ importers:
   packages/nuxt:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
       '@brip/glyphscramble-vue':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../vue
       '@nuxt/kit':
         specifier: ^4.5.2
@@ -317,7 +317,7 @@ importers:
   packages/react:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
       server-only:
         specifier: 0.0.1
@@ -333,7 +333,7 @@ importers:
   packages/svelte:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
     devDependencies:
       '@sveltejs/package':
@@ -349,10 +349,10 @@ importers:
   packages/sveltekit:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
       '@brip/glyphscramble-svelte':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../svelte
     devDependencies:
       '@sveltejs/kit':
@@ -371,7 +371,7 @@ importers:
   packages/vite:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
     devDependencies:
       vite:
@@ -381,7 +381,7 @@ importers:
   packages/vue:
     dependencies:
       '@brip/glyphscramble':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
     devDependencies:
       vue:
@@ -2192,6 +2192,11 @@ packages:
 
   '@vue/shared@3.5.42':
     resolution: {integrity: sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g==}
+
+  '@yarnpkg/cli-dist@4.9.2':
+    resolution: {integrity: sha512-qrMyWzvEnWhaWOflvE1pGxWGiVOPsO/q4XfGCeRPnLU8ECkvhrhJEfCNakcy3s3VHcApBASQ4fmL0sOEw6xtZQ==}
+    engines: {node: '>=18.12.0'}
+    hasBin: true
 
   abbrev@3.0.1:
     resolution: {integrity: sha512-AO2ac6pjRB3SJmGJo+v5/aK6Omggp6fsLrs6wN9bd35ulu4cCwaAU9+7ZhXjeqHVkaHThLuzH0nZr0YpCDhygg==}
@@ -7700,6 +7705,8 @@ snapshots:
       '@vue/shared': 3.5.42
 
   '@vue/shared@3.5.42': {}
+
+  '@yarnpkg/cli-dist@4.9.2': {}
 
   abbrev@3.0.1: {}
 

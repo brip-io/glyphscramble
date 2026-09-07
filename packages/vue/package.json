@@ -45,7 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@brip/glyphscramble": "workspace:^"
+    "@brip/glyphscramble": "workspace:*"
   },
   "peerDependencies": {
     "vue": ">=3.5 <4"

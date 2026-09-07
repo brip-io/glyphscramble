@@ -14,6 +14,10 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
+import {
+  GLYPH_INSTALLATION_PROFILES,
+  GLYPH_PUBLIC_PACKAGE_NAMES,
+} from "../packages/core/dist/package-surface.js";
 
 const execute = promisify(execFile);
 const root = resolve(import.meta.dirname, "..");
@@ -159,6 +163,12 @@ function validatePackedManifest(manifest) {
     throw new Error(
       `${manifest.name} ships generation-only Unicode data to consumers.`,
     );
+  for (const [name, range] of Object.entries(manifest.dependencies ?? {})) {
+    if (GLYPH_PUBLIC_PACKAGE_NAMES.includes(name) && range !== manifest.version)
+      throw new Error(
+        `${manifest.name} must pin internal dependency ${name} to exact release ${manifest.version}; found ${range}.`,
+      );
+  }
 }
 
 async function validateChangesetIgnores() {
@@ -189,6 +199,16 @@ async function validateChangesetIgnores() {
         `Changesets ignores publishable workspace package ${name}.`,
       );
   }
+  const fixedGroups = config.fixed ?? [];
+  const releaseGroup = fixedGroups.find(
+    (group) =>
+      group.length === GLYPH_PUBLIC_PACKAGE_NAMES.length &&
+      GLYPH_PUBLIC_PACKAGE_NAMES.every((name) => group.includes(name)),
+  );
+  if (!releaseGroup)
+    throw new Error(
+      "Changesets must keep all public GlyphScramble packages in one fixed release group.",
+    );
 }
 
 await validateChangesetIgnores();
@@ -200,6 +220,12 @@ try {
     const manifest = JSON.parse(
       await readFile(join(packageRoot, "package.json"), "utf8"),
     );
+    for (const [name, range] of Object.entries(manifest.dependencies ?? {})) {
+      if (GLYPH_PUBLIC_PACKAGE_NAMES.includes(name) && range !== "workspace:*")
+        throw new Error(
+          `${manifest.name} must declare internal dependency ${name} as workspace:* so packed releases are exact; found ${range}.`,
+        );
+    }
     requiredMetadata(manifest, directory);
     await access(join(packageRoot, "README.md"));
     const { stdout } = await execute(
@@ -227,6 +253,18 @@ try {
     });
   }
 
+  const inventoryNames = new Set(inventory.map((item) => item.name));
+  const missingPackages = GLYPH_PUBLIC_PACKAGE_NAMES.filter(
+    (name) => !inventoryNames.has(name),
+  );
+  const unexpectedPackages = [...inventoryNames].filter(
+    (name) => !GLYPH_PUBLIC_PACKAGE_NAMES.includes(name),
+  );
+  if (missingPackages.length > 0 || unexpectedPackages.length > 0)
+    throw new Error(
+      `Release package inventory does not match the canonical package surface. Missing: ${missingPackages.join(", ") || "none"}; unexpected: ${unexpectedPackages.join(", ") || "none"}.`,
+    );
+
   const versions = new Set(inventory.map((item) => item.version));
   if (versions.size !== 1)
     throw new Error(
@@ -247,6 +285,7 @@ try {
         version,
         distTag,
         qualificationManifestSha256: null,
+        installationProfiles: GLYPH_INSTALLATION_PROFILES,
         packages: inventory,
       },
       null,

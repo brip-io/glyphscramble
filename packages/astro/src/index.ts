@@ -5,9 +5,12 @@ import {
   responseHeadersForContext,
   type GlyphConfig,
   type GlyphEngine,
+  type GlyphPayload,
   type GlyphResponseFace,
   type ResponseContext,
 } from "@brip/glyphscramble";
+
+export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
 
 const DEFAULT_MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
 const MAX_BUFFERED_BYTES = 16 * 1024 * 1024;

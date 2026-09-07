@@ -6,10 +6,14 @@ import {
   type GlyphConfig,
   type GlyphDrainOptions,
   type GlyphEngine,
+  type GlyphPayload,
   type GlyphResponseFace,
   type ResponseContext,
 } from "@brip/glyphscramble";
 import { matchesProtectedRoute, normalizeProtectedRoutes } from "./routes.js";
+
+export { GlyphScramble } from "@brip/glyphscramble-svelte";
+export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
 
 export interface GlyphSvelteKitLocals {
   glyphscramble?: ResponseContext;
