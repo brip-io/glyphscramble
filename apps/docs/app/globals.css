@@ -774,46 +774,243 @@ button:active:not(:disabled) {
   font-weight: 620;
 }
 
-.install-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6vw;
+.installer-section {
+  padding-block: 92px;
   border-top: 1px solid var(--line);
 }
 
-.install-section p {
-  max-width: 50ch;
+.installer-intro {
+  max-width: 650px;
+  margin-bottom: 34px;
 }
 
-.install-action {
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
+.installer-intro h2 {
+  max-width: none;
+  margin-bottom: 14px;
+  font-size: clamp(2rem, 3.4vw, 3rem);
 }
 
-.install-command {
-  width: 100%;
-  padding: 11px 12px;
+.installer-intro p {
+  max-width: 58ch;
+  margin-bottom: 0;
+  font-size: 1.08rem;
+}
+
+.install-configurator {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  background: var(--canvas);
+}
+
+.installer-controls {
+  padding: 20px 22px;
+  display: grid;
+  grid-template-columns: minmax(390px, 1.5fr) minmax(150px, 0.55fr) minmax(
+      285px,
+      1fr
+    );
+  gap: clamp(20px, 3vw, 38px);
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.installer-controls fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.installer-controls legend {
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.installer-logo-choices,
+.installer-segmented {
+  display: grid;
+  gap: 5px;
+}
+
+.installer-logo-choices {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.installer-manager-choices {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.installer-segmented {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.installer-logo-choice,
+.installer-segmented button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 620;
+  white-space: nowrap;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.installer-logo-choice svg {
+  flex: 0 0 auto;
+}
+
+.installer-logo-choice:hover,
+.installer-segmented button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.installer-logo-choice[aria-pressed="true"],
+.installer-segmented button[aria-pressed="true"] {
+  border-color: var(--action-bright);
+  background: var(--action-soft);
+  color: var(--accent);
+}
+
+.installer-output {
+  padding: 18px 22px 20px;
+}
+
+.installer-output-heading {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.installer-output-heading p,
+.installer-output-heading span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.installer-output-heading p {
+  color: var(--body);
+}
+
+.installer-commands {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  list-style: none;
+}
+
+.installer-commands > li {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.installer-commands > li > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 640;
+}
+
+.installer-command {
+  min-width: 0;
+  min-height: 50px;
+  padding: 6px 7px 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
   background: var(--panel);
   color: var(--panel-ink);
 }
 
-.install-command .quickstart-command code {
+.installer-command code {
+  min-width: 0;
   color: var(--accent);
-  white-space: normal;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.install-link {
+.installer-command button {
+  min-width: 72px;
+  min-height: 36px;
+  padding: 7px 9px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 640;
+}
+
+.installer-command button:hover {
+  border-color: var(--accent);
+}
+
+.installer-next-action {
+  margin: 14px 0 0 86px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.installer-next-action p {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--body);
+  font-size: 0.82rem;
+}
+
+.installer-next-action strong {
+  color: var(--ink);
+}
+
+.installer-next-action a {
+  flex: 0 0 auto;
   color: var(--accent);
+  font-size: 0.82rem;
   font-weight: 620;
+  text-underline-offset: 3px;
+}
+
+.installer-scope-note {
+  margin: 0;
+  padding: 13px 22px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 .brip-bridge {
@@ -1249,9 +1446,16 @@ pre {
   }
 
   .mode-section,
-  .install-section,
   .bridge-grid {
     grid-template-columns: 1fr;
+  }
+
+  .installer-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .installer-framework-fieldset {
+    grid-column: 1 / -1;
   }
 
   .mode-comparison article {
@@ -1320,6 +1524,49 @@ pre {
   .quickstart-command code {
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .installer-controls {
+    padding: 18px;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .installer-framework-fieldset {
+    grid-column: auto;
+  }
+
+  .installer-logo-choices {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .installer-manager-choices {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .installer-output {
+    padding: 16px 18px 18px;
+  }
+
+  .installer-output-heading,
+  .installer-next-action {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .installer-commands > li {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .installer-next-action {
+    margin-left: 0;
+    gap: 8px;
+  }
+
+  .installer-scope-note {
+    padding-inline: 18px;
   }
 
   .hero-actions,
