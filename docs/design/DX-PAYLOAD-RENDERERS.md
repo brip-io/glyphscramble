@@ -2,7 +2,8 @@
 
 > Child of [DX-INSTRUMENTATION](DX-INSTRUMENTATION.md) — milestone **M2**.
 >
-> **Size:** S · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#82](https://github.com/brip-io/glyphscramble/issues/82)
+> **Size:** S · **Priority:** P1 · **Status:** Implemented in [PR #87](https://github.com/brip-io/glyphscramble/pull/87) · **GitHub issue:** [#82](https://github.com/brip-io/glyphscramble/issues/82)
+>
 > **Blocked by:** DX-PACKAGE-SURFACE · **Blocks:** DX-STATIC-BOUNDARY
 
 ## Objective
@@ -40,3 +41,11 @@ Give every framework the same unmistakably payload-only leaf component and preve
 ## Exit criteria
 
 Every adapter exposes one clearly named payload-only renderer with no plaintext-child or opaque-custom-component path, and the shared lifecycle and negative type suites pass across all supported frameworks.
+
+## Implementation evidence
+
+- React, Next, Vue, Nuxt, Svelte, SvelteKit, and Astro publish `GlyphText`; the old `GlyphScramble` values, prop types, and component subpaths resolve to the same implementation throughout beta.
+- React, Vue, and Astro constrain `as` to native non-void text containers in both their public types and runtime validation. Lifecycle-owned content, visibility, language, and raw-HTML attributes cannot override the renderer.
+- One declaration fixture asserts positive payload/attribute usage and negative plaintext-child, custom-component, and void-element usage through every platform re-export. Vue SSR and a deliberately invalid Astro build prove slot-based template syntax also fails closed with a `GlyphStaticBoundary` diagnostic.
+- The Next, Nuxt, SvelteKit, and Astro examples consume only their platform adapter's `GlyphText` export. Their browser suites retain equivalent-payload no-op, replacement, expiry, navigation, failure, cleanup, CSP, and plaintext-leakage coverage.
+- npm, pnpm, Yarn, and Bun install all ten canonical profiles from freshly packed artifacts and compile the canonical exports. Yarn's cache, mirror, and resolution metadata are isolated per run so a same-version beta candidate cannot be mistaken for an older tarball.
