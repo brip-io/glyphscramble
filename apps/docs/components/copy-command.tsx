@@ -2,9 +2,18 @@
 
 import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 import { useState } from "react";
+import {
+  GLYPH_BETA_CHANNEL,
+  GLYPH_INSTALLATION_PROFILES,
+  glyphInstallCommand,
+} from "@brip/glyphscramble/package-surface";
 
 const defaultCommands = [
-  "pnpm add @brip/glyphscramble @brip/glyphscramble-next @brip/glyphscramble-react",
+  glyphInstallCommand(
+    "pnpm",
+    GLYPH_INSTALLATION_PROFILES.next,
+    GLYPH_BETA_CHANNEL,
+  ),
 ];
 
 export function CopyCommand({

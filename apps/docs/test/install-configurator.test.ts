@@ -39,18 +39,21 @@ describe("installation configurator", () => {
   });
 
   it("generates beta install commands for each package manager", () => {
-    const packages = ["@brip/glyphscramble", "@brip/glyphscramble-next"];
+    const packages = [
+      "@brip/glyphscramble",
+      "@brip/glyphscramble-next",
+    ] as const;
     expect(installCommand("npm", packages)).toBe(
-      "npm install @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
     );
     expect(installCommand("pnpm", packages)).toBe(
-      "pnpm add @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "pnpm add --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
     );
     expect(installCommand("yarn", packages)).toBe(
-      "yarn add @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "yarn add --exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
     );
     expect(installCommand("bun", packages)).toBe(
-      "bun add @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "bun add --exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
     );
   });
 

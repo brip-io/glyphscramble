@@ -13,7 +13,7 @@ The `response-pool` runtime is intentionally stateful. Do not create a new engin
 
 ## React and Next 16
 
-Run `npx @brip/glyphscramble init` in an App Router project; it installs the
+Run `npx @brip/glyphscramble@beta init` in an App Router project; it installs the
 adapter and prepares the configured font,
 then call the generated process-level helper from an async Server Component:
 
@@ -58,8 +58,8 @@ Install the core and Nuxt adapter, then let the initializer add the module to a
 conventional `nuxt.config`. The adapter owns and registers the Vue renderer:
 
 ```bash
-pnpm add @brip/glyphscramble @brip/glyphscramble-nuxt
-pnpm dlx @brip/glyphscramble init
+pnpm add --save-exact @brip/glyphscramble@beta @brip/glyphscramble-nuxt@beta
+pnpm exec glyphscramble init
 ```
 
 The module registers the component, Nitro request plugin, typed request
@@ -133,8 +133,8 @@ process-level helper, locals augmentation, and (when no server hook exists) the
 server hook. The adapter re-exports the Svelte renderer:
 
 ```bash
-pnpm add @brip/glyphscramble @brip/glyphscramble-sveltekit
-pnpm dlx @brip/glyphscramble init
+pnpm add --save-exact @brip/glyphscramble@beta @brip/glyphscramble-sveltekit@beta
+pnpm exec glyphscramble init
 ```
 
 If `src/hooks.server.ts` already exists, `init` leaves it untouched and prints
@@ -217,7 +217,7 @@ separate [static deployment](STATIC-DEPLOYMENT.md) workflow.
 
 ## Astro 7
 
-Run `npx @brip/glyphscramble init`, then use the generated middleware and
+Run `npx @brip/glyphscramble@beta init`, then use the generated middleware and
 locals type.
 The middleware is typed against Astro's real `MiddlewareHandler` API and owns
 one engine plus one response context per rendered route:

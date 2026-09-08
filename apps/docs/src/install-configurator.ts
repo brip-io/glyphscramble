@@ -1,9 +1,20 @@
-export type InstallerFramework =
-  "next" | "nuxt" | "sveltekit" | "astro" | "vite";
-export type InstallerMode = "response" | "static";
-export type InstallerPackageManager = "npm" | "pnpm" | "yarn" | "bun";
+import {
+  GLYPH_BETA_CHANNEL,
+  glyphInstallCommand as sharedInstallCommand,
+  glyphLocalCliCommand,
+  type GlyphDeliveryMode,
+  type GlyphFramework,
+  type GlyphPackageManager,
+  type GlyphPackageName,
+} from "@brip/glyphscramble/package-surface";
 
-export type InstallationProfiles = Readonly<Record<string, readonly string[]>>;
+export type InstallerFramework = GlyphFramework;
+export type InstallerMode = GlyphDeliveryMode;
+export type InstallerPackageManager = GlyphPackageManager;
+
+export type InstallationProfiles = Readonly<
+  Record<string, readonly GlyphPackageName[]>
+>;
 
 interface FrameworkOption {
   readonly id: InstallerFramework;
@@ -123,16 +134,11 @@ export function profileFor(
     : framework;
 }
 
-function taggedPackage(packageName: string): string {
-  return `${packageName}@beta`;
-}
-
 export function installCommand(
   packageManager: InstallerPackageManager,
-  packages: readonly string[],
+  packages: readonly GlyphPackageName[],
 ): string {
-  const verb = packageManager === "npm" ? "install" : "add";
-  return `${packageManager} ${verb} ${packages.map(taggedPackage).join(" ")}`;
+  return sharedInstallCommand(packageManager, packages, GLYPH_BETA_CHANNEL);
 }
 
 export function initCommand(
@@ -140,20 +146,23 @@ export function initCommand(
   framework: InstallerFramework,
   mode: InstallerMode,
 ): string {
-  const invocation =
-    packageManager === "npm"
-      ? "npm exec glyphscramble --"
-      : packageManager === "bun"
-        ? "bun run glyphscramble"
-        : `${packageManager} exec glyphscramble`;
-  return `${invocation} init --framework ${framework} --mode ${mode} --package-manager ${packageManager} --no-install`;
+  return glyphLocalCliCommand(packageManager, [
+    "init",
+    "--framework",
+    framework,
+    "--mode",
+    mode,
+    "--package-manager",
+    packageManager,
+    "--no-install",
+  ]);
 }
 
 export function packagesForSelection(
   profiles: InstallationProfiles,
   framework: InstallerFramework,
   mode: InstallerMode,
-): readonly string[] {
+): readonly GlyphPackageName[] {
   const profile = profileFor(framework, mode);
   const packages = profiles[profile];
   if (!packages)

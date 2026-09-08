@@ -35,6 +35,10 @@
       "types": "./dist/browser.d.ts",
       "import": "./dist/browser.js"
     },
+    "./package-surface": {
+      "types": "./dist/package-surface.d.ts",
+      "import": "./dist/package-surface.js"
+    },
     "./woff2-worker": {
       "types": "./dist/woff2-worker.d.ts",
       "import": "./dist/woff2-worker.mjs",

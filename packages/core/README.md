@@ -5,8 +5,8 @@ by BRIP. It raises the cost of bulk DOM scraping; it is not DRM and does not
 stop headless browsers, OCR, font analysis, or plaintext side channels.
 
 ```bash
-npm install @brip/glyphscramble
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta
+npm exec glyphscramble -- init
 ```
 
 Use it only for optional, high-value blocks. Protected output is `aria-hidden`

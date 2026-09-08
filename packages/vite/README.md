@@ -4,8 +4,8 @@ Vite 7/8 SSR primitives and explicit static/per-build compiler integration for
 GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-vite
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-vite@beta
+npm exec glyphscramble -- init
 ```
 
 A client-only Vite build cannot provide per-response protection. Static mode

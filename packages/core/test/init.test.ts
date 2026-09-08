@@ -385,6 +385,10 @@ describe("framework initializer", () => {
       prepared: false,
       packageManager: "npm",
       dependencies: ["@brip/glyphscramble", "@brip/glyphscramble-next"],
+      dependencySpecifiers: [
+        "@brip/glyphscramble@0.1.0-beta.0",
+        "@brip/glyphscramble-next@0.1.0-beta.0",
+      ],
     });
     expect(result.planned.map((change) => change.action)).toEqual([
       "create",
@@ -445,11 +449,55 @@ describe("framework initializer", () => {
     expect(seen).toEqual([
       {
         command: "pnpm",
-        args: ["add", "@brip/glyphscramble", "@brip/glyphscramble-next"],
+        args: [
+          "add",
+          "--save-exact",
+          "@brip/glyphscramble@0.1.0-beta.0",
+          "@brip/glyphscramble-next@0.1.0-beta.0",
+        ],
         cwd,
       },
     ]);
     expect(result).toMatchObject({ packageManager: "pnpm", installed: true });
+  });
+
+  it("refuses an existing cross-version GlyphScramble package before writing", async () => {
+    const cwd = await project();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "16.3.4",
+          "@brip/glyphscramble": "0.1.0-beta.99",
+        },
+      }),
+    );
+
+    await expect(initProject({ cwd, packageManager: "npm" })).rejects.toThrow(
+      /must match the running CLI version 0\.1\.0-beta\.0.*npm install --save-exact.*0\.1\.0-beta\.0.*No files were changed/s,
+    );
+    await expect(
+      readFile(join(cwd, "glyphscramble.config.ts")),
+    ).rejects.toThrow();
+  });
+
+  it("accepts existing packages only when pinned to the running CLI version", async () => {
+    const cwd = await project();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "16.3.4",
+          "@brip/glyphscramble": "0.1.0-beta.0",
+        },
+      }),
+    );
+
+    const result = await initProject({ cwd, dryRun: true });
+    expect(result.dependencies).toEqual(["@brip/glyphscramble-next"]);
+    expect(result.commands[0]).toBe(
+      "npm install --save-exact @brip/glyphscramble-next@0.1.0-beta.0",
+    );
   });
 
   it("leaves integration files untouched when dependency installation fails", async () => {

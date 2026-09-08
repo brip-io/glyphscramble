@@ -3,8 +3,8 @@
 Next.js 16 App Router integration for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-next
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta
+npm exec glyphscramble -- init
 ```
 
 The generated Node-runtime route and request-local helper keep plaintext out of

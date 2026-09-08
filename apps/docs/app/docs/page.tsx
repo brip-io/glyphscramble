@@ -1,4 +1,10 @@
 import type { Metadata } from "next";
+import {
+  GLYPH_BETA_CHANNEL,
+  GLYPH_INSTALLATION_PROFILES,
+  glyphInstallCommand,
+  glyphLocalCliCommand,
+} from "@brip/glyphscramble/package-surface";
 
 export const metadata: Metadata = {
   title: "Documentation",
@@ -14,6 +20,14 @@ const frameworks = [
   ["SvelteKit", "Per response", "@brip/glyphscramble-sveltekit"],
   ["Vite", "Server primitives and static", "@brip/glyphscramble-vite"],
 ] as const;
+
+const nextInstall = glyphInstallCommand(
+  "pnpm",
+  GLYPH_INSTALLATION_PROFILES.next,
+  GLYPH_BETA_CHANNEL,
+);
+const nextInit = glyphLocalCliCommand("pnpm", ["init"]);
+const nextPrepare = glyphLocalCliCommand("pnpm", ["prepare"]);
 
 export default function DocsPage() {
   return (
@@ -37,13 +51,14 @@ export default function DocsPage() {
         <section id="install" className="doc-section">
           <h2>Install</h2>
           <pre>
-            <code>
-              pnpm add @brip/glyphscramble @brip/glyphscramble-next
-              @brip/glyphscramble-react
-            </code>
+            <code>{nextInstall}</code>
           </pre>
           <pre>
-            <code>npx glyphscramble init{"\n"}npx glyphscramble prepare</code>
+            <code>
+              {nextInit}
+              {"\n"}
+              {nextPrepare}
+            </code>
           </pre>
         </section>
 
@@ -54,12 +69,11 @@ export default function DocsPage() {
             into client code.
           </p>
           <pre>
-            <code>{`import { createGlyphPayload } from "@brip/glyphscramble-react/server";
-import { GlyphScramble } from "@brip/glyphscramble-react";
+            <code>{`import { GlyphScramble } from "@brip/glyphscramble-next";
 import { glyphs } from "../glyphscramble.next";
 
-export default function PremiumExcerpt({ copy }: { copy: string }) {
-  const payload = createGlyphPayload(glyphs.beginResponse(), copy, {
+export default async function PremiumExcerpt({ copy }: { copy: string }) {
+  const payload = await glyphs.scramble(copy, {
     font: "body",
     lang: "en",
   });

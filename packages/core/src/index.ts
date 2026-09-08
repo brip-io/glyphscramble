@@ -10,21 +10,32 @@ export {
 export type {
   GlyphDeliveryMode,
   GlyphFramework,
-  GlyphPackageManager,
   InitCommand,
   InitCommandRunner,
   InitProjectOptions,
   InitResult,
 } from "./init.js";
 export {
+  GLYPH_BETA_CHANNEL,
   GLYPH_INSTALLATION_PROFILES,
   GLYPH_PACKAGE_NAMES,
   GLYPH_PUBLIC_PACKAGE_NAMES,
+  GLYPH_STABLE_CHANNEL,
+  glyphCliCommand,
+  glyphCliCommandParts,
+  glyphExactChannel,
+  glyphInstallCommand,
+  glyphInstallCommandParts,
   glyphInstallationProfile,
+  glyphLocalCliCommand,
+  glyphLocalCliCommandParts,
+  glyphPackageSpecifier,
   glyphPackagesFor,
 } from "./package-surface.js";
 export type {
   GlyphInstallationProfile,
+  GlyphPackageChannel,
+  GlyphPackageManager,
   GlyphPackageName,
 } from "./package-surface.js";
 export { PACKAGE_VERSION } from "./generated/version.js";

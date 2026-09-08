@@ -3,7 +3,7 @@
 Payload-only Svelte 5 component and action for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-svelte
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-svelte@beta
 ```
 
 Pass only a server-produced `GlyphPayload`. Read the [Svelte and SvelteKit

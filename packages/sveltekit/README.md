@@ -3,8 +3,8 @@
 SvelteKit 2 request handle and endpoint integration for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-sveltekit
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-sveltekit@beta
+npm exec glyphscramble -- init
 ```
 
 The generated handle owns request-local context, font routing, and selective
