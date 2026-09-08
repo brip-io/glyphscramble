@@ -1,6 +1,6 @@
 # [DIST-INSTALL-DX] Prerelease installation and channel-safe onboarding
 
-> **Parent:** [DIST-RELEASE](DIST-RELEASE-package-release-delivery.md) · **Size:** S · **Priority:** P0 · **Status:** Proposed · **GitHub issue:** [#68](https://github.com/brip-io/glyphscramble/issues/68)
+> **Parent:** [DIST-RELEASE](DIST-RELEASE-package-release-delivery.md) · **Size:** S · **Priority:** P0 · **Status:** Implemented in [PR #86](https://github.com/brip-io/glyphscramble/pull/86) · **GitHub issue:** [#68](https://github.com/brip-io/glyphscramble/issues/68)
 > **Blocked by:** R15 and DX-PACKAGE-SURFACE · **Blocks:** DIST-NPM-BOOTSTRAP and DIST-REGISTRY-E2E
 
 ## Objective
@@ -58,3 +58,22 @@ The shared model feeds root and package readmes, `docs/DISTRIBUTION.md`, generat
 ## Exit criteria
 
 A beta user can copy any documented npm, pnpm, Yarn, or Bun command and receive the beta CLI plus a compatible adapter; tests fail if a governed beta surface points implicitly at `latest` or the initializer creates a cross-version installation.
+
+## Implementation evidence
+
+- The browser-safe `@brip/glyphscramble/package-surface` export owns typed
+  beta, exact, and stable specifiers plus install, discovery, and local-CLI
+  command rendering for npm, pnpm, Yarn, and Bun.
+- `init` exact-saves missing packages at its embedded `PACKAGE_VERSION`,
+  exposes the selected specifiers in dry-run/JSON output, and refuses existing
+  GlyphScramble dependencies that are floating or cross-version before
+  integration files are written.
+- `doctor` emits exact-version repair commands and reports
+  `GLYPH-VERSION-MISMATCH`; public beta documentation uses `@beta` only for
+  first discovery, then runs the installed local CLI.
+- The governed-surface scan rejects unqualified beta commands and floating
+  installs. The release consumer matrix resolves `@beta` from a mock registry,
+  proves exact saving, and proves the installed CLI selects the matching
+  adapter version through npm, pnpm, Yarn, and Bun.
+- Bun qualification uses one fresh cache per release-candidate run so an older
+  tarball with the same rehearsal version cannot satisfy the consumer checks.
