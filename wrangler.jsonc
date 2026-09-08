@@ -15,7 +15,17 @@
   // Nothing here is sensitive. The account ID is supplied by Workers Builds at
   // build time and the deploy credential never leaves Cloudflare, so this file
   // is safe to keep in a public repository.
-  "name": "glyphscramble",
+
+  // The name of the Worker this deploys to, and it has to be exactly that.
+  // Wrangler does not fail on a name nothing answers to: it creates a second
+  // Worker under the new name, with no routes and no custom domain, and
+  // reports success. This said "glyphscramble" while the Worker has been
+  // "glyphscramble-demo" since it was provisioned, so a `wrangler deploy`
+  // from here would have published the site to a Worker nobody was looking
+  // at. Workers Builds deploys against the dashboard's own Worker and was
+  // never reading this, which is why the site is up and the mismatch was
+  // invisible. Check the dashboard before changing it.
+  "name": "glyphscramble-demo",
   "compatibility_date": "2026-09-05",
   "assets": {
     "directory": "./apps/docs/out",
