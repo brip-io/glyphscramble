@@ -175,23 +175,78 @@ code {
   color: var(--accent);
 }
 
+/* The BRIP lockup: the ribbon-B mark, then the drawn wordmark, then the
+   trademark sign. Everything here is sized in `em` so the lockup tracks
+   whatever type it is set beside — the header endorsement, the hero maker
+   line and the footer sentence are three different sizes and none of them
+   needs its own rule.
+
+   The mark's height is the wordmark's cap height plus its ascender room:
+   1.06em against the word's 0.745em is the ratio the master identity uses
+   (a 19px mark beside an 18px lockup), and it is the proportion, not the
+   pixel figure, that has to travel. */
 .brip-lockup {
-  gap: 5px;
+  gap: 0.4em;
   color: currentColor;
-  font-weight: 670;
-  letter-spacing: -0.02em;
 }
 
-.brip-lockup svg {
-  width: 17px;
-  height: auto;
+/* The word and its trademark sign — see the note in brip-lockup.tsx for
+   why they are a row of their own. `baseline` rather than `center`: the
+   sign is aligned to this row's cap line by `align-self` below, and the
+   row itself sits on the type's baseline. */
+.brip-word-lockup {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.brip-lockup .brip-mark {
+  height: 1.06em;
+  width: auto;
+  flex: none;
+  /* The ribbon touches all four sides of its own box, so the outer column
+     and row are lost to the SVG viewport clip wherever the box lands on a
+     fraction of a device pixel. */
+  overflow: visible;
+}
+
+/* Two tones, and they are structure rather than decoration: the pale one
+   is the ribbon's underside where it turns, and it is what makes the
+   silhouette read as a B instead of as a blob with a notch in it.
+
+   Every ground on this site is near-black, so there is one treatment
+   rather than a light and a dark pair: the body takes `currentColor` —
+   which is how `.maker-line` and `.bridge-maker-line` already tint the
+   lockup to the accent — and the fold is a wash of the same colour. 40%
+   is not a guess: it puts the fold-to-body contrast at 4.1:1, which is
+   what the identity's own ink and fold measure against each other. */
+.brip-lockup .brip-mark-body {
   fill: currentColor;
 }
 
-.brip-lockup sup {
-  margin-left: 1px;
-  font-size: 0.46em;
-  vertical-align: super;
+.brip-lockup .brip-mark-fold {
+  fill: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+/* `currentColor` and a height in `em`, so the drawn word behaves like the
+   text node it replaced: a surface still colours it with `color` and
+   still sizes it with `font-size`. 0.745em is the box's own meaning — the
+   viewBox is exactly the cap height — so the word sits at the cap height
+   of the type beside it. */
+.brip-lockup .brip-word {
+  height: 0.745em;
+  width: auto;
+  fill: currentColor;
+  overflow: visible;
+}
+
+/* As a flex item the sup is baseline-aligned and sits on the baseline,
+   where `vertical-align` cannot reach it. Align it to the cap line. */
+.brip-lockup .brip-tm {
+  align-self: flex-start;
+  margin-left: 0.1em;
+  font-size: 0.42em;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .site-nav {
@@ -1079,10 +1134,6 @@ button:active:not(:disabled) {
   color: var(--body);
   text-decoration: none;
   vertical-align: middle;
-}
-
-.footer-maker .brip-lockup svg {
-  width: 15px;
 }
 
 .site-footer p {

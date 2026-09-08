@@ -171,7 +171,7 @@ export default function HomePage() {
           <div className="bridge-copy">
             <p>
               GlyphScramble protects a public surface without pretending it is a
-              vault. brip is the broader system for licensing deliberate access,
+              vault. BRIP is the broader system for licensing deliberate access,
               applying usage rules, and keeping a delivery record.
             </p>
             <div className="bridge-actions">
@@ -179,7 +179,7 @@ export default function HomePage() {
                 className="button button-light"
                 href="https://brip.io/?utm_source=glyphscramble&utm_medium=oss&utm_campaign=project-bridge"
               >
-                Visit brip
+                Visit BRIP
                 <ArrowUpRightIcon aria-hidden="true" size={18} />
               </a>
               <a className="text-link-light" href="/responsible-use/">

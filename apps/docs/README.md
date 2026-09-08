@@ -4,9 +4,26 @@ This private workspace package builds the public GlyphScramble product site,
 interactive demo, and documentation. The canonical production host is planned
 as `glyphscramble.brip.io`.
 
-The site is owned by the public GlyphScramble repository. brip's main website
+The site is owned by the public GlyphScramble repository. BRIP's main website
 and editorial channels promote it and receive the commercial handoff when a
 publisher is ready to move from scraping friction to licensed delivery.
+
+## BRIP identity assets
+
+`components/brip-lockup.tsx`, `app/icon.svg` and the lockup in the corner of
+`public/og.png` all carry the same two drawings: the ribbon-B mark and the
+drawn BRIP wordmark. Their master lives in the private BRIP monorepo
+(`site/src/brand-geometry.mjs`), and this repository shares no runtime code
+with it, so the paths are transcribed rather than imported and an identity
+change has to be brought across by hand — into all three, in one change.
+Do not redraw either by eye: nothing here can detect a favicon and a footer
+carrying different versions of the mark.
+
+The tones are this site's, not the identity's. BRIP's own palette is green on
+a light ground; every surface here is near-black with a teal accent, so the
+mark takes `currentColor` for its body and a wash of the same colour for the
+ribbon's underside. The wash is 40%, which puts the two tones at the same
+4.1:1 contrast the identity's own ink and fold measure against each other.
 
 ## Local development
 
@@ -121,5 +138,5 @@ infrastructure preference:
   demo as garbage.
 
 Production DNS, Content-Security-Policy, and deployment credentials remain a
-brip infrastructure decision and are intentionally not embedded in this
+BRIP infrastructure decision and are intentionally not embedded in this
 repository.

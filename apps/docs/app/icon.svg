@@ -1,4 +1,19 @@
+<!-- The BRIP ribbon-B on the site tile. The paths are the same two as
+     components/brip-lockup.tsx, whose header says where their master is and
+     why they are copied rather than imported; this file moves with them.
+
+     Centred on the 64 grid: the mark box is 29.54x40, so it is offset
+     by (17.23, 12.00). That box is the largest whose farthest point still
+     clears Android maskable cropping when centred here.
+
+     Flat tones rather than the identity gradient, and the fold is the
+     accent at 40% over the canvas resolved to a literal — an icon is
+     rendered outside the page, where no custom property or color-mix is
+     reachable. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#090a0a"/>
-  <path fill="#79c5c8" d="M14 13h10.9c2.2 0 3.9 1 5 2.9l2.2 3.6c1.2 1.9 2.8 2.9 5 2.9H49a8 8 0 0 1 8 8V47a8 8 0 0 1-8 8H15a8 8 0 0 1-8-8V20a7 7 0 0 1 7-7Z"/>
+  <g transform="translate(17.23 12.00)">
+    <path fill="#365556" d="M24.47 22.64L24.49 22.78L25.02 23.04L26.02 23.67C27.26 24.63 28.44 26 28.93 27.53C29.47 29.21 29.66 30.82 29.43 32.58C28.94 36.27 25.8 39.58 22.09 40L18.58 39.49L11.66 37.82C8.65 37.07 5.23 36.57 3.5 33.68L3.03 32.6L2.83 30.65L2.82 30.46L2.44 30.36L1.7 30.1L0.17 28.64L0 25.7L0 19.95L0 18.36L0.41 17.32L1.38 17.35L3.3 17.83L8.12 18.94L11 19.63L11.97 19.45L13.7 19.02L19.45 17.55L19.6 17.48L19.41 17.42L8.45 14.78L2.67 13.37L1.13 13L0.27 12.57L0 11.44L0 9.86L0.05 2.94L0 0.97L0.61 0.02L1.59 0.15L2.94 0.45L9.11 1.83L18.76 4C20.76 4.43 22.76 4.77 24.53 5.86C28.66 8.41 30.05 14.02 28.09 18.36C27.3 20.1 26.01 21.54 24.47 22.64Z"/>
+    <path fill="#79c5c8" d="M25.11 22.18L24.95 22.26L25 22.07C25.45 20.5 24.61 19.28 23.24 18.56L20.63 17.72L16.39 16.69L4.65 13.85L1.57 13.11L0.3 12.62C-0.14 12.14 0 11.3 0 10.71L0 5.95L0 1.82L0.2 0.27L1.39 0.1L2.94 0.45L10.65 2.18L18.76 4C20.76 4.43 22.76 4.77 24.53 5.86C28.66 8.41 30.05 14.02 28.09 18.36C27.39 19.9 26.31 21.03 25.11 22.18ZM24.42 39.36L24.26 39.4L24.33 39.22L24.53 38.47C24.61 36.48 22.21 35.53 20.65 35.14L19.51 34.84L18.17 34.48L5.53 31.18L2.86 30.47C1.91 30.2 0.95 29.88 0.38 29.02L0 26.72L0 22.95L0 18.99L0.24 17.48L1.34 17.34L2.69 17.67L9.62 19.31L19.84 21.6C21.79 22.03 23.94 22.27 25.64 23.4C29.7 26.11 30.67 31.91 28.15 35.99C27.24 37.46 25.95 38.57 24.42 39.36Z"/>
+  </g>
 </svg>
