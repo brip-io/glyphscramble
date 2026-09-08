@@ -7,24 +7,22 @@
  * it drifted in exactly the way a hand-made image does: it showed one string
  * of invented glyphs turning into another string of invented glyphs, so the
  * one picture most people see before they ever reach the site demonstrated
- * nothing the product does. The page two screens below it was already saying
- * it correctly, out of `src/generated/demo-fixtures.json`. The card now reads
- * from the same file, and from `src/brand-geometry.mjs` for the identity, so
- * the two cannot disagree again.
+ * nothing the product does. Generating it from `src/brand-geometry.mjs` means
+ * the card, the favicon and the header lockup are three consumers of one
+ * drawing rather than three copies somebody has to keep in step.
  *
- * THE PICTURE IS THE PRODUCT'S ONE CLAIM. Both panes carry the SAME bytes —
- * the encoded text out of the fixtures — and only the font differs: the left
- * pane in the body face, which is what a parser reading the response sees,
- * and the right pane in that response's own generated WOFF2, which is what a
- * browser draws. That is not a stylistic choice about the diagram; it is the
- * mechanism, and a card showing two different strings is claiming something
- * else. It is also why the right pane cannot simply be set in the sentence:
- * a card that types out the plaintext is a card that has decoded it, which is
- * the opposite of what happens.
+ * THE CARD SAYS THREE THINGS: the product's name, one line about what it is
+ * for, and who made it. A share card is rendered at about 40% of its own
+ * width in a feed and is very often the only part of the site somebody looks
+ * at, so it is a poster, not a page. An earlier version put the site's own
+ * scraper-versus-reader comparison on it — the real encoded bytes beside the
+ * same bytes drawn through the response's font, which is a genuinely good
+ * demonstration and completely illegible at 500px. The demonstration belongs
+ * on the page, where a reader has arrived and can read it.
  *
- * Both fonts are inlined as data URIs so the render needs no server — and the
- * body face as well as the demo font, because a card that renders in a
- * fallback face is the same class of fault as a wordmark set in one.
+ * The body face is inlined as a data URI so the render needs no server and no
+ * network: a card that renders in a fallback face is the same class of fault
+ * as a wordmark set in one.
  *
  * NOT RUN BY THE BUILD, deliberately. It needs a browser, and the site is
  * deployed by Cloudflare's Git integration from a plain static export; making
@@ -33,10 +31,9 @@
  *
  *     pnpm --filter @brip/glyphscramble-demo generate:brand
  *
- * `test/og-source.test.ts` is what stops that being a promise nobody keeps:
- * the script records the exact strings it drew in
- * `src/generated/og-source.json`, and the test fails when they no longer
- * match the fixtures the site renders from.
+ * Nothing here reads the demo fixtures any more, so there is nothing for the
+ * card to fall out of step with — which is why the drift test that guarded
+ * the previous card was deleted along with it rather than left behind.
  */
 
 import { createRequire } from "node:module";
@@ -70,20 +67,23 @@ const appRoot = fileURLToPath(new URL("../", import.meta.url));
    reachable. A change to the palette has to be made in both places, which is
    the same bargain src/brand-geometry.mjs makes with the private monorepo. */
 const CANVAS = "#090a0a";
-const PANEL = "#070808";
 const INK = "#f1f3f1";
 const MUTED = "#8b908c";
 const ACCENT = "#79c5c8";
-const LINE = "#2b2f2f";
 
 /* The mark's pale tone on this ground: the accent at 40%, resolved to a
    literal because a rendered asset has no color-mix. 40% is what puts the
    two tones at 4.1:1, the contrast the identity's own ink and fold hold. */
 const FOLD_TONE = "#365556";
 
+/* The card's own words. Short enough to survive a feed, and the same two
+   lines the page leads with — app/layout.tsx and the hero in app/page.tsx. */
+const NAME = "GlyphScramble";
+const CLAIM = "Make bulk DOM scraping cost more.";
+
 const WIDTH = 1200;
 const HEIGHT = 630;
-const PAD = 64;
+const PAD = 80;
 
 const dataUri = async (path, mime = "font/woff2") =>
   `data:${mime};base64,${(await readFile(path)).toString("base64")}`;
@@ -126,7 +126,7 @@ function lockupSvg(cap, body, fold) {
 </span>`;
 }
 
-function cardHtml({ encodedText, family, bodyFont, demoFont }) {
+function cardHtml({ bodyFont }) {
   return `<style>
   @font-face {
     font-family: "Instrument Sans Variable";
@@ -134,87 +134,50 @@ function cardHtml({ encodedText, family, bodyFont, demoFont }) {
     font-weight: 100 900;
     font-display: block;
   }
-  /* The response's own generated font. Both panes below are the same
-     characters; this is the entire difference between them. */
-  @font-face {
-    font-family: "${family}";
-    src: url("${demoFont}") format("woff2");
-    font-weight: 400;
-    font-display: block;
-  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     width: ${WIDTH}px;
     height: ${HEIGHT}px;
+    position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* The name and its line are the card; the maker sits out of the way at
+       the foot. Centring the pair and pinning the lockup splits the empty
+       space above and below them, where anchoring both to the edges pools
+       it all into one hole in the middle. */
+    justify-content: center;
     padding: ${PAD}px;
     background: ${CANVAS};
     color: ${INK};
     font-family: "Instrument Sans Variable", system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.55;
     text-rendering: optimizeLegibility;
   }
+  /* Sized for the feed rather than for the 1200px file. At 92px the name is
+     still 38px in a 500px-wide preview, which is the smallest thing on the
+     card a reader has to be able to take in at a glance. */
   h1 {
-    margin: 0 0 10px;
-    font-size: 62px;
+    margin: 0 0 22px;
+    font-size: 92px;
     font-weight: 620;
-    letter-spacing: -0.025em;
-    line-height: 1.05;
+    letter-spacing: -0.028em;
+    line-height: 1;
   }
-  .claim { margin: 0; color: ${MUTED}; font-size: 25px; }
-  /* Full-bleed, so the panes read as the page's own comparison strip rather
-     than as a card sitting on the card. */
-  .panes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin: 0 -${PAD}px;
-    border-block: 1px solid ${LINE};
-    background: ${PANEL};
-  }
-  .pane { min-width: 0; padding: 38px ${PAD}px; }
-  .pane + .pane { border-left: 1px solid ${LINE}; }
-  /* Bigger than the same label on the page. A share card is read at about
-     40% of its own width in a feed, and these two words are what tell a
-     reader that the two blocks below are the same text twice. */
-  .label { margin: 0 0 20px; color: ${MUTED}; font-size: 18px; font-weight: 620; }
-  .text { margin: 0; font-size: 27px; line-height: 1.32; }
-  .raw { color: ${ACCENT}; overflow-wrap: anywhere; }
-  .rendered { color: ${INK}; font-family: "${family}"; }
-  .foot { display: flex; align-items: center; justify-content: space-between; }
-  .limit { margin: 0; color: ${MUTED}; font-size: 17px; }
+  /* No max-width: the claim is one short line and it should stay one line.
+     A second line here costs more than it buys — the eye reads the name, the
+     line under it, and the maker, and a wrap turns three things into four. */
+  .claim { margin: 0; color: ${MUTED}; font-size: 36px; line-height: 1.3; }
+  .maker { position: absolute; left: ${PAD}px; bottom: ${PAD}px; }
 </style>
 <div>
-  <h1>GlyphScramble</h1>
-  <p class="claim">Make bulk DOM scraping cost more.</p>
+  <h1>${NAME}</h1>
+  <p class="claim">${CLAIM}</p>
 </div>
-<div class="panes">
-  <div class="pane">
-    <p class="label">Raw scraper receives</p>
-    <p class="text raw">${encodedText}</p>
-  </div>
-  <div class="pane">
-    <p class="label">Human sees</p>
-    <p class="text rendered">${encodedText}</p>
-  </div>
-</div>
-<div class="foot">
-  ${lockupSvg(21, ACCENT, FOLD_TONE)}
-  <p class="limit">Friction, not DRM.</p>
-</div>`;
+<div class="maker">${lockupSvg(26, ACCENT, FOLD_TONE)}</div>`;
 }
 
 async function main() {
   await writeFile(join(appRoot, "app/icon.svg"), iconSvg());
-
-  const fixtures = JSON.parse(
-    await readFile(join(appRoot, "src/generated/demo-fixtures.json"), "utf8"),
-  );
-  const { sentence } = fixtures;
-  const { encodedText, family, fontFile } = fixtures.runtime.a;
 
   const fontRoot = dirname(
     require_.resolve("@fontsource-variable/instrument-sans/package.json"),
@@ -222,7 +185,6 @@ async function main() {
   const bodyFont = await dataUri(
     join(fontRoot, "files/instrument-sans-latin-wght-normal.woff2"),
   );
-  const demoFont = await dataUri(join(appRoot, "public", fontFile));
 
   /* CHROMIUM_PATH is for environments that already carry a browser and
      cannot run `playwright install` — CI images, sandboxes. Unset, this is
@@ -236,29 +198,14 @@ async function main() {
     const page = await browser.newPage({
       viewport: { width: WIDTH, height: HEIGHT },
     });
-    await page.setContent(
-      cardHtml({ encodedText, family, bodyFont, demoFont }),
-    );
+    await page.setContent(cardHtml({ bodyFont }));
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: join(appRoot, "public/og.png") });
   } finally {
     await browser.close();
   }
 
-  /* What the card actually says, so a test can notice when the fixtures move
-     under it. The card is a committed artifact, and this is the only thing
-     tying it back to its source. `sentence` is recorded even though it is
-     never typed on the card: it is what the right pane's font renders the
-     encoded text as, so a fixture regenerated against a new sentence has
-     changed the card whether or not the encoded string happens to match. */
-  await writeFile(
-    join(appRoot, "src/generated/og-source.json"),
-    `${JSON.stringify({ sentence, encodedText, family }, null, 2)}\n`,
-  );
-
-  process.stdout.write(
-    "wrote app/icon.svg, public/og.png, src/generated/og-source.json\n",
-  );
+  process.stdout.write("wrote app/icon.svg, public/og.png\n");
 }
 
 await main();

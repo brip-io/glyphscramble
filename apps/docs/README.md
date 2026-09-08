@@ -16,25 +16,21 @@ publisher is ready to move from scraping friction to licensed delivery.
 pnpm --filter @brip/glyphscramble-demo generate:brand
 ```
 
-`scripts/generate-brand-assets.mjs` draws both from two sources in this
-repository — `src/brand-geometry.mjs` for the identity and
-`src/generated/demo-fixtures.json` for the share card's text. Re-run it after
-regenerating the demo fixtures, or after changing the geometry or the site's
-palette. It is not part of the build: it needs a browser, and the deploy is a
-plain static export that Cloudflare builds from Git, so making every deploy
-download Chromium to redraw an image that changes twice a year is the wrong
-trade. `test/og-source.test.ts` is what keeps that honest — the generator
-records the strings it drew and the test fails when they no longer match the
-fixtures. Set `CHROMIUM_PATH` if the environment already carries a browser and
-cannot run `playwright install`.
+`scripts/generate-brand-assets.mjs` draws both from `src/brand-geometry.mjs`,
+so the card, the favicon and the header lockup are three consumers of one
+drawing rather than three copies somebody has to keep in step. Re-run it after
+changing the geometry, the card's words or the site's palette. It is not part
+of the build: it needs a browser, and the deploy is a plain static export that
+Cloudflare builds from Git, so making every deploy download Chromium to redraw
+an image that changes twice a year is the wrong trade. Set `CHROMIUM_PATH` if
+the environment already carries a browser and cannot run `playwright install`.
 
-The share card shows the product's one claim and nothing else: both panes
-carry the **same bytes** — the encoded text out of the fixtures — and only the
-font differs, the left in the body face and the right in that response's own
-generated WOFF2. A card showing two different strings is claiming something
-else, and a card that types out the plaintext is a card that has decoded it.
-The previous card was drawn by hand and did exactly that, which is why this
-script exists.
+The card says three things — the product's name, one line about what it is
+for, and who made it. It is read at roughly 40% of its own width in a feed and
+is often the only part of this site anybody looks at, so it is a poster rather
+than a page. An earlier version put the site's own scraper-versus-reader
+comparison on it, which is a good demonstration and illegible at 500px; the
+demonstration belongs on the page, where a reader has arrived and can read it.
 
 ### The identity itself
 
