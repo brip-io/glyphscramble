@@ -871,8 +871,13 @@ button:active:not(:disabled) {
     color 160ms ease;
 }
 
-.installer-logo-choice svg {
+.installer-brand-icon {
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
+  background: currentColor;
+  mask: var(--installer-brand-icon) center / contain no-repeat;
+  -webkit-mask: var(--installer-brand-icon) center / contain no-repeat;
 }
 
 .installer-logo-choice:hover,
