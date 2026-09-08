@@ -45,10 +45,6 @@ export default function HomePage() {
       <section className="section shell" id="how-it-works">
         <div className="section-heading">
           <h2>The response is wrong. The rendering is right.</h2>
-          <p>
-            GlyphScramble changes the Unicode a raw parser receives. The browser
-            restores the intended glyphs with a matching WOFF2 font.
-          </p>
         </div>
         <ol className="mechanism-list">
           <li>
@@ -84,10 +80,6 @@ export default function HomePage() {
       <section className="comparison-section shell">
         <div className="section-heading">
           <h2>What a raw scraper gets. What a reader sees.</h2>
-          <p>
-            The same encoded text becomes readable only after the browser loads
-            its matching generated font.
-          </p>
         </div>
         <div className="landing-comparison">
           <article className="comparison-pane raw-pane">
