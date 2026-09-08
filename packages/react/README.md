@@ -3,7 +3,7 @@
 Payload-only React component and server helper for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-react
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-react@beta
 ```
 
 Plaintext belongs in the server helper; Client Components accept only a

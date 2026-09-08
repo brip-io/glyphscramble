@@ -4,8 +4,8 @@ Nuxt 4/Nitro request integration and Vue component registration for
 GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-nuxt
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-nuxt@beta
+npm exec glyphscramble -- init
 ```
 
 The module installs request context, the font endpoint, selective cache

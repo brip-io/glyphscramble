@@ -37,12 +37,12 @@ framework adapter, and prepares the font locally:
 
 ```bash
 # npm (canonical)
-npx @brip/glyphscramble init
+npx @brip/glyphscramble@beta init
 
 # pnpm / Yarn / Bun
-pnpm dlx @brip/glyphscramble init
-yarn dlx @brip/glyphscramble init
-bunx @brip/glyphscramble init
+pnpm dlx @brip/glyphscramble@beta init
+yarn dlx @brip/glyphscramble@beta init
+bunx @brip/glyphscramble@beta init
 ```
 
 `init` detects Next, Nuxt, SvelteKit, Astro, or Vite and writes one config plus
@@ -51,10 +51,15 @@ locally during initialization/build; runtime requests use locked local
 artifacts. Automation must pass every safety choice explicitly, for example:
 
 ```bash
-npx @brip/glyphscramble init --yes --framework next --mode response \
+npx @brip/glyphscramble@beta init --yes --framework next --mode response \
   --font ./fonts/body.woff2 --license-spdx OFL-1.1 \
   --license-file ./licenses/OFL.txt --acknowledge-accessibility-risk
 ```
+
+`@beta` is the discovery channel while GlyphScramble is in prerelease. The
+initializer resolves that CLI once, then pins every missing GlyphScramble
+package to the CLI's exact version. Unqualified commands are reserved for a
+future stable release after npm's `latest` channel is deliberately enabled.
 
 For Next 16, the initializer supports App Router projects rooted at either
 `app/` or `src/app/`. It generates a server helper and

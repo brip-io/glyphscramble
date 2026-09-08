@@ -34,7 +34,9 @@ describe("doctor readiness", () => {
       "CONFIG-MISSING",
     ]);
     expect(findings.every((item) => item.severity === "error")).toBe(true);
-    expect(findings[1]?.message).toContain("init --dry-run");
+    expect(findings[1]?.message).toContain(
+      "npx @brip/glyphscramble@beta init --dry-run",
+    );
   });
 
   it("checks config, secret, prepared licences, adapter range, and sources", async () => {
@@ -44,7 +46,8 @@ describe("doctor readiness", () => {
       JSON.stringify({
         dependencies: {
           next: "^16.3.0",
-          "@brip/glyphscramble-next": "^0.1.0-beta.0",
+          "@brip/glyphscramble": "0.1.0-beta.0",
+          "@brip/glyphscramble-next": "0.1.0-beta.0",
         },
       }),
     );
@@ -83,5 +86,32 @@ describe("doctor readiness", () => {
       "SOURCE-READY",
     ]);
     expect(findings.every((item) => item.severity === "info")).toBe(true);
+  });
+
+  it("reports cross-version packages with an exact repair command", async () => {
+    const cwd = await project();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "16.3.4",
+          "@brip/glyphscramble": "0.1.0-beta.0",
+          "@brip/glyphscramble-next": "^0.1.0-beta.0",
+        },
+      }),
+    );
+    await writeFile(
+      join(cwd, "glyphscramble.config.mjs"),
+      "export default {};\n",
+    );
+
+    const findings = await doctorProject({ cwd });
+    const mismatch = findings.find(
+      (item) => item.code === "GLYPH-VERSION-MISMATCH",
+    );
+    expect(mismatch?.message).toContain(
+      "npm install --save-exact @brip/glyphscramble@0.1.0-beta.0 @brip/glyphscramble-next@0.1.0-beta.0",
+    );
+    expect(mismatch?.message).not.toMatch(/@(?:beta|latest)\b/u);
   });
 });

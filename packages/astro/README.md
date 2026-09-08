@@ -3,8 +3,8 @@
 Astro 7 SSR middleware and payload component for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-astro
-npx @brip/glyphscramble init
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-astro@beta
+npm exec glyphscramble -- init
 ```
 
 SSR uses per-response mappings. Static Astro output instead uses the core

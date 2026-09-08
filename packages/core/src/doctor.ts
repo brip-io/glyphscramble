@@ -3,10 +3,28 @@ import { readFile, readdir } from "node:fs/promises";
 import { extname, join, relative, resolve } from "node:path";
 import { discoverGlyphConfigPath, loadGlyphConfig } from "./config-loader.js";
 import type { DoctorFinding } from "./types.js";
+import {
+  GLYPH_BETA_CHANNEL,
+  GLYPH_PACKAGE_NAMES,
+  glyphCliCommand,
+  glyphExactChannel,
+  glyphInstallCommand,
+  type GlyphPackageName,
+} from "./package-surface.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
 
 const GUIDE = "https://github.com/brip-io/glyphscramble#install-and-prepare";
 const USAGE =
   "https://github.com/brip-io/glyphscramble/blob/main/docs/USAGE-GUIDE.md";
+const INIT_REPAIR = glyphCliCommand("npm", GLYPH_BETA_CHANNEL, [
+  "init",
+  "--dry-run",
+]);
+const DOCTOR_CHANNEL = glyphExactChannel(PACKAGE_VERSION);
+
+function installRepair(...names: readonly GlyphPackageName[]): string {
+  return glyphInstallCommand("npm", names, DOCTOR_CHANNEL);
+}
 
 async function sourceFiles(root: string): Promise<string[]> {
   const paths: string[] = [];
@@ -147,7 +165,7 @@ export async function doctorProject(
       finding(
         "error",
         "CONFIG-MISSING",
-        `${error instanceof Error ? error.message : String(error)} Repair: npx @brip/glyphscramble init --dry-run. ${GUIDE}`,
+        `${error instanceof Error ? error.message : String(error)} Repair: ${INIT_REPAIR}. ${GUIDE}`,
       ),
     );
     return findings;
@@ -231,20 +249,29 @@ export async function doctorProject(
       Object.keys(SUPPORT) as Array<keyof typeof SUPPORT>
     ).find((candidate) => dependencies[SUPPORT[candidate].package]);
     if (!framework) {
-      if (dependencies["@brip/glyphscramble"])
+      const coreVersion = dependencies[GLYPH_PACKAGE_NAMES.core];
+      if (!coreVersion)
         findings.push(
           finding(
-            "info",
-            "BOUNDARY-GENERIC",
-            "Core package detected without a framework adapter; verify that a generic Fetch/Node server boundary owns plaintext and font routing.",
+            "error",
+            "CORE-MISSING",
+            `Install ${GLYPH_PACKAGE_NAMES.core} in the server application. Repair: ${installRepair(GLYPH_PACKAGE_NAMES.core)}. ${GUIDE}`,
+          ),
+        );
+      else if (coreVersion !== PACKAGE_VERSION)
+        findings.push(
+          finding(
+            "error",
+            "GLYPH-VERSION-MISMATCH",
+            `${GLYPH_PACKAGE_NAMES.core}@${String(coreVersion)} does not match the running CLI version ${PACKAGE_VERSION}. Repair: ${installRepair(GLYPH_PACKAGE_NAMES.core)}. ${GUIDE}`,
           ),
         );
       else
         findings.push(
           finding(
-            "error",
-            "CORE-MISSING",
-            `Install @brip/glyphscramble in the server application. Repair: npm install @brip/glyphscramble. ${GUIDE}`,
+            "info",
+            "BOUNDARY-GENERIC",
+            "Core package detected without a framework adapter; verify that a generic Fetch/Node server boundary owns plaintext and font routing.",
           ),
         );
     } else {
@@ -268,17 +295,34 @@ export async function doctorProject(
           finding(
             "error",
             "ADAPTER-MISSING",
-            `Install ${support.adapter}. Repair: npm install @brip/glyphscramble ${support.adapter}. ${GUIDE}`,
+            `Install ${support.adapter}. Repair: ${installRepair(GLYPH_PACKAGE_NAMES.core, support.adapter)}. ${GUIDE}`,
           ),
         );
-      else
-        findings.push(
-          finding(
-            "info",
-            "ADAPTER-READY",
-            `${support.adapter} matches detected ${support.package}@${rawVersion}.`,
-          ),
-        );
+      else {
+        const glyphVersions = [
+          [GLYPH_PACKAGE_NAMES.core, dependencies[GLYPH_PACKAGE_NAMES.core]],
+          [support.adapter, dependencies[support.adapter]],
+        ] as const;
+        const mismatches = glyphVersions
+          .filter(([, version]) => version !== PACKAGE_VERSION)
+          .map(([name, version]) => `${name}@${String(version ?? "missing")}`);
+        if (mismatches.length > 0)
+          findings.push(
+            finding(
+              "error",
+              "GLYPH-VERSION-MISMATCH",
+              `GlyphScramble packages must match the running CLI version ${PACKAGE_VERSION}; found ${mismatches.join(", ")}. Repair: ${installRepair(GLYPH_PACKAGE_NAMES.core, support.adapter)}. ${GUIDE}`,
+            ),
+          );
+        else
+          findings.push(
+            finding(
+              "info",
+              "ADAPTER-READY",
+              `${support.adapter}@${PACKAGE_VERSION} matches detected ${support.package}@${rawVersion}.`,
+            ),
+          );
+      }
     }
   }
 

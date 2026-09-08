@@ -3,7 +3,7 @@
 Payload-only Vue 3 component for GlyphScramble by BRIP.
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-vue
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-vue@beta
 ```
 
 Pass only a server-produced `GlyphPayload` to the component. Read the [Vue and

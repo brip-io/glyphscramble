@@ -2,9 +2,16 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  GLYPH_BETA_CHANNEL,
   GLYPH_INSTALLATION_PROFILES,
   GLYPH_PACKAGE_NAMES,
   GLYPH_PUBLIC_PACKAGE_NAMES,
+  GLYPH_STABLE_CHANNEL,
+  glyphCliCommand,
+  glyphExactChannel,
+  glyphInstallCommand,
+  glyphLocalCliCommand,
+  glyphPackageSpecifier,
   glyphPackagesFor,
 } from "../src/package-surface.js";
 
@@ -61,6 +68,41 @@ describe("canonical package surface", () => {
     }
   });
 
+  it("keeps governed beta commands explicit and exact-saving", async () => {
+    const files = [
+      "README.md",
+      "apps/docs/app/docs/page.tsx",
+      "apps/docs/components/copy-command.tsx",
+      "docs/DISTRIBUTION.md",
+      "docs/FRAMEWORKS.md",
+      ...Object.keys(GLYPH_PACKAGE_NAMES).map(
+        (directory) => `packages/${directory}/README.md`,
+      ),
+    ];
+    const violations: string[] = [];
+    const command =
+      /(?:npx|bunx|(?:npm|pnpm|yarn|bun)\s+(?:install|add|dlx))\b/u;
+    const unqualified =
+      /@brip\/glyphscramble(?:-(?:react|next|vue|nuxt|svelte|sveltekit|astro|vite))?(?=[\s`\\]|$)/u;
+    const packageInstall = /(?:npm\s+install|(?:pnpm|yarn|bun)\s+add)\b/u;
+
+    for (const file of files) {
+      const source = await readFile(join(root, file), "utf8");
+      for (const [index, line] of source.split("\n").entries()) {
+        if (command.test(line) && unqualified.test(line))
+          violations.push(`${file}:${index + 1}: unqualified package`);
+        if (
+          packageInstall.test(line) &&
+          line.includes("@brip/glyphscramble") &&
+          !/(?:--save-exact|--exact)\b/u.test(line)
+        )
+          violations.push(`${file}:${index + 1}: floating install`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("packs every internal runtime dependency at the exact release version", async () => {
     for (const [directory, name] of Object.entries(GLYPH_PACKAGE_NAMES)) {
       const packageDirectory = directory === "core" ? "core" : directory;
@@ -83,6 +125,92 @@ describe("canonical package surface", () => {
           )
         )
           expect(range).toBe("workspace:*");
+    }
+  });
+
+  it("renders beta, exact, and stable package specifiers explicitly", () => {
+    const exact = glyphExactChannel("0.1.0-beta.7");
+    expect(
+      [GLYPH_BETA_CHANNEL, exact, GLYPH_STABLE_CHANNEL].map((channel) =>
+        glyphPackageSpecifier(GLYPH_PACKAGE_NAMES.core, channel),
+      ),
+    ).toEqual([
+      "@brip/glyphscramble@beta",
+      "@brip/glyphscramble@0.1.0-beta.7",
+      "@brip/glyphscramble",
+    ]);
+    expect(() => glyphExactChannel("beta")).toThrow(/exact package version/i);
+    expect(() =>
+      glyphPackageSpecifier(GLYPH_PACKAGE_NAMES.core, {
+        kind: "exact",
+        version: "latest",
+      }),
+    ).toThrow(/exact package version/i);
+  });
+
+  it.each([
+    [
+      "npm",
+      "npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "npx @brip/glyphscramble@beta init",
+      "npm exec glyphscramble -- doctor",
+    ],
+    [
+      "pnpm",
+      "pnpm add --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "pnpm dlx @brip/glyphscramble@beta init",
+      "pnpm exec glyphscramble doctor",
+    ],
+    [
+      "yarn",
+      "yarn add --exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "yarn dlx @brip/glyphscramble@beta init",
+      "yarn exec glyphscramble doctor",
+    ],
+    [
+      "bun",
+      "bun add --exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta",
+      "bunx @brip/glyphscramble@beta init",
+      "bun run glyphscramble doctor",
+    ],
+  ] as const)(
+    "generates channel-safe %s commands",
+    (manager, install, discovery, local) => {
+      expect(
+        glyphInstallCommand(
+          manager,
+          GLYPH_INSTALLATION_PROFILES.next,
+          GLYPH_BETA_CHANNEL,
+        ),
+      ).toBe(install);
+      expect(glyphCliCommand(manager, GLYPH_BETA_CHANNEL, ["init"])).toBe(
+        discovery,
+      );
+      expect(glyphLocalCliCommand(manager, ["doctor"])).toBe(local);
+    },
+  );
+
+  it("covers every package manager, channel, and installation profile", () => {
+    const managers = ["npm", "pnpm", "yarn", "bun"] as const;
+    const channels = [
+      GLYPH_BETA_CHANNEL,
+      glyphExactChannel("0.1.0-beta.7"),
+      GLYPH_STABLE_CHANNEL,
+    ] as const;
+
+    for (const manager of managers) {
+      for (const channel of channels) {
+        for (const packages of Object.values(GLYPH_INSTALLATION_PROFILES)) {
+          const install = glyphInstallCommand(manager, packages, channel);
+          for (const name of packages)
+            expect(install).toContain(glyphPackageSpecifier(name, channel));
+          expect(install).toMatch(/--(?:save-)?exact\b/u);
+        }
+        const discovery = glyphCliCommand(manager, channel, ["init"]);
+        expect(discovery).toContain(
+          glyphPackageSpecifier(GLYPH_PACKAGE_NAMES.core, channel),
+        );
+      }
     }
   });
 });

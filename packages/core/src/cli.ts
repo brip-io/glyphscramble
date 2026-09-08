@@ -134,7 +134,7 @@ function initPreview(result: Awaited<ReturnType<typeof initProject>>): string {
       `${change.action === "create" ? "Create" : "Update"}: ${change.path}`,
     );
   if (result.dependencies.length)
-    lines.push(`Install: ${result.dependencies.join(", ")}`);
+    lines.push(`Install: ${result.dependencySpecifiers.join(", ")}`);
   if (!result.planned.length && !result.dependencies.length)
     lines.push("No file or dependency changes are required.");
   return `${lines.join("\n")}\n`;

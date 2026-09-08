@@ -33,7 +33,7 @@ function consumerSource(profile) {
   switch (profile) {
     case "generic-node":
     case "astro-static":
-      return 'import { defineGlyphConfig } from "@brip/glyphscramble";\nvoid defineGlyphConfig;\n';
+      return 'import { defineGlyphConfig } from "@brip/glyphscramble";\nimport { GLYPH_BETA_CHANNEL, glyphCliCommand } from "@brip/glyphscramble/package-surface";\nvoid defineGlyphConfig;\nvoid glyphCliCommand("npm", GLYPH_BETA_CHANNEL, ["init"]);\n';
     case "react":
       return 'import { GlyphScramble, type GlyphScrambleProps } from "@brip/glyphscramble-react";\nvoid (GlyphScramble satisfies unknown);\nlet props!: GlyphScrambleProps;\nvoid props;\n';
     case "vue":
@@ -170,6 +170,51 @@ const installs = {
   bun: ["bun", ["install", "--ignore-scripts"]],
 };
 
+const betaAdds = {
+  npm: [
+    "npm",
+    [
+      "install",
+      "--save-exact",
+      "--ignore-scripts",
+      "--legacy-peer-deps",
+      "--no-audit",
+      "--no-fund",
+      "@brip/glyphscramble@beta",
+    ],
+  ],
+  pnpm: [
+    "pnpm",
+    [
+      "add",
+      "--save-exact",
+      "--ignore-scripts",
+      "--strict-peer-dependencies=false",
+      "@brip/glyphscramble@beta",
+    ],
+  ],
+  yarn: [
+    process.execPath,
+    [yarnCli, "add", "--exact", "@brip/glyphscramble@beta"],
+  ],
+  bun: [
+    "bun",
+    ["add", "--exact", "--ignore-scripts", "@brip/glyphscramble@beta"],
+  ],
+};
+
+async function writeRegistryConfiguration(consumer) {
+  await writeFile(
+    join(consumer, ".npmrc"),
+    `@brip:registry=${registryUrl}\nauto-install-peers=false\n`,
+  );
+  if (manager === "yarn")
+    await writeFile(
+      join(consumer, ".yarnrc.yml"),
+      `nodeLinker: node-modules\nunsafeHttpWhitelist:\n  - 127.0.0.1\nnpmScopes:\n  brip:\n    npmRegistryServer: ${JSON.stringify(registryUrl)}\n`,
+    );
+}
+
 try {
   for (const [profile, directPackages] of Object.entries(
     inventory.installationProfiles,
@@ -193,26 +238,24 @@ try {
         2,
       )}\n`,
     );
-    await writeFile(
-      join(consumer, ".npmrc"),
-      `@brip:registry=${registryUrl}\nauto-install-peers=false\n`,
-    );
-    if (manager === "yarn")
-      await writeFile(
-        join(consumer, ".yarnrc.yml"),
-        `nodeLinker: node-modules\nunsafeHttpWhitelist:\n  - 127.0.0.1\nnpmScopes:\n  brip:\n    npmRegistryServer: ${JSON.stringify(registryUrl)}\n`,
-      );
+    await writeRegistryConfiguration(consumer);
 
     const [command, args] = installs[manager];
-    await execute(command, args, {
-      cwd: consumer,
-      env: {
-        ...process.env,
-        ...(manager === "yarn"
-          ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
-          : {}),
+    await execute(
+      command,
+      manager === "bun"
+        ? [...args, "--cache-dir", join(root, ".bun-cache")]
+        : args,
+      {
+        cwd: consumer,
+        env: {
+          ...process.env,
+          ...(manager === "yarn"
+            ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
+            : {}),
+        },
       },
-    });
+    );
 
     const installedManifest = JSON.parse(
       await readFile(join(consumer, "package.json"), "utf8"),
@@ -271,8 +314,92 @@ try {
         );
     }
   }
+
+  const betaConsumer = join(root, "beta-init");
+  await mkdir(betaConsumer);
+  await writeFile(
+    join(betaConsumer, "package.json"),
+    `${JSON.stringify(
+      {
+        name: `glyphscramble-${manager}-beta-init`,
+        private: true,
+        type: "module",
+        ...(manager === "yarn" ? { packageManager: "yarn@4.9.2" } : {}),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await writeRegistryConfiguration(betaConsumer);
+  const [betaCommand, betaArgs] = betaAdds[manager];
+  await execute(
+    betaCommand,
+    manager === "bun"
+      ? [...betaArgs, "--cache-dir", join(root, ".bun-cache")]
+      : betaArgs,
+    {
+      cwd: betaConsumer,
+      env: {
+        ...process.env,
+        ...(manager === "yarn"
+          ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
+          : {}),
+      },
+    },
+  );
+  const betaManifestPath = join(betaConsumer, "package.json");
+  const betaManifest = JSON.parse(await readFile(betaManifestPath, "utf8"));
+  if (betaManifest.dependencies?.["@brip/glyphscramble"] !== inventory.version)
+    throw new Error(
+      `${manager} did not exact-save @brip/glyphscramble@beta as ${inventory.version}.`,
+    );
+  betaManifest.dependencies.next = "16.3.4";
+  await writeFile(
+    betaManifestPath,
+    `${JSON.stringify(betaManifest, null, 2)}\n`,
+  );
+  await mkdir(join(betaConsumer, "app"));
+  await mkdir(join(betaConsumer, "fonts"));
+  await mkdir(join(betaConsumer, "licenses"));
+  await writeFile(join(betaConsumer, "fonts/body.woff2"), "font fixture");
+  await writeFile(join(betaConsumer, "licenses/OFL.txt"), "license fixture");
+  const { stdout: initOutput } = await execute(
+    process.execPath,
+    [
+      join(betaConsumer, "node_modules/@brip/glyphscramble/dist/cli.js"),
+      "init",
+      "--framework",
+      "next",
+      "--mode",
+      "response",
+      "--package-manager",
+      manager,
+      "--font",
+      "./fonts/body.woff2",
+      "--license-spdx",
+      "OFL-1.1",
+      "--license-file",
+      "./licenses/OFL.txt",
+      "--acknowledge-accessibility-risk",
+      "--dry-run",
+      "--json",
+    ],
+    { cwd: betaConsumer },
+  );
+  const initResult = JSON.parse(initOutput);
+  const expectedAdapter = `@brip/glyphscramble-next@${inventory.version}`;
+  if (
+    JSON.stringify(initResult.dependencySpecifiers) !==
+      JSON.stringify([expectedAdapter]) ||
+    !initResult.commands[0]?.includes(expectedAdapter) ||
+    initResult.commands[0]?.includes("@latest") ||
+    initResult.commands[0]?.includes("@beta")
+  )
+    throw new Error(
+      `${manager} initializer did not pin the adapter to the exact beta CLI version: ${JSON.stringify({ dependencySpecifiers: initResult.dependencySpecifiers, command: initResult.commands[0] })}.`,
+    );
   process.stdout.write(
-    `${manager} installed ${Object.keys(inventory.installationProfiles).length} minimal package profiles at ${inventory.version}.\n`,
+    `${manager} installed ${Object.keys(inventory.installationProfiles).length} minimal package profiles and pinned beta init at ${inventory.version}.\n`,
   );
 } finally {
   await close(server);

@@ -7,14 +7,21 @@ import { promisify } from "node:util";
 import { loadGlyphConfig } from "./config-loader.js";
 import { prepareGlyphFonts } from "./font-pipeline.js";
 import {
+  glyphExactChannel,
+  glyphInstallCommand,
+  glyphInstallCommandParts,
+  glyphLocalCliCommand,
+  glyphPackageSpecifier,
   glyphPackagesFor,
   type GlyphDeliveryMode,
   type GlyphFramework,
+  type GlyphPackageManager,
   type GlyphPackageName,
 } from "./package-surface.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
 
 export type { GlyphDeliveryMode, GlyphFramework } from "./package-surface.js";
-export type GlyphPackageManager = "npm" | "pnpm" | "yarn" | "bun";
+export type { GlyphPackageManager } from "./package-surface.js";
 
 export interface InitCommand {
   readonly command: string;
@@ -42,6 +49,7 @@ export interface InitResult {
   readonly typescript: boolean;
   readonly packageName: GlyphPackageName;
   readonly dependencies: readonly GlyphPackageName[];
+  readonly dependencySpecifiers: readonly string[];
   readonly planned: readonly {
     path: string;
     action: "create" | "update";
@@ -172,11 +180,15 @@ function defaultMode(framework: GlyphFramework): GlyphDeliveryMode {
 
 function installCommand(
   packageManager: GlyphPackageManager,
-  dependencies: readonly string[],
+  dependencies: readonly GlyphPackageName[],
   cwd: string,
 ): InitCommand {
-  const args = packageManager === "npm" ? ["install"] : ["add"];
-  return { command: packageManager, args: [...args, ...dependencies], cwd };
+  const [command, ...args] = glyphInstallCommandParts(
+    packageManager,
+    dependencies,
+    glyphExactChannel(PACKAGE_VERSION),
+  );
+  return { command, args, cwd };
 }
 
 function commandText(command: InitCommand): string {
@@ -202,16 +214,7 @@ function binCommand(
   packageManager: GlyphPackageManager,
   subcommand: string,
 ): string {
-  switch (packageManager) {
-    case "npm":
-      return `npm exec glyphscramble -- ${subcommand}`;
-    case "pnpm":
-      return `pnpm exec glyphscramble ${subcommand}`;
-    case "yarn":
-      return `yarn exec glyphscramble ${subcommand}`;
-    case "bun":
-      return `bun run glyphscramble ${subcommand}`;
-  }
+  return glyphLocalCliCommand(packageManager, [subcommand]);
 }
 
 function protectedExample(framework: GlyphFramework): string {
@@ -819,12 +822,29 @@ export async function initProject(
     ...(pkg.devDependencies as object),
   } as Record<string, string>;
   const desiredDependencies = glyphPackagesFor(framework, mode);
+  const packageChannel = glyphExactChannel(PACKAGE_VERSION);
+  const incompatibleDependencies = desiredDependencies.flatMap((name) => {
+    const configured = manifestDependencies[name];
+    return configured === undefined || configured === PACKAGE_VERSION
+      ? []
+      : [`${name}@${configured}`];
+  });
+  if (incompatibleDependencies.length > 0)
+    throw new Error(
+      `GlyphScramble packages must match the running CLI version ${PACKAGE_VERSION}; found ${incompatibleDependencies.join(", ")}. Repair: ${glyphInstallCommand(packageManager, desiredDependencies, packageChannel)}, then rerun init. No files were changed.`,
+    );
   const dependencies = desiredDependencies.filter(
     (name) => !(name in manifestDependencies),
   );
-  const install = installCommand(packageManager, dependencies, cwd);
+  const dependencySpecifiers = dependencies.map((name) =>
+    glyphPackageSpecifier(name, packageChannel),
+  );
+  const install =
+    dependencies.length > 0
+      ? installCommand(packageManager, dependencies, cwd)
+      : undefined;
   const commands = [
-    ...(dependencies.length > 0 ? [commandText(install)] : []),
+    ...(install ? [commandText(install)] : []),
     binCommand(packageManager, "prepare"),
     devCommand(packageManager),
     binCommand(packageManager, "doctor"),
@@ -849,6 +869,7 @@ export async function initProject(
       typescript,
       packageName: desiredDependencies.at(-1)!,
       dependencies,
+      dependencySpecifiers,
       planned,
       created,
       modified,
@@ -862,7 +883,7 @@ export async function initProject(
     };
 
   let installed = false;
-  if (options.install && dependencies.length > 0) {
+  if (options.install && install) {
     try {
       await (options.commandRunner ?? defaultCommandRunner)(install);
       installed = true;
@@ -911,6 +932,7 @@ export async function initProject(
     typescript,
     packageName: desiredDependencies.at(-1)!,
     dependencies,
+    dependencySpecifiers,
     planned,
     created,
     modified,

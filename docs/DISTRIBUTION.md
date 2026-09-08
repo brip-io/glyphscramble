@@ -10,21 +10,28 @@ The initializer is the shortest supported path and installs the detected
 adapter. It requires Node 22 or 24 and never contacts BRIP:
 
 ```bash
-npx @brip/glyphscramble init
-pnpm dlx @brip/glyphscramble init
-yarn dlx @brip/glyphscramble init
-bunx @brip/glyphscramble init
+npx @brip/glyphscramble@beta init
+pnpm dlx @brip/glyphscramble@beta init
+yarn dlx @brip/glyphscramble@beta init
+bunx @brip/glyphscramble@beta init
 ```
 
 For manual installation, use the core package plus one server adapter. UI-only
 packages are already dependencies of their server adapters:
 
 ```bash
-npm install @brip/glyphscramble @brip/glyphscramble-next
-pnpm add @brip/glyphscramble @brip/glyphscramble-nuxt
-yarn add @brip/glyphscramble @brip/glyphscramble-sveltekit
-bun add @brip/glyphscramble @brip/glyphscramble-astro
+npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-next@beta
+pnpm add --save-exact @brip/glyphscramble@beta @brip/glyphscramble-nuxt@beta
+yarn add --exact @brip/glyphscramble@beta @brip/glyphscramble-sveltekit@beta
+bun add --exact @brip/glyphscramble@beta @brip/glyphscramble-astro@beta
 ```
+
+`@beta` is for discovering the current prerelease. `--save-exact`/`--exact`
+makes the resolved version immutable in the application manifest so core and
+its adapter cannot drift to different betas. Release evidence and reproducible
+CI use the exact form, such as `@brip/glyphscramble@0.1.0-beta.0`. An
+unqualified package name means npm's `latest` channel and is reserved for the
+future stable documentation after an approved stable promotion.
 
 The canonical direct-dependency profiles are:
 
