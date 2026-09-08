@@ -82,7 +82,7 @@ export default function HomePage() {
       </section>
 
       <section className="comparison-section shell">
-        <div className="section-heading comparison-heading">
+        <div className="section-heading">
           <h2>What a raw scraper gets. What a reader sees.</h2>
           <p>
             The same encoded text becomes readable only after the browser loads

@@ -478,12 +478,41 @@ button:active:not(:disabled) {
   padding-block: 120px;
 }
 
+/* Heading left, its intro line beside it, rather than stacked in the left
+   half of a shell whose right half is then empty. Both section headings on
+   this page had that shape while the fork and the bridge below already put
+   their copy beside the heading, so the page alternated between two rhythms
+   for no reason a reader could see. This is the fork's rhythm, applied to
+   the two that were missing it.
+
+   THE COLUMN RATIO IS SET BY THE HEADING, NOT BY TASTE. These headings are
+   two sentences and must break on the full stop rather than mid-sentence
+   (see the note on `h2`), which needs a column at least as wide as their
+   longest sentence — 706px once the font-size clamp tops out at 60.8px.
+   1fr against 0.56fr with a 64px gap leaves the heading 715px on the widest
+   shell and more on narrower ones, because the sentence shrinks with the
+   font while the ratio holds. Widening the intro column past this is what
+   would quietly put the heading back on three lines, so check that first if
+   this ratio is ever changed.
+
+   `end` rather than `start`: the intro is the shorter of the two at every
+   width the split applies to, so aligning the bottoms sits it against the
+   heading's last line instead of leaving it floating beside the first. */
 .section-heading {
   margin-bottom: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.56fr);
+  gap: clamp(32px, 4vw, 64px);
+  align-items: end;
+}
+
+.section-heading h2 {
+  margin-bottom: 0;
 }
 
 .section-heading > p {
   margin-bottom: 0;
+  max-width: 46ch;
 }
 
 .mechanism-list {
@@ -536,10 +565,6 @@ button:active:not(:disabled) {
 .mechanism-list p {
   margin: 0;
   max-width: 37ch;
-}
-
-.comparison-heading {
-  max-width: 760px;
 }
 
 .landing-comparison {
@@ -1527,8 +1552,19 @@ pre {
   }
 
   .mode-section,
-  .bridge-grid {
+  .bridge-grid,
+  .section-heading {
     grid-template-columns: 1fr;
+  }
+
+  /* Stacked again, so the intro needs the gap back as vertical space and
+     its own measure rather than the column's. */
+  .section-heading {
+    gap: 18px;
+  }
+
+  .section-heading > p {
+    max-width: 58ch;
   }
 
   .installer-controls {
