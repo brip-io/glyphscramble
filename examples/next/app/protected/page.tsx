@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { GlyphScramble } from "@brip/glyphscramble-next";
+import { GlyphText } from "@brip/glyphscramble-next";
 import { glyphs } from "../../glyphscramble.next";
 import { ClonedPayload } from "./cloned-payload";
 
@@ -13,7 +13,7 @@ async function ProtectedBlocks() {
   return (
     <section aria-label="Demonstration of intentionally inaccessible protected content">
       <ClonedPayload payload={first} />
-      <GlyphScramble
+      <GlyphText
         className="protected"
         data-testid="protected-second"
         data-font-url={second.fontUrl}

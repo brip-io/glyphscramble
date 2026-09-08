@@ -47,6 +47,26 @@ test("renders, updates, navigates, and rotates without stale Vue mounts", async 
   expect(await second.textContent()).not.toBe(SECOND);
   expect(await second.getAttribute("data-font-url")).toBe(firstFontUrl);
 
+  await first.evaluate((element) => {
+    const transitions: string[] = [];
+    new MutationObserver(() => {
+      transitions.push(element.getAttribute("data-glyphscramble") ?? "missing");
+    }).observe(element, {
+      attributes: true,
+      attributeFilter: ["data-glyphscramble"],
+    });
+    Object.assign(window, { __glyphscrambleTransitions: transitions });
+  });
+  await page.getByTestId("clone-payload").click();
+  await page.waitForTimeout(100);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as typeof window & { __glyphscrambleTransitions?: string[] })
+          .__glyphscrambleTransitions,
+    ),
+  ).toEqual([]);
+
   await page.getByTestId("replace-payload").click();
   await expect(first).toHaveAttribute("data-glyphscramble", "ready");
   await expect.poll(() => first.textContent()).not.toBe(firstEncoded);

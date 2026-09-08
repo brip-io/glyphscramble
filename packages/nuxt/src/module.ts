@@ -81,6 +81,11 @@ const glyphscrambleModule: NuxtModule<
         `export default Object.freeze(${JSON.stringify(config)});\nexport const glyphscrambleRuntimeOptions = Object.freeze(${JSON.stringify(runtimeOptions)});\n`,
     });
     addComponent({
+      name: "GlyphText",
+      export: "GlyphText",
+      filePath: "@brip/glyphscramble-vue",
+    });
+    addComponent({
       name: "GlyphScramble",
       export: "GlyphScramble",
       filePath: "@brip/glyphscramble-vue",

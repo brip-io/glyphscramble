@@ -36,7 +36,7 @@ export const FRAMEWORK_OPTIONS: readonly FrameworkOption[] = [
     guidePath: "/docs/#frameworks",
     nextAction: {
       response:
-        "Call the generated server helper, then render its payload with GlyphScramble.",
+        "Call the generated server helper, then render its payload with GlyphText.",
       static: undefined,
     },
   },

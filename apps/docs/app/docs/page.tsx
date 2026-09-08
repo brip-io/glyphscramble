@@ -69,7 +69,7 @@ export default function DocsPage() {
             into client code.
           </p>
           <pre>
-            <code>{`import { GlyphScramble } from "@brip/glyphscramble-next";
+            <code>{`import { GlyphText } from "@brip/glyphscramble-next";
 import { glyphs } from "../glyphscramble.next";
 
 export default async function PremiumExcerpt({ copy }: { copy: string }) {
@@ -77,7 +77,7 @@ export default async function PremiumExcerpt({ copy }: { copy: string }) {
     font: "body",
     lang: "en",
   });
-  return <GlyphScramble payload={payload} />;
+  return <GlyphText payload={payload} />;
 }`}</code>
           </pre>
         </section>

@@ -9,7 +9,7 @@ npm exec glyphscramble -- init
 ```
 
 The module installs request context, the font endpoint, selective cache
-handling, and the payload-only component. The adapter owns the Vue renderer and
+handling, and the payload-only `GlyphText` component. The adapter owns the Vue renderer and
 exports common payload/config types; applications do not install
 `@brip/glyphscramble-vue` directly. Read the [Nuxt guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#vue-3-and-nuxt-4).
 

@@ -17,6 +17,16 @@ async function replacePayload(): Promise<void> {
   const replacement = await $fetch<ProtectedPayloads>("/api/protected");
   first.value = replacement.first;
 }
+
+function clonePayload(): void {
+  first.value = {
+    ...first.value,
+    face: {
+      ...first.value.face,
+      unicodeRange: [...first.value.face.unicodeRange],
+    },
+  };
+}
 </script>
 
 <template>
@@ -27,7 +37,7 @@ async function replacePayload(): Promise<void> {
     </nav>
     <h1>Protected high-value block fixture</h1>
     <section aria-label="Intentionally inaccessible protected content">
-      <GlyphScramble
+      <GlyphText
         :payload="first"
         as="span"
         class="protected"
@@ -35,13 +45,16 @@ async function replacePayload(): Promise<void> {
         :data-font-url="first.fontUrl"
         error-text="Protected fixture unavailable."
       />
-      <GlyphScramble
+      <GlyphText
         :payload="second"
         as="span"
         class="protected"
         data-testid="protected-second"
         :data-font-url="second.fontUrl"
       />
+      <button data-testid="clone-payload" type="button" @click="clonePayload">
+        Clone equivalent payload
+      </button>
       <button
         data-testid="replace-payload"
         type="button"

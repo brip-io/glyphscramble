@@ -1,0 +1,147 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import type { GlyphPayload } from "@brip/glyphscramble";
+
+const GLYPH_TEXT_ELEMENTS = [
+  "article",
+  "aside",
+  "blockquote",
+  "caption",
+  "code",
+  "dd",
+  "div",
+  "dt",
+  "em",
+  "figcaption",
+  "footer",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "li",
+  "main",
+  "mark",
+  "p",
+  "pre",
+  "q",
+  "s",
+  "section",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "sup",
+  "td",
+  "th",
+] as const;
+
+type GlyphTextElement = (typeof GLYPH_TEXT_ELEMENTS)[number];
+type LifecycleAttribute =
+  | "aria-hidden"
+  | "children"
+  | "hidden"
+  | "lang"
+  | "set:html"
+  | "set:text";
+
+export type Props = {
+  payload: GlyphPayload;
+  as?: GlyphTextElement;
+  fontTimeoutMs?: number;
+  errorText?: string;
+} & Omit<HTMLAttributes<GlyphTextElement>, LifecycleAttribute>;
+
+if (Astro.slots.has("default"))
+  throw new TypeError(
+    "GlyphText is payload-only and does not accept children or slots. Use GlyphStaticBoundary for a compiler-validated subtree once available.",
+  );
+
+const {
+  payload,
+  as: Element = "span",
+  fontTimeoutMs,
+  errorText,
+  ...attributes
+} = Astro.props;
+
+if (!(GLYPH_TEXT_ELEMENTS as readonly string[]).includes(Element))
+  throw new TypeError(
+    "GlyphText `as` must be a supported intrinsic text container; custom components and void elements cannot own the required font lifecycle.",
+  );
+
+for (const name of [
+  "aria-hidden",
+  "children",
+  "hidden",
+  "lang",
+  "set:html",
+  "set:text",
+])
+  delete (attributes as Record<string, unknown>)[name];
+---
+
+<brip-glyphscramble-v3
+  data-payload={JSON.stringify(payload)}
+  data-timeout={fontTimeoutMs}
+  data-error={errorText}
+>
+  <Element
+    {...attributes}
+    hidden
+    aria-hidden="true"
+    lang={payload.lang}
+    data-content>{payload.encodedText}</Element
+  >
+</brip-glyphscramble-v3>
+
+<style>
+  brip-glyphscramble-v3 {
+    display: contents;
+  }
+</style>
+
+<script>
+  import {
+    mountGlyphPayload,
+    type GlyphMountHandle,
+  } from "@brip/glyphscramble/runtime";
+
+  const ELEMENT = "brip-glyphscramble-v3";
+
+  class GlyphTextElement extends HTMLElement {
+    #mount: GlyphMountHandle | undefined;
+
+    connectedCallback() {
+      if (this.#mount) return;
+      const element = this.querySelector<HTMLElement>(":scope > [data-content]");
+      const serialized = this.dataset.payload;
+      if (!element || !serialized) return;
+      try {
+        const timeout = this.dataset.timeout;
+        this.#mount = mountGlyphPayload(element, JSON.parse(serialized), {
+          ...(timeout ? { timeoutMs: Number(timeout) } : {}),
+          ...(this.dataset.error === undefined
+            ? {}
+            : { errorText: this.dataset.error }),
+        });
+      } catch {
+        element.textContent =
+          this.dataset.error ??
+          "This protected content could not be displayed.";
+        element.dataset.glyphscramble = "error";
+        element.hidden = false;
+      }
+    }
+
+    disconnectedCallback() {
+      this.#mount?.destroy();
+      this.#mount = undefined;
+    }
+  }
+
+  if (!customElements.get(ELEMENT))
+    customElements.define(ELEMENT, GlyphTextElement);
+</script>

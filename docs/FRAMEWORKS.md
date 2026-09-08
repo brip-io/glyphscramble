@@ -4,6 +4,13 @@ All SSR integrations follow the same sequence: create one process-level engine, 
 
 Every client adapter delegates to the same validated `mountGlyphPayload()` lifecycle. The compact data-only v3 payload contains exact face descriptors and no serialized CSS; duplicate mounts and temporary remounts share a bounded face load, equivalent payload clones are no-ops, and semantic updates abort stale work. React, Vue, Svelte, and Astro expose the same `fontTimeoutMs` and localized `errorText` controls. See [Client payload and font lifecycle](CLIENT-RUNTIME.md).
 
+`GlyphText` is the canonical payload-only leaf in every framework. It accepts
+no plaintext children, slots, snippets, or arbitrary custom component through
+`as`; use only a server-produced `GlyphPayload`. `GlyphScramble` remains a
+deprecated compatibility alias throughout beta. The forthcoming
+`GlyphStaticBoundary` is the separate compiler-backed API for safe,
+non-hydrated subtrees—`GlyphText` does not instrument descendants.
+
 Core `beginResponse()` and the Next, Nuxt, SvelteKit, and Astro server-helper
 options accept the same `faces: [{ font, face }]` predeclaration when a route or
 application wants a smaller fixed token scope. Omitting it authorizes the
@@ -18,7 +25,7 @@ adapter and prepares the configured font,
 then call the generated process-level helper from an async Server Component:
 
 ```tsx
-import { GlyphScramble } from "@brip/glyphscramble-next";
+import { GlyphText } from "@brip/glyphscramble-next";
 import { glyphs } from "@/glyphscramble.next";
 
 export default async function PremiumExcerpt() {
@@ -26,7 +33,7 @@ export default async function PremiumExcerpt() {
     font: "body",
     lang: "en",
   });
-  return <GlyphScramble payload={payload} />;
+  return <GlyphText payload={payload} />;
 }
 ```
 
@@ -87,7 +94,7 @@ const { data: payload } = await useFetch<GlyphPayload>("/api/premium");
 </script>
 
 <template>
-  <GlyphScramble
+  <GlyphText
     v-if="payload"
     :payload="payload"
     error-text="This protected excerpt could not be displayed."
@@ -170,13 +177,13 @@ export const load: PageServerLoad = async (event) => {
 
 ```svelte
 <script lang="ts">
-  import { GlyphScramble } from "@brip/glyphscramble-sveltekit";
+  import { GlyphText } from "@brip/glyphscramble-sveltekit";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
 </script>
 
-<GlyphScramble
+<GlyphText
   payload={data.excerpt}
   errorText="This protected excerpt could not be displayed."
 />
@@ -253,7 +260,7 @@ export const onRequest = await createAstroGlyphMiddleware(config, {
 ```
 
 Render the branded payload with
-`@brip/glyphscramble-astro/GlyphScramble.astro`. `fontTimeoutMs` and
+`@brip/glyphscramble-astro/GlyphText.astro`. `fontTimeoutMs` and
 `errorText` customize the shared R06 guard. A versioned custom element mounts
 and destroys exactly one lifecycle per block; there is no document-wide scan.
 The package's build runs `astro check`, because ordinary `tsc` ignores `.astro`

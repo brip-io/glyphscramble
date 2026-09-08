@@ -27,11 +27,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./GlyphScramble.astro": "./src/GlyphScramble.astro"
+    "./GlyphText.astro": "./src/GlyphText.astro",
+    "./GlyphScramble.astro": "./src/GlyphText.astro"
   },
   "files": [
     "dist",
-    "src/GlyphScramble.astro",
+    "src/GlyphText.astro",
     "README.md"
   ],
   "engines": {

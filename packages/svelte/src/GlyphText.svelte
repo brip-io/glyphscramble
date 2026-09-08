@@ -1,15 +1,9 @@
 <script lang="ts">
-  import type { GlyphPayload } from "@brip/glyphscramble";
   import { glyphPayload } from "./action.js";
-  import type { HTMLAttributes } from "svelte/elements";
+  import type { GlyphTextProps } from "./types.js";
 
-  interface Props extends HTMLAttributes<HTMLSpanElement> {
-    payload: GlyphPayload;
-    fontTimeoutMs?: number;
-    errorText?: string;
-  }
-
-  let { payload, fontTimeoutMs, errorText, ...attributes }: Props = $props();
+  let { payload, fontTimeoutMs, errorText, ...attributes }: GlyphTextProps =
+    $props();
 </script>
 
 <span

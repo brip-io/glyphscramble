@@ -12,7 +12,12 @@ import {
 } from "@brip/glyphscramble";
 import { matchesProtectedRoute, normalizeProtectedRoutes } from "./routes.js";
 
-export { GlyphScramble } from "@brip/glyphscramble-svelte";
+export {
+  GlyphText,
+  GlyphScramble,
+  type GlyphTextProps,
+  type GlyphScrambleProps,
+} from "@brip/glyphscramble-svelte";
 export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
 
 export interface GlyphSvelteKitLocals {
