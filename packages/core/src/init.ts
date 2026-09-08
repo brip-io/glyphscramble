@@ -220,13 +220,13 @@ function binCommand(
 function protectedExample(framework: GlyphFramework): string {
   switch (framework) {
     case "next":
-      return `const payload = await glyphs.scramble(copy, { font: "body" });\nreturn <GlyphScramble payload={payload} />;`;
+      return `const payload = await glyphs.scramble(copy, { font: "body" });\nreturn <GlyphText payload={payload} />;`;
     case "nuxt":
-      return `const payload = await event.context.glyphscramble.scrambleAsync(copy, { font: "body" });\nreturn { payload }; // pass only payload to <GlyphScramble>`;
+      return `const payload = await event.context.glyphscramble.scrambleAsync(copy, { font: "body" });\nreturn { payload }; // pass only payload to <GlyphText>`;
     case "sveltekit":
-      return `const payload = await locals.glyphscramble.scrambleAsync(copy, { font: "body" });\nreturn { payload }; // pass only payload to <GlyphScramble>`;
+      return `const payload = await locals.glyphscramble.scrambleAsync(copy, { font: "body" });\nreturn { payload }; // pass only payload to <GlyphText>`;
     case "astro":
-      return `const payload = await Astro.locals.glyphscramble.scrambleAsync(copy, { font: "body" });\n---\n<GlyphScramble payload={payload} />`;
+      return `const payload = await Astro.locals.glyphscramble.scrambleAsync(copy, { font: "body" });\n---\n<GlyphText payload={payload} />`;
     default:
       return `<article data-glyphscramble-font="body">High-value excerpt only.</article>`;
   }

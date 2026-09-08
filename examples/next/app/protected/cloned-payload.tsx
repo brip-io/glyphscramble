@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GlyphScramble, type GlyphPayload } from "@brip/glyphscramble-next";
+import { GlyphText, type GlyphPayload } from "@brip/glyphscramble-next";
 
 export function ClonedPayload({ payload }: { payload: GlyphPayload }) {
   const [, setRenderCount] = useState(0);
@@ -12,7 +12,7 @@ export function ClonedPayload({ payload }: { payload: GlyphPayload }) {
 
   return (
     <>
-      <GlyphScramble
+      <GlyphText
         className="protected"
         data-testid="protected-first"
         data-font-url={clonedPayload.fontUrl}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GlyphScramble } from "@brip/glyphscramble-sveltekit";
+  import { GlyphText } from "@brip/glyphscramble-sveltekit";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -10,6 +10,6 @@
   {#await data.payload}
     <p>Loading protected block.</p>
   {:then payload}
-    <GlyphScramble {payload} data-testid="streamed-block" />
+    <GlyphText {payload} data-testid="streamed-block" />
   {/await}
 </main>

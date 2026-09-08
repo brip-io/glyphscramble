@@ -1,0 +1,25 @@
+---
+import GlyphText from "../../../../../src/GlyphText.astro";
+import type { GlyphPayload } from "@brip/glyphscramble";
+
+const payload = {
+  version: 3,
+  encodedText: "Hqfrghg",
+  font: "body",
+  face: {
+    id: "regular",
+    family: "GlyphScramble-body-regular-0123456789abcdef",
+    weight: "400",
+    style: "normal",
+    stretch: "normal",
+    unicodeRange: ["U+0020-007E"],
+  },
+  fontUrl:
+    "/_glyphscramble/font/v2.current.0123456789abcdef/body%40regular.woff2",
+  expiresAt: 2_000_000_000,
+  coverage: "0123456789abcdef".repeat(4),
+  lang: "en",
+} satisfies GlyphPayload;
+---
+
+<GlyphText payload={payload}>plaintext</GlyphText>

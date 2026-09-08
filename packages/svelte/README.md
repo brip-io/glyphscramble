@@ -6,7 +6,9 @@ Payload-only Svelte 5 component and action for GlyphScramble by BRIP.
 npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-svelte@beta
 ```
 
-Pass only a server-produced `GlyphPayload`. Read the [Svelte and SvelteKit
+Pass only a server-produced `GlyphPayload` to `GlyphText`; snippets and
+children are intentionally unavailable. `GlyphScramble` remains a deprecated
+beta alias. Read the [Svelte and SvelteKit
 guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#svelte-5-and-sveltekit-2)
 and protect only optional, high-value content.
 

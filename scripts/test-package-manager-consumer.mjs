@@ -35,15 +35,15 @@ function consumerSource(profile) {
     case "astro-static":
       return 'import { defineGlyphConfig } from "@brip/glyphscramble";\nimport { GLYPH_BETA_CHANNEL, glyphCliCommand } from "@brip/glyphscramble/package-surface";\nvoid defineGlyphConfig;\nvoid glyphCliCommand("npm", GLYPH_BETA_CHANNEL, ["init"]);\n';
     case "react":
-      return 'import { GlyphScramble, type GlyphScrambleProps } from "@brip/glyphscramble-react";\nvoid (GlyphScramble satisfies unknown);\nlet props!: GlyphScrambleProps;\nvoid props;\n';
+      return 'import { GlyphText, GlyphScramble, type GlyphTextProps, type GlyphScrambleProps } from "@brip/glyphscramble-react";\nvoid (GlyphText satisfies unknown);\nvoid (GlyphScramble satisfies typeof GlyphText);\nlet props!: GlyphTextProps;\nlet compatibilityProps!: GlyphScrambleProps;\nvoid props;\nvoid compatibilityProps;\n';
     case "vue":
-      return 'import { GlyphScramble } from "@brip/glyphscramble-vue";\nvoid GlyphScramble;\n';
+      return 'import { GlyphText, GlyphScramble } from "@brip/glyphscramble-vue";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\n';
     case "svelte":
-      return 'import { GlyphScramble } from "@brip/glyphscramble-svelte";\nvoid GlyphScramble;\n';
+      return 'import { GlyphText, GlyphScramble } from "@brip/glyphscramble-svelte";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\n';
     case "next":
     case "nuxt":
     case "sveltekit":
-      return `import { GlyphScramble, type GlyphPayload } from "@brip/glyphscramble-${profile}";\nvoid GlyphScramble;\nlet payload!: GlyphPayload;\nvoid payload;\n`;
+      return `import { GlyphText, GlyphScramble, type GlyphPayload } from "@brip/glyphscramble-${profile}";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\nlet payload!: GlyphPayload;\nvoid payload;\n`;
     case "astro":
       return 'import type { GlyphPayload } from "@brip/glyphscramble-astro";\nlet payload!: GlyphPayload;\nvoid payload;\n';
     case "vite":
@@ -211,7 +211,7 @@ async function writeRegistryConfiguration(consumer) {
   if (manager === "yarn")
     await writeFile(
       join(consumer, ".yarnrc.yml"),
-      `nodeLinker: node-modules\nunsafeHttpWhitelist:\n  - 127.0.0.1\nnpmScopes:\n  brip:\n    npmRegistryServer: ${JSON.stringify(registryUrl)}\n`,
+      `nodeLinker: node-modules\nenableGlobalCache: false\nenableMirror: false\ncacheFolder: ${JSON.stringify(join(root, ".yarn-cache"))}\nglobalFolder: ${JSON.stringify(join(root, ".yarn-global"))}\nunsafeHttpWhitelist:\n  - 127.0.0.1\nnpmScopes:\n  brip:\n    npmRegistryServer: ${JSON.stringify(registryUrl)}\n`,
     );
 }
 
@@ -251,7 +251,12 @@ try {
         env: {
           ...process.env,
           ...(manager === "yarn"
-            ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
+            ? {
+                YARN_ENABLE_GLOBAL_CACHE: "false",
+                YARN_ENABLE_IMMUTABLE_INSTALLS: "false",
+                YARN_ENABLE_MIRROR: "false",
+                YARN_GLOBAL_FOLDER: join(root, ".yarn-global"),
+              }
             : {}),
         },
       },
@@ -342,7 +347,12 @@ try {
       env: {
         ...process.env,
         ...(manager === "yarn"
-          ? { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" }
+          ? {
+              YARN_ENABLE_GLOBAL_CACHE: "false",
+              YARN_ENABLE_IMMUTABLE_INSTALLS: "false",
+              YARN_ENABLE_MIRROR: "false",
+              YARN_GLOBAL_FOLDER: join(root, ".yarn-global"),
+            }
           : {}),
       },
     },

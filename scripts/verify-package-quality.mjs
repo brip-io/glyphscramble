@@ -44,7 +44,12 @@ for (const directoryName of packageDirectories) {
   if (directoryName === "svelte")
     attw.push("--ignore-rules=internal-resolution-error");
   if (directoryName === "astro")
-    attw.push("--exclude-entrypoints", "./GlyphScramble.astro");
+    attw.push(
+      "--exclude-entrypoints",
+      "./GlyphText.astro",
+      "--exclude-entrypoints",
+      "./GlyphScramble.astro",
+    );
   await run(attw);
 }
 

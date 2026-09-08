@@ -12,7 +12,7 @@ Apply GlyphScramble narrowly to high-value blocks where lower scrape throughput 
 
 ```tsx
 // App Router Server Component: plaintext never crosses into the Client Component.
-import { GlyphScramble } from "@brip/glyphscramble-next";
+import { GlyphText } from "@brip/glyphscramble-next";
 import { glyphs } from "../glyphscramble.next";
 
 export default async function PremiumExcerpt({ copy }: { copy: string }) {
@@ -20,7 +20,7 @@ export default async function PremiumExcerpt({ copy }: { copy: string }) {
     font: "body",
     lang: "en",
   });
-  return <GlyphScramble payload={payload} />;
+  return <GlyphText payload={payload} />;
 }
 ```
 

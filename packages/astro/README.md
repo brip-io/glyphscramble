@@ -9,7 +9,9 @@ npm exec glyphscramble -- init
 
 SSR uses per-response mappings. Static Astro output instead uses the core
 post-build compiler and one mapping per build. The adapter exports common
-payload/config types and its payload renderer at
-`@brip/glyphscramble-astro/GlyphScramble.astro`. Read the [Astro guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#astro-7).
+payload/config types and its payload-only renderer at
+`@brip/glyphscramble-astro/GlyphText.astro`; default slots fail closed during
+the build or request. The old `GlyphScramble.astro` subpath remains a beta
+compatibility alias. Read the [Astro guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#astro-7).
 
 GlyphScramble raises the cost of bulk DOM scraping; it is not DRM. Apache-2.0.

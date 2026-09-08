@@ -1,6 +1,6 @@
 <script lang="ts">
   import {
-    GlyphScramble,
+    GlyphText,
     type GlyphPayload,
   } from "@brip/glyphscramble-sveltekit";
   import type { PageData } from "./$types";
@@ -37,13 +37,13 @@
   </nav>
   <h1>Protected high-value block fixture</h1>
   <section aria-label="Intentionally inaccessible protected content">
-    <GlyphScramble
+    <GlyphText
       payload={first}
       errorText="Protected fixture unavailable."
       data-testid="protected-first"
       data-font-url={first.fontUrl}
     />
-    <GlyphScramble
+    <GlyphText
       payload={data.second}
       data-testid="protected-second"
       data-font-url={data.second.fontUrl}

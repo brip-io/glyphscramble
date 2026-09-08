@@ -29,9 +29,14 @@
       "import": "./dist/index.js"
     },
     "./GlyphScramble.svelte": {
-      "types": "./dist/GlyphScramble.svelte.d.ts",
-      "svelte": "./dist/GlyphScramble.svelte",
-      "default": "./dist/GlyphScramble.svelte"
+      "types": "./dist/GlyphText.svelte.d.ts",
+      "svelte": "./dist/GlyphText.svelte",
+      "default": "./dist/GlyphText.svelte"
+    },
+    "./GlyphText.svelte": {
+      "types": "./dist/GlyphText.svelte.d.ts",
+      "svelte": "./dist/GlyphText.svelte",
+      "default": "./dist/GlyphText.svelte"
     }
   },
   "files": [

@@ -8,7 +8,12 @@ import {
   type ResponseContext,
 } from "@brip/glyphscramble";
 
-export { GlyphScramble } from "@brip/glyphscramble-vue";
+export {
+  GlyphText,
+  GlyphScramble,
+  type GlyphTextElement,
+  type GlyphTextProps,
+} from "@brip/glyphscramble-vue";
 export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
 
 export interface GlyphNitroEvent {

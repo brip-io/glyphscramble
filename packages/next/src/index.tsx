@@ -3,8 +3,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  GlyphScramble as ReactGlyphScramble,
-  type GlyphScrambleProps,
+  GlyphText as ReactGlyphText,
+  type GlyphTextElement,
+  type GlyphTextProps,
 } from "@brip/glyphscramble-react";
 
 const REFRESH_SAFETY_MS = 250;
@@ -14,7 +15,9 @@ const REFRESH_SAFETY_MS = 250;
  * wrapper refreshes the current RSC route just before then so back/forward
  * restoration cannot leave an expired mapping readable indefinitely.
  */
-export function GlyphScramble(props: GlyphScrambleProps) {
+export function GlyphText<Element extends GlyphTextElement = "span">(
+  props: GlyphTextProps<Element>,
+) {
   const router = useRouter();
   const { expiresAt } = props.payload;
 
@@ -54,10 +57,17 @@ export function GlyphScramble(props: GlyphScrambleProps) {
     };
   }, [expiresAt, router]);
 
-  return <ReactGlyphScramble {...props} />;
+  return <ReactGlyphText {...props} />;
 }
 
-export type { GlyphScrambleProps } from "@brip/glyphscramble-react";
+/** @deprecated Use GlyphText. The alias remains available throughout beta. */
+export const GlyphScramble: typeof GlyphText = GlyphText;
+
+export type {
+  GlyphTextElement,
+  GlyphTextProps,
+  GlyphScrambleProps,
+} from "@brip/glyphscramble-react";
 export type {
   GlyphConfig,
   GlyphPayload,
