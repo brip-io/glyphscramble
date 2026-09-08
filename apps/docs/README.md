@@ -8,16 +8,44 @@ The site is owned by the public GlyphScramble repository. BRIP's main website
 and editorial channels promote it and receive the commercial handoff when a
 publisher is ready to move from scraping friction to licensed delivery.
 
-## BRIP identity assets
+## Brand assets
 
-`components/brip-lockup.tsx`, `app/icon.svg` and the lockup in the corner of
-`public/og.png` all carry the same two drawings: the ribbon-B mark and the
-drawn BRIP wordmark. Their master lives in the private BRIP monorepo
-(`site/src/brand-geometry.mjs`), and this repository shares no runtime code
-with it, so the paths are transcribed rather than imported and an identity
-change has to be brought across by hand — into all three, in one change.
-Do not redraw either by eye: nothing here can detect a favicon and a footer
-carrying different versions of the mark.
+`app/icon.svg` and `public/og.png` are **generated**, and committed:
+
+```bash
+pnpm --filter @brip/glyphscramble-demo generate:brand
+```
+
+`scripts/generate-brand-assets.mjs` draws both from two sources in this
+repository — `src/brand-geometry.mjs` for the identity and
+`src/generated/demo-fixtures.json` for the share card's text. Re-run it after
+regenerating the demo fixtures, or after changing the geometry or the site's
+palette. It is not part of the build: it needs a browser, and the deploy is a
+plain static export that Cloudflare builds from Git, so making every deploy
+download Chromium to redraw an image that changes twice a year is the wrong
+trade. `test/og-source.test.ts` is what keeps that honest — the generator
+records the strings it drew and the test fails when they no longer match the
+fixtures. Set `CHROMIUM_PATH` if the environment already carries a browser and
+cannot run `playwright install`.
+
+The share card shows the product's one claim and nothing else: both panes
+carry the **same bytes** — the encoded text out of the fixtures — and only the
+font differs, the left in the body face and the right in that response's own
+generated WOFF2. A card showing two different strings is claiming something
+else, and a card that types out the plaintext is a card that has decoded it.
+The previous card was drawn by hand and did exactly that, which is why this
+script exists.
+
+### The identity itself
+
+`src/brand-geometry.mjs` is the only place the ribbon-B mark and the drawn
+BRIP wordmark exist here, and `components/brip-lockup.tsx` and the generator
+both read it. Its own master is the private BRIP monorepo
+(`site/src/brand-geometry.mjs`); this repository shares no runtime code with
+it, so the paths are transcribed rather than imported and an identity change
+has to be brought across by hand. Do not redraw either by eye — nothing here
+can detect a drift from the master, and the single module is what at least
+stops the chrome, the favicon and the card drifting from each other.
 
 The tones are this site's, not the identity's. BRIP's own palette is green on
 a light ground; every surface here is near-black with a teal accent, so the
