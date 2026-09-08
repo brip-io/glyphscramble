@@ -5,7 +5,7 @@ import { BripLockup } from "../components/brip-lockup";
 import { SiteHeader } from "../components/site-header";
 import "./globals.css";
 
-const title = "GlyphScramble by brip";
+const title = "GlyphScramble by BRIP";
 const description =
   "Raise the cost of bulk DOM scraping with response-specific glyph scrambling.";
 
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="/privacy/">Privacy</a>
             <a href="https://github.com/brip-io/glyphscramble">GitHub</a>
             <a href="https://brip.io/?utm_source=glyphscramble&utm_medium=oss&utm_campaign=site-footer">
-              Visit brip
+              Visit BRIP
             </a>
           </div>
         </footer>

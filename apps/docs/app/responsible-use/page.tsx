@@ -72,14 +72,14 @@ export default function ResponsibleUsePage() {
       <section className="responsible-bridge">
         <h2>Need an authorized delivery path?</h2>
         <p>
-          brip lets content owners license deliberate access, execute usage
+          BRIP lets content owners license deliberate access, execute usage
           rules at delivery, and receive a record of what was delivered.
         </p>
         <a
           className="button button-primary"
           href="https://brip.io/providers?utm_source=glyphscramble&utm_medium=oss&utm_campaign=responsible-use"
         >
-          Explore brip for providers
+          Explore BRIP for providers
         </a>
       </section>
     </div>

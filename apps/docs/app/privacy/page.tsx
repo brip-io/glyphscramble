@@ -23,7 +23,7 @@ export default function PrivacyPage() {
         <section>
           <h2>Who is responsible</h2>
           <p>
-            brip is a Swiss company and the controller for the personal data
+            BRIP is a Swiss company and the controller for the personal data
             described here. Email{" "}
             <a href="mailto:hello@brip.io">hello@brip.io</a> with a privacy
             question or rights request.
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
           <h2>Why it is processed</h2>
           <p>
             Request information is used only to deliver the site, keep it
-            reliable, and respond to abuse. The legal basis is brip&apos;s
+            reliable, and respond to abuse. The legal basis is BRIP&apos;s
             legitimate interest in operating a secure website that works.
           </p>
         </section>
@@ -56,14 +56,14 @@ export default function PrivacyPage() {
         <section>
           <h2>Who sees it and where it goes</h2>
           <p>
-            Cloudflare processes request information under brip&apos;s
+            Cloudflare processes request information under BRIP&apos;s
             instructions and serves pages from the location nearest the reader.
             Where processing takes place outside Switzerland or the EEA,
             transfers rely on an adequacy decision or standard contractual
             clauses.
           </p>
           <p>
-            If you choose a link to brip or GitHub, that destination receives
+            If you choose a link to BRIP or GitHub, that destination receives
             your request and its own privacy terms apply.
           </p>
         </section>
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           <p>
             You can ask for access to your personal data, correction, deletion,
             restriction, portability where applicable, or object to processing.
-            Write to <a href="mailto:hello@brip.io">hello@brip.io</a> and brip
+            Write to <a href="mailto:hello@brip.io">hello@brip.io</a> and BRIP
             will respond within one month.
           </p>
           <p>
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
             will be updated before that processing begins.
           </p>
           <p>
-            The broader brip platform has a separate, more detailed{" "}
+            The broader BRIP platform has a separate, more detailed{" "}
             <a href="https://brip.io/privacy">privacy policy</a>.
           </p>
         </section>

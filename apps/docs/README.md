@@ -4,9 +4,50 @@ This private workspace package builds the public GlyphScramble product site,
 interactive demo, and documentation. The canonical production host is planned
 as `glyphscramble.brip.io`.
 
-The site is owned by the public GlyphScramble repository. brip's main website
+The site is owned by the public GlyphScramble repository. BRIP's main website
 and editorial channels promote it and receive the commercial handoff when a
 publisher is ready to move from scraping friction to licensed delivery.
+
+## Brand assets
+
+`app/icon.svg` and `public/og.png` are **generated**, and committed:
+
+```bash
+pnpm --filter @brip/glyphscramble-demo generate:brand
+```
+
+`scripts/generate-brand-assets.mjs` draws both from `src/brand-geometry.mjs`,
+so the card, the favicon and the header lockup are three consumers of one
+drawing rather than three copies somebody has to keep in step. Re-run it after
+changing the geometry, the card's words or the site's palette. It is not part
+of the build: it needs a browser, and the deploy is a plain static export that
+Cloudflare builds from Git, so making every deploy download Chromium to redraw
+an image that changes twice a year is the wrong trade. Set `CHROMIUM_PATH` if
+the environment already carries a browser and cannot run `playwright install`.
+
+The card says three things — the product's name, one line about what it is
+for, and who made it. It is read at roughly 40% of its own width in a feed and
+is often the only part of this site anybody looks at, so it is a poster rather
+than a page. An earlier version put the site's own scraper-versus-reader
+comparison on it, which is a good demonstration and illegible at 500px; the
+demonstration belongs on the page, where a reader has arrived and can read it.
+
+### The identity itself
+
+`src/brand-geometry.mjs` is the only place the ribbon-B mark and the drawn
+BRIP wordmark exist here, and `components/brip-lockup.tsx` and the generator
+both read it. Its own master is the private BRIP monorepo
+(`site/src/brand-geometry.mjs`); this repository shares no runtime code with
+it, so the paths are transcribed rather than imported and an identity change
+has to be brought across by hand. Do not redraw either by eye — nothing here
+can detect a drift from the master, and the single module is what at least
+stops the chrome, the favicon and the card drifting from each other.
+
+The tones are this site's, not the identity's. BRIP's own palette is green on
+a light ground; every surface here is near-black with a teal accent, so the
+mark takes `currentColor` for its body and a wash of the same colour for the
+ribbon's underside. The wash is 40%, which puts the two tones at the same
+4.1:1 contrast the identity's own ink and fold measure against each other.
 
 ## Local development
 
@@ -121,5 +162,5 @@ infrastructure preference:
   demo as garbage.
 
 Production DNS, Content-Security-Policy, and deployment credentials remain a
-brip infrastructure decision and are intentionally not embedded in this
+BRIP infrastructure decision and are intentionally not embedded in this
 repository.
