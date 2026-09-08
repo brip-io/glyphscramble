@@ -80,10 +80,29 @@ h1 {
   margin-bottom: 28px;
 }
 
+/* 18ch, not 14. The section headings here are two short sentences, and at
+   14ch every one of them broke mid-sentence — "The response is / wrong. The
+   / rendering is right." — three cramped lines against a 1180px shell with
+   its right half empty. The measure is what the eye reads as condensed, not
+   the font size.
+
+   18ch is measured rather than picked: at the desktop size the longest
+   single sentence in these headings is 669px and 18ch is 703px, so each
+   sentence fits its own line and the break lands on the full stop; the
+   shortest one-line heading is 675px, so nothing that already fitted on one
+   line starts wrapping. In `ch` so it stays the same count of characters as
+   the clamped font-size shrinks, and the headings inside narrow grid
+   columns (the fork, the bridge) are capped by their container well below
+   this and are unaffected.
+
+   `balance` is the insurance: it evens the two lines at any width where the
+   greedy break would leave a runt, and does nothing to a heading that fits
+   on one line. Browsers without it still get the wider measure. */
 h2 {
   font-size: clamp(2.25rem, 4vw, 3.8rem);
-  max-width: 14ch;
+  max-width: 18ch;
   margin-bottom: 22px;
+  text-wrap: balance;
 }
 
 h3 {
@@ -474,11 +493,17 @@ button:active:not(:disabled) {
   list-style: none;
 }
 
+/* The icon column is the icon's width and nothing more. It was
+   `minmax(92px, 0.55fr)`, which at 1440 resolved to 301px around a 42px
+   mark — 259px of dead space, then the 86px gap, then the text squeezed
+   into what was left. The row read as broken rather than airy, and it is
+   the other half of why this section felt condensed. The gap already
+   supplies the gutter. */
 .mechanism-list li {
   min-height: 148px;
   padding: 28px 0;
   display: grid;
-  grid-template-columns: minmax(92px, 0.55fr) minmax(0, 1.45fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   gap: clamp(24px, 6vw, 96px);
   align-items: center;
   border-bottom: 1px solid var(--line);
