@@ -1,18 +1,7 @@
 "use client";
 
-import {
-  SiAstro,
-  SiBun,
-  SiNextdotjs,
-  SiNpm,
-  SiNuxt,
-  SiPnpm,
-  SiSvelte,
-  SiVite,
-  SiYarn,
-  type IconType,
-} from "@icons-pack/react-simple-icons";
 import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   FRAMEWORK_OPTIONS,
@@ -29,22 +18,21 @@ import {
   type InstallerPackageManager,
 } from "../src/install-configurator";
 
-const FRAMEWORK_ICONS: Readonly<Record<InstallerFramework, IconType>> = {
-  next: SiNextdotjs,
-  nuxt: SiNuxt,
-  sveltekit: SiSvelte,
-  astro: SiAstro,
-  vite: SiVite,
+const FRAMEWORK_ICONS: Readonly<Record<InstallerFramework, string>> = {
+  next: "/brand-icons/nextdotjs.svg",
+  nuxt: "/brand-icons/nuxt.svg",
+  sveltekit: "/brand-icons/svelte.svg",
+  astro: "/brand-icons/astro.svg",
+  vite: "/brand-icons/vite.svg",
 };
 
-const PACKAGE_MANAGER_ICONS: Readonly<
-  Record<InstallerPackageManager, IconType>
-> = {
-  npm: SiNpm,
-  pnpm: SiPnpm,
-  yarn: SiYarn,
-  bun: SiBun,
-};
+const PACKAGE_MANAGER_ICONS: Readonly<Record<InstallerPackageManager, string>> =
+  {
+    npm: "/brand-icons/npm.svg",
+    pnpm: "/brand-icons/pnpm.svg",
+    yarn: "/brand-icons/yarn.svg",
+    bun: "/brand-icons/bun.svg",
+  };
 
 function CopyableCommand({
   command,
@@ -114,13 +102,13 @@ function CopyableCommand({
 
 function LogoChoice<T extends string>({
   active,
-  icon: Icon,
+  icon,
   label,
   onSelect,
   value,
 }: {
   active: boolean;
-  icon: IconType;
+  icon: string;
   label: string;
   onSelect: (value: T) => void;
   value: T;
@@ -132,7 +120,11 @@ function LogoChoice<T extends string>({
       aria-pressed={active}
       onClick={() => onSelect(value)}
     >
-      <Icon aria-hidden="true" size={18} />
+      <span
+        className="installer-brand-icon"
+        aria-hidden="true"
+        style={{ "--installer-brand-icon": `url("${icon}")` } as CSSProperties}
+      />
       <span>{label}</span>
     </button>
   );

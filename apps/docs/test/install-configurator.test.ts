@@ -1,3 +1,4 @@
+import { access, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { GLYPH_INSTALLATION_PROFILES } from "@brip/glyphscramble";
 import {
@@ -7,6 +8,18 @@ import {
   modeForFramework,
   packagesForSelection,
 } from "../src/install-configurator";
+
+const BRAND_ICON_FILES = [
+  "astro.svg",
+  "bun.svg",
+  "nextdotjs.svg",
+  "npm.svg",
+  "nuxt.svg",
+  "pnpm.svg",
+  "svelte.svg",
+  "vite.svg",
+  "yarn.svg",
+] as const;
 
 describe("installation configurator", () => {
   it("covers every website framework and allowed delivery mode with a canonical profile", () => {
@@ -60,5 +73,20 @@ describe("installation configurator", () => {
     expect(
       packagesForSelection(GLYPH_INSTALLATION_PROFILES, "astro", "static"),
     ).toEqual(["@brip/glyphscramble"]);
+  });
+
+  it("ships local brand marks without a runtime icon dependency", async () => {
+    const packageJson = JSON.parse(
+      await readFile(new URL("../package.json", import.meta.url), "utf8"),
+    ) as { dependencies?: Record<string, string> };
+
+    expect(packageJson.dependencies).not.toHaveProperty(
+      "@icons-pack/react-simple-icons",
+    );
+    await Promise.all(
+      BRAND_ICON_FILES.map((file) =>
+        access(new URL(`../public/brand-icons/${file}`, import.meta.url)),
+      ),
+    );
   });
 });
