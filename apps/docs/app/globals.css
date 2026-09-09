@@ -411,7 +411,8 @@ code {
   pointer-events: none;
 }
 
-.cine-hero[data-mode="cinematic"] .cine-overlay a {
+.cine-hero[data-mode="cinematic"] .cine-overlay a,
+.cine-hero[data-mode="cinematic"] .cine-overlay button {
   pointer-events: auto;
 }
 
@@ -453,13 +454,93 @@ code {
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 570;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
   animation: cine-hint 2.2s ease-in-out infinite;
+}
+
+.cine-play-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  color: var(--accent);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.cine-play-hint:hover,
+.cine-play-hint:focus-visible {
+  border-color: var(--accent);
+  background: var(--action-soft);
+}
+
+.cine-controls {
+  position: absolute;
+  top: 18px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.cine-controls button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.cine-controls button:hover,
+.cine-controls button:focus-visible {
+  background: var(--action-soft);
+  color: var(--accent);
+}
+
+.cine-controls button[aria-pressed="true"] {
+  background: var(--action);
+  color: var(--ink);
+}
+
+.cine-controls button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cine-controls-beat {
+  padding: 0 10px 0 6px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes cine-hint {
@@ -652,6 +733,14 @@ code {
     font-size: 1rem;
   }
 
+  .cine-controls {
+    top: 12px;
+  }
+
+  .cine-scroll-hint span {
+    display: none;
+  }
+
   .cine-hero[data-beat="recovery"] .cine-captions {
     bottom: calc(132px + env(safe-area-inset-bottom));
   }
@@ -694,6 +783,7 @@ code {
   .cine-hero .cine-captions,
   .cine-hero .cine-outro,
   .cine-hero .cine-progress,
+  .cine-hero .cine-controls,
   .cine-hero .cine-scroll-hint {
     display: none !important;
   }

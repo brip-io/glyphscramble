@@ -84,6 +84,12 @@ of that state, so scrubbing backwards is exact and screenshots are stable.
   particles, bricks, lower DPR, no antialiasing).
 - The frame loop runs only while the stage intersects the viewport and the
   document is visible.
+- **Playback controls**: a play/pause button autoplays the sequence by driving
+  the scroll position over about 42 seconds; any wheel, touch, or pointer
+  input hands control back. Up/Down (and Page Up/Down) step between beat
+  starts while the stage is on screen; Escape pauses. `?autoplay` on the
+  landing URL starts playback on load. Playback never starts on its own
+  otherwise.
 
 ## Budget (measured on the static export, gzip)
 

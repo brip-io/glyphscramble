@@ -6,8 +6,10 @@ import {
   segment,
 } from "../components/cinematic-hero/storyboard";
 import {
+  beatStart,
   createProgressStore,
   scrollerProgress,
+  stepProgress,
 } from "../components/cinematic-hero/scroll-progress";
 
 const forbiddenClaims = [
@@ -96,6 +98,21 @@ describe("scroll progress store", () => {
     store.set(0.5);
     expect(seen).toEqual([0.25, 1, 0]);
     expect(store.get()).toBe(0.5);
+  });
+
+  it("steps between beats with the arrow keys", () => {
+    const prepare = beats[1]!;
+    expect(stepProgress(0, 1)).toBeCloseTo(beatStart(1));
+    expect(beatStart(1)).toBeGreaterThan(prepare.range[0]);
+    expect(stepProgress(beatStart(1), 1)).toBeCloseTo(beatStart(2));
+    // Up from just inside a beat returns to the previous beat.
+    expect(stepProgress(beatStart(2), -1)).toBeCloseTo(beatStart(1));
+    // Up from deep inside a beat returns to its own start first.
+    expect(stepProgress(0.28, -1)).toBeCloseTo(beatStart(2));
+    expect(stepProgress(0.04, -1)).toBe(0);
+    expect(stepProgress(0, -1)).toBeNull();
+    expect(stepProgress(1, 1)).toBeNull();
+    expect(stepProgress(0.95, 1)).toBeNull();
   });
 
   it("derives progress from the scroller geometry", () => {

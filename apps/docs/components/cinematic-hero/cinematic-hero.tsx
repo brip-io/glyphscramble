@@ -4,19 +4,29 @@ import {
   ArrowRightIcon,
   BookOpenIcon,
   CaretDownIcon,
+  CaretUpIcon,
+  PauseIcon,
+  PlayIcon,
 } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HeroMode, HeroTier } from "./capabilities";
 import { detectMode, detectTier } from "./capabilities";
-import { createProgressStore, scrollerProgress } from "./scroll-progress";
+import {
+  createProgressStore,
+  scrollerProgress,
+  stepProgress,
+} from "./scroll-progress";
 import { beatAt, beats } from "./storyboard";
 
 const CinematicScene = dynamic(() => import("./cinematic-scene"), {
   ssr: false,
   loading: () => null,
 });
+
+/** Seconds for the autoplay to travel the whole scroller. */
+const AUTOPLAY_SECONDS = 42;
 
 interface CinematicHeroProps {
   /** Server-rendered hero copy: maker line, h1, summary, actions. */
@@ -30,9 +40,23 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
   const [tier, setTier] = useState<HeroTier>("lite");
   const [beatIndex, setBeatIndex] = useState(0);
   const [inView, setInView] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const store = useMemo(() => createProgressStore(0), []);
+  const geometry = useRef({ top: 0, height: 0 });
+  const inViewRef = useRef(true);
+  inViewRef.current = inView;
+
+  /** Scroll the window so the stage sits at progress `p`. */
+  const scrollToProgress = useCallback(
+    (p: number, behavior: ScrollBehavior) => {
+      const { top, height } = geometry.current;
+      const travel = Math.max(height - window.innerHeight, 0);
+      window.scrollTo({ top: top + p * travel, behavior });
+    },
+    [],
+  );
 
   useEffect(() => {
     setMode(detectMode());
@@ -60,6 +84,7 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
       const rect = scroller.getBoundingClientRect();
       top = rect.top + window.scrollY;
       height = scroller.offsetHeight;
+      geometry.current = { top, height };
     };
 
     const update = () => {
@@ -98,6 +123,10 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
       { rootMargin: "20% 0px" },
     );
     observer.observe(scroller);
+    if (new URLSearchParams(window.location.search).has("autoplay")) {
+      scrollToProgress(0, "instant");
+      setPlaying(true);
+    }
 
     return () => {
       window.removeEventListener("scroll", schedule);
@@ -105,7 +134,89 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
       observer.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [mode, store]);
+  }, [mode, store, scrollToProgress]);
+
+  // Arrow keys step between beats while the stage is on screen.
+  useEffect(() => {
+    if (mode !== "cinematic") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      )
+        return;
+      if (!inViewRef.current) return;
+      const direction =
+        event.key === "ArrowDown" || event.key === "PageDown"
+          ? 1
+          : event.key === "ArrowUp" || event.key === "PageUp"
+            ? -1
+            : 0;
+      if (direction === 0) {
+        if (event.key === "Escape") setPlaying(false);
+        return;
+      }
+      const next = stepProgress(store.get(), direction);
+      if (next === null) return;
+      event.preventDefault();
+      scrollToProgress(next, "smooth");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, store, scrollToProgress]);
+
+  // Autoplay drives the scroll position at a fixed pace; any manual input
+  // hands control back to the reader.
+  useEffect(() => {
+    if (!playing || mode !== "cinematic") return;
+    let frame = 0;
+    let last = performance.now();
+    let p = store.get();
+    const tick = (now: number) => {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      p = Math.min(p + dt / AUTOPLAY_SECONDS, 1);
+      scrollToProgress(p, "instant");
+      if (p >= 1) {
+        setPlaying(false);
+        return;
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    const stop = () => setPlaying(false);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    window.addEventListener("pointerdown", stop);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+      window.removeEventListener("pointerdown", stop);
+    };
+  }, [playing, mode, store, scrollToProgress]);
+
+  const togglePlay = () => {
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    if (store.get() >= 0.999) scrollToProgress(0, "instant");
+    setPlaying(true);
+  };
+  const step = (direction: 1 | -1) => {
+    const next = stepProgress(store.get(), direction);
+    if (next !== null) scrollToProgress(next, "smooth");
+  };
 
   const beat = beats[beatIndex] ?? beats[0]!;
   const cinematic = mode === "cinematic";
@@ -137,10 +248,18 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
             >
               {children}
               {cinematic ? (
-                <p className="cine-scroll-hint" aria-hidden="true">
-                  Scroll to run the pipeline
-                  <CaretDownIcon size={16} />
-                </p>
+                <div className="cine-scroll-hint">
+                  <button
+                    type="button"
+                    className="cine-play-hint"
+                    onClick={togglePlay}
+                  >
+                    <PlayIcon aria-hidden="true" size={14} weight="fill" />
+                    Play the pipeline
+                  </button>
+                  <span aria-hidden="true">or scroll</span>
+                  <CaretDownIcon aria-hidden="true" size={16} />
+                </div>
               ) : null}
             </div>
             {cinematic ? (
@@ -178,6 +297,45 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
                 </div>
                 <div className="cine-progress" aria-hidden="true">
                   <span />
+                </div>
+                <div
+                  className="cine-controls"
+                  role="group"
+                  aria-label="Pipeline playback"
+                >
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    aria-pressed={playing}
+                    aria-label={
+                      playing ? "Pause autoplay" : "Play the pipeline"
+                    }
+                  >
+                    {playing ? (
+                      <PauseIcon aria-hidden="true" size={16} weight="fill" />
+                    ) : (
+                      <PlayIcon aria-hidden="true" size={16} weight="fill" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => step(-1)}
+                    disabled={beatIndex === 0 && store.get() <= 0}
+                    aria-label="Previous beat (Up arrow)"
+                  >
+                    <CaretUpIcon aria-hidden="true" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => step(1)}
+                    disabled={beatIndex === beats.length - 1}
+                    aria-label="Next beat (Down arrow)"
+                  >
+                    <CaretDownIcon aria-hidden="true" size={16} />
+                  </button>
+                  <span className="cine-controls-beat" aria-live="polite">
+                    {String(beatIndex).padStart(2, "0")} / 08
+                  </span>
                 </div>
               </>
             ) : null}
