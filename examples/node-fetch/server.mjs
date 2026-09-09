@@ -6,7 +6,9 @@ import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 import {
   createGlyphEngine,
+  glyphResponseBoundaryAttributes,
   responseHeadersForContext,
+  transformGlyphHtmlResponse,
 } from "@brip/glyphscramble";
 import config from "./glyphscramble.config.mjs";
 
@@ -97,6 +99,25 @@ const server = createServer(async (incoming, outgoing) => {
         new globalThis.Response("Abort was not propagated.", { status: 504 }),
         outgoing,
       );
+    }
+    if (pathname === "/boundary") {
+      const context = engine.beginResponse({
+        signal: request.signal,
+        faces: [{ font: "body" }],
+      });
+      const marker = glyphResponseBoundaryAttributes("body");
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Node response boundary</title></head><body><h1>Indexable Node boundary heading</h1><article data-glyphscramble-font="${marker["data-glyphscramble-font"]}" data-glyphscramble-source="${marker["data-glyphscramble-source"]}"><h2>Node boundary protected value</h2><p>Nested server-rendered component content.</p></article></body></html>`;
+      const transformed = await transformGlyphHtmlResponse(
+        new globalThis.Response(html, {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "public, max-age=3600",
+          },
+        }),
+        context,
+        { signal: request.signal },
+      );
+      return await writeResponse(transformed, outgoing);
     }
     if (pathname !== "/")
       return await writeResponse(

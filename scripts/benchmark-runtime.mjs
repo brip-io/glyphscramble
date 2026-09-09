@@ -16,6 +16,7 @@ import {
   parseSfnt,
   prepareGlyphFonts,
   ResponsePoolVariantProvider,
+  transformGlyphHtmlResponse,
 } from "../packages/core/dist/index.js";
 import { evaluateSmokeGate } from "../packages/core/dist/benchmark-policy.js";
 
@@ -179,7 +180,9 @@ async function run(label, source, ceilings) {
     });
     const encoding = [];
     const response = [];
+    const responseHtml = [];
     const payloads = [];
+    const requestContexts = [];
     const warmupPayloads = [];
     const sample = "High value block. "
       .repeat(Math.ceil(10_000 / "High value block. ".length))
@@ -200,12 +203,12 @@ async function run(label, source, ceilings) {
       await font.arrayBuffer();
     }
     for (let index = 0; index < REQUEST_ITERATIONS; index++) {
+      const context = engine.beginResponse();
       const acquired = performance.now();
-      const payload = await engine
-        .beginResponse()
-        .scrambleAsync(sample, { font: "body" });
+      const payload = await context.scrambleAsync(sample, { font: "body" });
       encoding.push(performance.now() - acquired);
       payloads.push(payload);
+      requestContexts.push(context);
     }
 
     // Acquiring a variant schedules an asynchronous pool refill. Let those
@@ -232,6 +235,39 @@ async function run(label, source, ceilings) {
     for (const font of fontResponses) {
       await font.arrayBuffer();
     }
+    let responseMarkup;
+    // HTML transformation is independent of normalized font byte size. Run
+    // this gate once in the small-font qualification to avoid charging GC from
+    // the unrelated 1 MiB compression workload to parser/serializer latency.
+    if (label === "inter-123kb") {
+      const protectedExcerpt = "High value block. ".repeat(60);
+      const publicContext = "Public response context. ".repeat(4_100);
+      responseMarkup = `<!doctype html><html><head><title>Benchmark</title></head><body><main>${publicContext}</main><article data-glyphscramble-font="body" data-glyphscramble-source="response-boundary-v1">${protectedExcerpt}</article></body></html>`;
+      if (
+        new globalThis.TextEncoder().encode(responseMarkup).byteLength <
+          100 * 1024 ||
+        new globalThis.TextEncoder().encode(responseMarkup).byteLength >
+          110 * 1024
+      )
+        throw new Error(
+          "Response-transform benchmark fixture must remain 100 KB.",
+        );
+      for (const context of requestContexts) {
+        const transformStarted = performance.now();
+        const transformed = await transformGlyphHtmlResponse(
+          new globalThis.Response(responseMarkup, {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          }),
+          context,
+        );
+        responseHtml.push(performance.now() - transformStarted);
+        if (!transformed.ok)
+          throw new Error(
+            `${label} response transform returned ${transformed.status}`,
+          );
+        await transformed.arrayBuffer();
+      }
+    }
     const requestMetrics = engine.metrics();
     const warmGenerationSamples = generationRuns
       .filter((run) => run.phase === "process-warm")
@@ -253,6 +289,9 @@ async function run(label, source, ceilings) {
       ),
       encoding: evaluateSmokeGate(encoding, 5),
       fontResponse: evaluateSmokeGate(response, 5),
+      ...(responseHtml.length > 0
+        ? { responseHtml: evaluateSmokeGate(responseHtml, 10) }
+        : {}),
     };
     const result = {
       label,
@@ -271,6 +310,17 @@ async function run(label, source, ceilings) {
       encodingSamplesMs: encoding.map((value) => Number(value.toFixed(3))),
       fontResponseMilliseconds: stats(response),
       fontResponseSamplesMs: response.map((value) => Number(value.toFixed(3))),
+      ...(responseMarkup
+        ? {
+            responseHtmlBytes: new globalThis.TextEncoder().encode(
+              responseMarkup,
+            ).byteLength,
+            responseHtmlMilliseconds: stats(responseHtml),
+            responseHtmlSamplesMs: responseHtml.map((value) =>
+              Number(value.toFixed(3)),
+            ),
+          }
+        : {}),
       ceilings,
       smokeGates: gates,
       capacityPrediction,

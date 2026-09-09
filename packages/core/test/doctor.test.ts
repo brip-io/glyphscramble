@@ -39,6 +39,26 @@ describe("doctor readiness", () => {
     ).toBe(true);
   });
 
+  it("reports response-boundary tradeoffs and refuses hydrated use", async () => {
+    const cwd = await project();
+    await writeFile(
+      join(cwd, "src/card.astro"),
+      '<GlyphResponseBoundary font="body"><ResearchCard client:load /></GlyphResponseBoundary>',
+    );
+
+    const findings = await doctorProject({ cwd });
+    expect(findings.map((item) => item.code)).toEqual([
+      "RESPONSE-BOUNDARY-HYDRATION",
+      "RESPONSE-BOUNDARY-A11Y",
+      "RESPONSE-BOUNDARY-SEO",
+      "CONFIG-MISSING",
+    ]);
+    expect(findings[0]?.severity).toBe("error");
+    expect(
+      findings.slice(1, 3).every((item) => item.severity === "warning"),
+    ).toBe(true);
+  });
+
   it("reports independent source leakage and missing-config repairs", async () => {
     const cwd = await project();
     await writeFile(

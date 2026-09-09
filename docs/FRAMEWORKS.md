@@ -305,6 +305,37 @@ Astro static output uses the same post-build marker as any other HTML generator.
 It accepts only non-hydrated output; a protected `astro-island`, `client:*`
 boundary, or other known hydration marker fails before publication.
 
+### Per-response inert HTML boundary
+
+With the default bounded-buffer middleware, an SSR page can wrap an existing
+presentational component instead of manually scrambling each leaf:
+
+```astro
+---
+import GlyphResponseBoundary from "@brip/glyphscramble-astro/GlyphResponseBoundary.astro";
+import ResearchCard from "../components/ResearchCard.astro";
+---
+
+<h1>Indexable research heading</h1>
+<GlyphResponseBoundary font="body" as="section">
+  <ResearchCard />
+</GlyphResponseBoundary>
+```
+
+The component emits a server-only marker. Middleware then owns the complete
+HTML response, validates the final subtree, rotates it with one response
+variant, injects one matching face/guard, and changes the response to
+`private, no-store` before returning bytes. The block remains hidden until
+`document.fonts` confirms the face. A font or runtime failure keeps it hidden
+and reveals only the configured generic status.
+
+This boundary refuses Astro client islands, arbitrary scripts or attributes,
+interactive content, mixed font IDs, partial/streamed output, and middleware's
+`strategy: "route"`. It is not available to Next RSC, Nuxt, SvelteKit,
+client-rendered Vite, or static Astro output. Those environments must use their
+server-issued `GlyphText` payload path or the explicitly per-build static
+compiler. Keep SEO copy and accessible acquisition UI outside the boundary.
+
 ## Vite and vanilla servers
 
 Vite is not a server boundary. Per-response rotation requires a Node or Fetch
@@ -314,6 +345,13 @@ per complete response, routes font GET/HEAD to that same engine, applies cache
 headers only after rendering, serves the client runtime from the same origin,
 and drains the server and engine on shutdown. A streamed server response must
 declare protection and commit `private, no-store` before its first byte.
+
+For complete inert HTML, render `glyphResponseBoundaryAttributes("body")` on
+the outer element and pass the final `Response` plus a narrowed response
+context to `transformGlyphHtmlResponse()`. Invoke it only on eligible routes;
+unprotected streaming routes should bypass it. The default 2 MiB byte ceiling,
+one-second server deadline, abort signal, CSP nonce, and aggregate-only
+diagnostic callback are configurable. The hard parser ceiling is 16 MiB.
 
 For non-hydrated static HTML, register the real Vite plugin:
 
