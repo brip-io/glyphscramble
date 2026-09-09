@@ -242,7 +242,7 @@ async function run(label, source, ceilings) {
     // the unrelated 1 MiB compression workload to parser/serializer latency.
     if (label === "inter-123kb") {
       const protectedExcerpt = "High value block. ".repeat(60);
-      const publicContext = "Public response context. ".repeat(4_100);
+      const publicContext = "Public response context. ".repeat(4_046);
       responseMarkup = `<!doctype html><html><head><title>Benchmark</title></head><body><main>${publicContext}</main><article data-glyphscramble-font="body" data-glyphscramble-source="response-boundary-v1">${protectedExcerpt}</article></body></html>`;
       if (
         new globalThis.TextEncoder().encode(responseMarkup).byteLength <
