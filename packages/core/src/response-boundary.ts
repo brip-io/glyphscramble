@@ -34,6 +34,8 @@ const MARKER_PATTERN = /\bdata-glyphscramble-(?:font|source)\s*=/iu;
 const SAFE_FONT_ID = /^[a-z][a-z0-9_-]{0,31}$/iu;
 const SAFE_LANG = /^(?:[a-z]{2,8}|x-[a-z0-9]{1,8})(?:-[a-z0-9]{1,8})*$/iu;
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+const UTF8_ENCODER = new TextEncoder();
 
 type HtmlNode = StaticHtmlNode;
 
@@ -584,7 +586,7 @@ export async function transformGlyphHtmlResponse(
   try {
     const body = await readBounded(response, maxBytes, signal);
     bytes = body.byteLength;
-    const source = new TextDecoder("utf-8", { fatal: true }).decode(body);
+    const source = UTF8_DECODER.decode(body);
     if (!MARKER_PATTERN.test(source))
       return rebuiltResponse(
         response,
@@ -611,7 +613,7 @@ export async function transformGlyphHtmlResponse(
       ...(options.cspNonce ? { nonce: options.cspNonce } : {}),
     });
     ensureDeadline(signal, "protect");
-    const output = new TextEncoder().encode(protectedResult.html);
+    const output = UTF8_ENCODER.encode(protectedResult.html);
     const headers = protectedResponseHeaders(response.headers);
     headers.delete("content-encoding");
     headers.delete("etag");
