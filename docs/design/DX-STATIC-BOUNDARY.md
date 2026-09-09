@@ -2,7 +2,7 @@
 
 > Child of [DX-INSTRUMENTATION](DX-INSTRUMENTATION.md) — milestone **M3**.
 >
-> **Size:** M · **Priority:** P1 · **Status:** Proposed · **GitHub issue:** [#78](https://github.com/brip-io/glyphscramble/issues/78)
+> **Size:** M · **Priority:** P1 · **Status:** Implemented in [PR #90](https://github.com/brip-io/glyphscramble/pull/90) · **GitHub issue:** [#78](https://github.com/brip-io/glyphscramble/issues/78)
 > **Blocked by:** DX-PAYLOAD-RENDERERS and R02/R03 · **Blocks:** DX-RESPONSE-BOUNDARY and DX-COMPILER-SPIKE
 
 ## Objective
@@ -56,3 +56,11 @@ It emits a normal wrapper carrying `data-glyphscramble-font` and versioned sourc
 ## Exit criteria
 
 A real non-hydrated research-card component can be wrapped with one boundary, compiled and published without plaintext, and rendered pixel-equivalently within approved tolerances; unsafe, hydrated, or typography-incompatible output fails before publication.
+
+## Implementation evidence
+
+- Core now provides a versioned static-boundary marker contract, with static-only React, Vue, Svelte, and Astro entrypoints that expose the same one-face authoring model.
+- Planning validates the final generated HTML, rejects stale markers and unsafe typography, permits empty framework structure comments, and records protected block, element, and text-node counts.
+- Generated CSS and the font-load guard enforce the mapped family throughout descendants. The versioned static manifest carries count totals plus explicit SEO and accessibility warnings, and `doctor` verifies and reports those totals.
+- The Astro qualification fixture wraps a real nested research-card component and publishes it through the existing two-tree compiler without exposing source text.
+- Qualification covers 258 unit/integration tests, 21 cross-browser static-delivery cases, pixel equivalence, RTL and combining-mark layouts, vertical text, multi-script and emoji/ZWJ encoding, packed consumers under npm, pnpm, Yarn, and Bun, and the seven-case Astro/Vite/vanilla suite.
