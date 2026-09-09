@@ -119,6 +119,7 @@ Equivalent `pnpm dlx`, `yarn dlx`, and `bunx` commands come from DIST-INSTALL-DX
 | Nuxt                                        | core + `@brip/glyphscramble-nuxt`                    |
 | SvelteKit                                   | core + `@brip/glyphscramble-sveltekit`               |
 | Astro SSR                                   | core + `@brip/glyphscramble-astro`                   |
+| Astro static                                | core + `@brip/glyphscramble-astro`                   |
 | Vite static                                 | core + `@brip/glyphscramble-vite`                    |
 | Plain React, Vue, or Svelte                 | core + the corresponding UI renderer                 |
 | Generic Node/Fetch or CLI-only static build | core only                                            |

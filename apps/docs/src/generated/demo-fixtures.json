@@ -32,25 +32,25 @@
       "id": "static-a",
       "label": "Build A",
       "encodedText": "Lmbhuhmbhmv ohzhroti bhzhokhz bhxcwhorvh rtthzz.",
-      "family": "GlyphScrambleStatic-body-c4d6163bdf89ea65",
+      "family": "GlyphScrambleStatic-body-3fce2b6411452270",
       "fontFile": "/demo-fixtures/static-a.woff2",
       "fontIdentity": "f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b",
-      "fontUrl": "/_glyphscramble/6d35067a9f988778bd7edbc0c6d12b18b2c0001441d41aac6370fce9f9f41e41/body.f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b.woff2",
+      "fontUrl": "/_glyphscramble/39aca08e508074d8aa835bcb02dfbeaea5fa4e6cd27f0cfc6dc674e2a74c7929/body.f675b75e9dd0d5f701d03105021226f4b77aea3ebeb455976c405b939368880b.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "6d35067a9f988778bd7edbc0c6d12b18b2c0001441d41aac6370fce9f9f41e41"
+      "buildId": "39aca08e508074d8aa835bcb02dfbeaea5fa4e6cd27f0cfc6dc674e2a74c7929"
     },
     "b": {
       "id": "static-b",
       "label": "Build B",
       "encodedText": "Blcftflcflr jfyfzjwg cfyfjbfy cfhnsfjzrf zwwfyy.",
-      "family": "GlyphScrambleStatic-body-739ad2e1c6459f29",
+      "family": "GlyphScrambleStatic-body-c6f556eee6af9914",
       "fontFile": "/demo-fixtures/static-b.woff2",
       "fontIdentity": "c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5",
-      "fontUrl": "/_glyphscramble/f00ce5f1ea65ed0c07e6bcf7089a8ed178ab22e5bd2b1556ea18008f1cad6fca/body.c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5.woff2",
+      "fontUrl": "/_glyphscramble/3c27fd6566c95d2b24568457c68cb6cc9c7dc92f07189ae154ad6411e10aec33/body.c4991b96260f991f7b726f8568a55dae0429cb039d27bc7f447bf179038759d5.woff2",
       "documentCache": "public, revalidate",
       "fontCache": "public, immutable",
-      "buildId": "f00ce5f1ea65ed0c07e6bcf7089a8ed178ab22e5bd2b1556ea18008f1cad6fca"
+      "buildId": "3c27fd6566c95d2b24568457c68cb6cc9c7dc92f07189ae154ad6411e10aec33"
     }
   }
 }

@@ -32,14 +32,15 @@ const yarnCli = resolve(
 function consumerSource(profile) {
   switch (profile) {
     case "generic-node":
-    case "astro-static":
       return 'import { defineGlyphConfig } from "@brip/glyphscramble";\nimport { GLYPH_BETA_CHANNEL, glyphCliCommand } from "@brip/glyphscramble/package-surface";\nvoid defineGlyphConfig;\nvoid glyphCliCommand("npm", GLYPH_BETA_CHANNEL, ["init"]);\n';
+    case "astro-static":
+      return 'import { glyphStaticBoundaryAttributes } from "@brip/glyphscramble";\nimport type { GlyphConfig } from "@brip/glyphscramble-astro";\nvoid glyphStaticBoundaryAttributes("body");\nlet config!: GlyphConfig;\nvoid config;\n';
     case "react":
-      return 'import { GlyphText, GlyphScramble, type GlyphTextProps, type GlyphScrambleProps } from "@brip/glyphscramble-react";\nvoid (GlyphText satisfies unknown);\nvoid (GlyphScramble satisfies typeof GlyphText);\nlet props!: GlyphTextProps;\nlet compatibilityProps!: GlyphScrambleProps;\nvoid props;\nvoid compatibilityProps;\n';
+      return 'import { GlyphText, GlyphScramble, type GlyphTextProps, type GlyphScrambleProps } from "@brip/glyphscramble-react";\nimport { GlyphStaticBoundary, type GlyphStaticBoundaryProps } from "@brip/glyphscramble-react/static";\nvoid (GlyphText satisfies unknown);\nvoid (GlyphScramble satisfies typeof GlyphText);\nvoid GlyphStaticBoundary;\nlet props!: GlyphTextProps;\nlet compatibilityProps!: GlyphScrambleProps;\nlet staticProps!: GlyphStaticBoundaryProps;\nvoid props;\nvoid compatibilityProps;\nvoid staticProps;\n';
     case "vue":
-      return 'import { GlyphText, GlyphScramble } from "@brip/glyphscramble-vue";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\n';
+      return 'import { GlyphText, GlyphScramble } from "@brip/glyphscramble-vue";\nimport { GlyphStaticBoundary } from "@brip/glyphscramble-vue/static";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\nvoid GlyphStaticBoundary;\n';
     case "svelte":
-      return 'import { GlyphText, GlyphScramble } from "@brip/glyphscramble-svelte";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\n';
+      return 'import { GlyphText, GlyphScramble, type GlyphStaticBoundaryProps } from "@brip/glyphscramble-svelte";\nvoid GlyphText;\nvoid (GlyphScramble satisfies typeof GlyphText);\nlet staticProps!: GlyphStaticBoundaryProps;\nvoid staticProps;\n';
     case "next":
     case "nuxt":
     case "sveltekit":

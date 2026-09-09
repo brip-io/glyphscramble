@@ -410,7 +410,7 @@ describe("framework initializer", () => {
       ["@brip/glyphscramble", "@brip/glyphscramble-sveltekit"],
     ],
     ["astro", "response", ["@brip/glyphscramble", "@brip/glyphscramble-astro"]],
-    ["astro", "static", ["@brip/glyphscramble"]],
+    ["astro", "static", ["@brip/glyphscramble", "@brip/glyphscramble-astro"]],
     ["vite", "static", ["@brip/glyphscramble", "@brip/glyphscramble-vite"]],
   ] as const)(
     "uses the canonical %s/%s dependency profile during dry-run",
@@ -608,7 +608,7 @@ describe("framework initializer", () => {
     const result = await initProject({ cwd, mode: "static" });
     expect(result).toMatchObject({
       mode: "static",
-      packageName: "@brip/glyphscramble",
+      packageName: "@brip/glyphscramble-astro",
       created: ["glyphscramble.config.ts"],
     });
     expect(result.notes.join(" ")).toMatch(/rotates once per build/);

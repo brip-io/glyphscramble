@@ -5,6 +5,10 @@ import {
   type GlyphTextProps as ReactGlyphTextProps,
 } from "../../packages/react/dist/index.js";
 import {
+  GlyphStaticBoundary as ReactStaticBoundary,
+  type GlyphStaticBoundaryProps as ReactStaticBoundaryProps,
+} from "../../packages/react/dist/static.js";
+import {
   GlyphText as NextGlyphText,
   GlyphScramble as NextGlyphScramble,
 } from "../../packages/next/dist/index.js";
@@ -12,6 +16,7 @@ import {
   GlyphText as VueGlyphText,
   GlyphScramble as VueGlyphScramble,
 } from "../../packages/vue/dist/index.js";
+import { GlyphStaticBoundary as VueStaticBoundary } from "../../packages/vue/dist/static.js";
 import {
   GlyphText as NuxtGlyphText,
   GlyphScramble as NuxtGlyphScramble,
@@ -20,6 +25,7 @@ import {
   GlyphText as SvelteGlyphText,
   GlyphScramble as SvelteGlyphScramble,
   type GlyphTextProps as SvelteGlyphTextProps,
+  type GlyphStaticBoundaryProps as SvelteStaticBoundaryProps,
 } from "../../packages/svelte/dist/index.js";
 import {
   GlyphText as SvelteKitGlyphText,
@@ -103,3 +109,41 @@ const svelteKitChildren: SvelteKitProps = {
 };
 void svelteChildren;
 void svelteKitChildren;
+
+const reactStaticProps: ReactStaticBoundaryProps<"article"> = {
+  font: "body",
+  as: "article",
+  className: "research",
+  children: null,
+};
+ReactStaticBoundary(reactStaticProps);
+// @ts-expect-error Static boundaries reject interactive wrappers.
+ReactStaticBoundary({ font: "body", as: "button", children: null });
+ReactStaticBoundary({
+  font: "body",
+  children: null,
+  // @ts-expect-error Raw HTML bypasses descendant validation.
+  dangerouslySetInnerHTML: { __html: "plaintext" },
+});
+
+type VueStaticProps = InstanceType<typeof VueStaticBoundary>["$props"];
+const vueStaticProps: VueStaticProps = {
+  font: "body",
+  as: "article",
+  class: "research",
+};
+void vueStaticProps;
+// @ts-expect-error Vue static boundaries reject interactive wrappers.
+const vueStaticInteractive: VueStaticProps = { font: "body", as: "button" };
+void vueStaticInteractive;
+
+declare const svelteChildrenSnippet: SvelteStaticBoundaryProps["children"];
+const svelteStaticProps: SvelteStaticBoundaryProps = {
+  font: "body",
+  as: "article",
+  children: svelteChildrenSnippet,
+};
+void svelteStaticProps;
+// @ts-expect-error Svelte static boundaries require descendants.
+const svelteStaticMissingChildren: SvelteStaticBoundaryProps = { font: "body" };
+void svelteStaticMissingChildren;

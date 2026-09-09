@@ -34,8 +34,45 @@ npm exec glyphscramble -- doctor --static-output dist-protected
 
 `errorText` localizes the generic visible failure status and is capped at 512
 UTF-8 bytes. It must not repeat or summarize the protected source. The same
-generic text is recorded in the version 3 manifest so `doctor` can reject a page whose
+generic text is recorded in the version 4 manifest so `doctor` can reject a page whose
 failure contract was changed after publication.
+
+## Wrap an existing static component
+
+Astro static pages can mark a complete presentational subtree without
+rewriting each text node:
+
+```astro
+---
+import GlyphStaticBoundary from "@brip/glyphscramble-astro/GlyphStaticBoundary.astro";
+import ResearchCard from "../components/ResearchCard.astro";
+---
+
+<h1>Indexable research catalog</h1>
+<p>Public summary and acquisition link.</p>
+<GlyphStaticBoundary font="body" as="article">
+  <ResearchCard />
+</GlyphStaticBoundary>
+```
+
+Install both `@brip/glyphscramble@beta` and
+`@brip/glyphscramble-astro@beta` with `--save-exact`. React and Vue expose a
+named `GlyphStaticBoundary` from their `/static` entrypoint; Svelte exposes a
+default component there. A framework-neutral template can spread
+`glyphStaticBoundaryAttributes("body")` from core.
+
+The marker does not scramble anything at render time. Always publish the
+separate compiler output, never the source build. Final-HTML planning rejects
+hydration, interaction, plaintext attributes, text comments, incompatible
+nested fonts, and inline face overrides. One prepared face owns every
+descendant; generated CSS and the load guard prevent component styles from
+silently restoring an ordinary font.
+
+The command result and manifest report protected block, element, and text-node
+counts. `doctor --static-output` independently checks those totals while
+verifying the encoded-text fingerprint and reports them in `STATIC-OUTPUT-OK`.
+The manifest also carries explicit SEO and accessibility warnings so deployment
+automation cannot present the static fallback without its tradeoffs.
 
 In Vite 7 or 8, `glyphscrambleStatic(config)` can own this two-tree flow from
 the normal `vite build` command. It captures the user's final `outDir`, directs

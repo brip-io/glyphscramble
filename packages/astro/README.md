@@ -13,5 +13,9 @@ payload/config types and its payload-only renderer at
 `@brip/glyphscramble-astro/GlyphText.astro`; default slots fail closed during
 the build or request. The old `GlyphScramble.astro` subpath remains a beta
 compatibility alias. Read the [Astro guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#astro-7).
+Static Astro pages can import
+`@brip/glyphscramble-astro/GlyphStaticBoundary.astro` to wrap an existing
+non-hydrated component subtree. The component only emits a marker; publish the
+separate post-build compiler output, which rotates once per build.
 
 GlyphScramble raises the cost of bulk DOM scraping; it is not DRM. Apache-2.0.

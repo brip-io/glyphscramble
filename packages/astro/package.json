@@ -1,7 +1,7 @@
 {
   "name": "@brip/glyphscramble-astro",
   "version": "0.1.0-beta.0",
-  "description": "Astro SSR integration for GlyphScramble.",
+  "description": "Astro SSR integration and static component boundaries for GlyphScramble.",
   "keywords": [
     "anti-scraping",
     "astro",
@@ -28,11 +28,14 @@
       "import": "./dist/index.js"
     },
     "./GlyphText.astro": "./src/GlyphText.astro",
-    "./GlyphScramble.astro": "./src/GlyphText.astro"
+    "./GlyphScramble.astro": "./src/GlyphText.astro",
+    "./GlyphStaticBoundary.astro": "./src/GlyphStaticBoundary.astro",
+    "./static": "./src/GlyphStaticBoundary.astro"
   },
   "files": [
     "dist",
     "src/GlyphText.astro",
+    "src/GlyphStaticBoundary.astro",
     "README.md"
   ],
   "engines": {

@@ -21,6 +21,24 @@ async function project(): Promise<string> {
 }
 
 describe("doctor readiness", () => {
+  it("warns about the accessibility and SEO cost of static boundaries", async () => {
+    const cwd = await project();
+    await writeFile(
+      join(cwd, "src/card.tsx"),
+      '<GlyphStaticBoundary font="body"><ResearchCard /></GlyphStaticBoundary>',
+    );
+
+    const findings = await doctorProject({ cwd });
+    expect(findings.map((item) => item.code)).toEqual([
+      "STATIC-BOUNDARY-A11Y",
+      "STATIC-BOUNDARY-SEO",
+      "CONFIG-MISSING",
+    ]);
+    expect(
+      findings.slice(0, 2).every((item) => item.severity === "warning"),
+    ).toBe(true);
+  });
+
   it("reports independent source leakage and missing-config repairs", async () => {
     const cwd = await project();
     await writeFile(

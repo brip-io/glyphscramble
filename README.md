@@ -198,7 +198,10 @@ Vite users can register `glyphscrambleStatic(config)` directly in the normal
 `plugins` array. It derives the final directory and root-relative public base
 from Vite's resolved configuration, stages a fresh unprotected build internally,
 and atomically publishes only the verified protected tree. Astro static users
-run the same compiler after `astro build`. Both modes reject protected hydrated
+can wrap an existing non-hydrated component with
+`@brip/glyphscramble-astro/GlyphStaticBoundary.astro` before running the same
+compiler after `astro build`. Framework-neutral templates can emit the marker
+with `glyphStaticBoundaryAttributes()`. Both modes reject protected hydrated
 islands, state, or client bundles.
 
 ## Tradeoffs
