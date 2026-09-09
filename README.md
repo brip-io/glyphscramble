@@ -125,6 +125,15 @@ Next invokes its request-time boundary only when a Server Component requests a
 payload, so unprotected routes retain their ordinary cache behavior. Proxy
 cannot observe downstream rendering and is not part of the integration.
 
+For complete non-hydrated Astro SSR or generic Fetch/Node HTML,
+`GlyphResponseBoundary` can wrap an existing inert component subtree. The
+owning middleware buffers at most 2 MiB by default, validates the final HTML,
+uses one fresh response mapping for every descendant text node, and fails
+closed before returning any bytes. It rejects hydration, interactive content,
+mixed fonts, partial documents, and route-streaming mode. Protected responses
+are `private, no-store`; routes that need ordinary streaming should bypass the
+transformer. See the [framework contract](docs/FRAMEWORKS.md#per-response-inert-html-boundary).
+
 CSS sources that contain more than one `@font-face` require explicit named selectors, so a remote stylesheet cannot silently change which weight, style, stretch, or Unicode subset is used. Select a non-default face with `{ font: "body", face: "bold" }`.
 
 Coverage limits the codepoints eligible for permutation and can satisfy the normalized-size guard, but it does not physically subset outline tables in this release. Use an already-subset source when artifact size matters. Preparation records raw and normalized hashes, copies the exact notice bytes into `.glyphscramble/licenses`, and publishes all faces plus the lockfile transactionally.

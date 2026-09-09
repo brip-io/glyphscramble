@@ -141,6 +141,29 @@ Static mode is the opposite trade: output can be cached globally, but the mappin
 For exact subpath, cache, CSP, and atomic-publication settings, see
 [Static deployment](STATIC-DEPLOYMENT.md).
 
+## Per-response HTML boundary
+
+`GlyphResponseBoundary` is the descendant-wrapping option for complete inert
+Astro SSR or generic Fetch/Node HTML. The server buffers the final document,
+validates the marked subtree with the same conservative policy as the static
+compiler, encodes every descendant text node with one fresh response variant,
+and releases no bytes until the transform succeeds. Sibling and nested
+same-font boundaries share one font lifecycle; mixed fonts fail closed.
+
+This mode is intentionally narrow. It rejects client islands, hydration data,
+scripts, styles, templates, links, controls, text-bearing attributes, inline
+font overrides, malformed or partial documents, compressed upstream HTML, and
+buffers above 2 MiB by default. The configurable ceiling cannot exceed 16 MiB.
+Abort, timeout, overload, CSP, and font failures expose only a generic status or
+generic 503—never the source block. If an existing CSP is present, pass a nonce
+already authorized by both `script-src` and `style-src`.
+
+Protected responses become `private, no-store`; unmarked responses retain their
+original headers. Apply the transformer only on known eligible routes so other
+routes can keep streaming. It does not inspect or protect APIs, RSC payloads,
+JSON-LD, OpenGraph, feeds, email, print, clipboard data, or client bundles.
+Use it for small optional high-value blocks, not the page shell.
+
 ## Accessibility
 
 There is no honest plaintext accessibility mirror: any mirror is also a plaintext scraping surface. GlyphScramble therefore marks protected output `aria-hidden` and requires `accessibilityRiskAcknowledged: true`.

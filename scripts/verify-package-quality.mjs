@@ -53,6 +53,8 @@ for (const directoryName of packageDirectories) {
       "./GlyphStaticBoundary.astro",
       "--exclude-entrypoints",
       "./static",
+      "--exclude-entrypoints",
+      "./GlyphResponseBoundary.astro",
     );
   await run(attw);
 }

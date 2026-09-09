@@ -1,0 +1,47 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import {
+  glyphResponseBoundaryAttributes,
+  isGlyphResponseBoundaryElement,
+  type GlyphResponseBoundaryElement,
+} from "@brip/glyphscramble";
+
+type BoundaryAttribute =
+  | "data-glyphscramble-font"
+  | "data-glyphscramble-source"
+  | "set:html"
+  | "set:text";
+
+export type Props = {
+  /** One prepared face owns this complete non-hydrated response subtree. */
+  font: string;
+  as?: GlyphResponseBoundaryElement;
+} & Omit<HTMLAttributes<GlyphResponseBoundaryElement>, BoundaryAttribute>;
+
+if (!Astro.slots.has("default"))
+  throw new TypeError("GlyphResponseBoundary requires a default slot.");
+if (
+  (Astro.locals as { glyphscrambleResponseBoundary?: true })
+    .glyphscrambleResponseBoundary !== true
+)
+  throw new TypeError(
+    "GlyphResponseBoundary requires createAstroGlyphMiddleware in bounded buffer mode. It cannot run in route-streaming, static, or hydrated output.",
+  );
+
+const { font, as: Element = "div", ...attributes } = Astro.props;
+if (!isGlyphResponseBoundaryElement(Element))
+  throw new TypeError(
+    "GlyphResponseBoundary `as` must be a supported non-interactive intrinsic element.",
+  );
+for (const name of [
+  "data-glyphscramble-font",
+  "data-glyphscramble-source",
+  "set:html",
+  "set:text",
+])
+  delete (attributes as Record<string, unknown>)[name];
+---
+
+<Element {...attributes} {...glyphResponseBoundaryAttributes(font)}>
+  <slot />
+</Element>

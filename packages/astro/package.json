@@ -30,12 +30,14 @@
     "./GlyphText.astro": "./src/GlyphText.astro",
     "./GlyphScramble.astro": "./src/GlyphText.astro",
     "./GlyphStaticBoundary.astro": "./src/GlyphStaticBoundary.astro",
-    "./static": "./src/GlyphStaticBoundary.astro"
+    "./static": "./src/GlyphStaticBoundary.astro",
+    "./GlyphResponseBoundary.astro": "./src/GlyphResponseBoundary.astro"
   },
   "files": [
     "dist",
     "src/GlyphText.astro",
     "src/GlyphStaticBoundary.astro",
+    "src/GlyphResponseBoundary.astro",
     "README.md"
   ],
   "engines": {

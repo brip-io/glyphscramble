@@ -123,6 +123,23 @@ export {
   glyphStaticBoundaryAttributes,
   isGlyphStaticBoundaryElement,
 } from "./static-boundary.js";
+export {
+  DEFAULT_RESPONSE_FONT_TIMEOUT_MS,
+  DEFAULT_RESPONSE_HTML_BYTES,
+  DEFAULT_RESPONSE_TRANSFORM_TIMEOUT_MS,
+  GLYPH_RESPONSE_BOUNDARY_SOURCE,
+  MAX_RESPONSE_HTML_BYTES,
+  glyphResponseBoundaryAttributes,
+  isGlyphResponseBoundaryElement,
+  transformGlyphHtmlResponse,
+} from "./response-boundary.js";
+export type {
+  GlyphHtmlTransformDiagnostic,
+  GlyphHtmlTransformDiagnosticCode,
+  GlyphResponseBoundaryAttributes,
+  GlyphResponseBoundaryElement,
+  TransformGlyphHtmlResponseOptions,
+} from "./response-boundary.js";
 export type {
   GlyphStaticBoundaryAttributes,
   GlyphStaticBoundaryElement,

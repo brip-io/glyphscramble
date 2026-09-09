@@ -68,6 +68,32 @@ test("Astro shows the localized generic error when its font fails", async ({
   await expect(content).toBeVisible();
 });
 
+test("Astro transforms a nested inert component with a fresh response mapping", async ({
+  page,
+  request,
+}) => {
+  const first = await request.get(`${ASTRO}/boundary`);
+  const second = await request.get(`${ASTRO}/boundary`);
+  const firstHtml = await first.text();
+  const secondHtml = await second.text();
+  expect(first.headers()["cache-control"]).toBe("private, no-store");
+  expect(firstHtml).not.toContain("Per-response research brief");
+  expect(firstHtml).not.toContain("Fresh mapping");
+  expect(firstHtml).not.toContain("Café");
+  expect(firstHtml).toContain("Indexable response-boundary heading");
+  expect(firstHtml).not.toBe(secondHtml);
+
+  await page.goto(`${ASTRO}/boundary`);
+  const content = page.locator(
+    '[data-glyphscramble-source="response-output-v1"]',
+  );
+  await expect(content).toHaveAttribute("data-glyphscramble-state", "ready");
+  await expect(content).toBeVisible();
+  expect(
+    await content.evaluate((node) => getComputedStyle(node).fontFamily),
+  ).toContain("GlyphScramble-");
+});
+
 test("Vite publishes a fresh subpath-safe static build", async ({
   page,
   request,
@@ -148,4 +174,26 @@ test("generic Node/Fetch integration propagates client aborts", async ({
     )
     .toBe(before + 1);
   expect((await request.get(`${NODE}/plain`)).ok()).toBe(true);
+});
+
+test("generic Fetch response boundary rotates nested final HTML", async ({
+  page,
+  request,
+}) => {
+  const first = await request.get(`${NODE}/boundary`);
+  const second = await request.get(`${NODE}/boundary`);
+  const firstHtml = await first.text();
+  const secondHtml = await second.text();
+  expect(first.headers()["cache-control"]).toBe("private, no-store");
+  expect(firstHtml).not.toContain("Node boundary protected value");
+  expect(firstHtml).not.toContain("Nested server-rendered component content");
+  expect(firstHtml).toContain("Indexable Node boundary heading");
+  expect(firstHtml).not.toBe(secondHtml);
+
+  await page.goto(`${NODE}/boundary`);
+  const content = page.locator(
+    '[data-glyphscramble-source="response-output-v1"]',
+  );
+  await expect(content).toHaveAttribute("data-glyphscramble-state", "ready");
+  await expect(content).toBeVisible();
 });

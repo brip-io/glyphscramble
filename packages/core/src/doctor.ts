@@ -129,6 +129,39 @@ async function inspectSources(root: string): Promise<DoctorFinding[]> {
         ),
       );
     }
+    if (
+      /GlyphResponseBoundary|data-glyphscramble-source\s*=\s*["']response-boundary-v1/iu.test(
+        source,
+      )
+    ) {
+      if (
+        /(?:^["']use client["'];?|client:|data-(?:reactroot|vue|sveltekit))/imu.test(
+          source,
+        )
+      )
+        findings.push(
+          finding(
+            "error",
+            "RESPONSE-BOUNDARY-HYDRATION",
+            `GlyphResponseBoundary supports only complete inert Astro or generic server HTML. Remove client hydration from the boundary or use a server-issued GlyphText payload. ${USAGE}#per-response-html-boundary`,
+            file,
+          ),
+        );
+      findings.push(
+        finding(
+          "warning",
+          "RESPONSE-BOUNDARY-A11Y",
+          `Response-boundary output is aria-hidden and is not WCAG-conformant. Restrict it to optional, opted-in high-value content with an accessible acquisition route outside the boundary. ${USAGE}#accessibility`,
+          file,
+        ),
+        finding(
+          "warning",
+          "RESPONSE-BOUNDARY-SEO",
+          `Search crawlers receive encoded text from response boundaries. Keep headings, summaries, metadata, structured data, and link context unprotected. ${USAGE}#per-response-html-boundary`,
+          file,
+        ),
+      );
+    }
   }
   return findings;
 }

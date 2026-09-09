@@ -28,6 +28,7 @@ interface HtmlAttribute {
 
 export interface StaticHtmlNode {
   nodeName: string;
+  namespaceURI?: string;
   value?: string;
   data?: string;
   attrs?: HtmlAttribute[];
@@ -369,20 +370,29 @@ function hydrationReason(
   return undefined;
 }
 
-interface HtmlScan {
+export interface GlyphHtmlScan {
   protectedBlocks: number;
   protectedElements: number;
   protectedTextNodes: number;
   fonts: readonly string[];
   warnings: readonly StaticPlanWarning[];
-  protectedText: readonly ProtectedTextSpan[];
+  protectedText: readonly GlyphProtectedTextSpan[];
 }
 
-interface ProtectedTextSpan {
+export interface GlyphProtectedTextSpan {
   readonly file: string;
   readonly path: string;
   readonly font: string;
   readonly text: string;
+}
+
+export interface GlyphHtmlBoundaryPolicy {
+  /** Versioned marker value accepted by this transformation mode. */
+  readonly source: string;
+  /** Public boundary name used only in content-free diagnostics. */
+  readonly name: string;
+  /** Require the source marker instead of accepting legacy bare font markers. */
+  readonly requireSource?: boolean;
 }
 
 function nodeText(node: StaticHtmlNode): string {
@@ -430,18 +440,28 @@ function documentHydrationReason(
   return result;
 }
 
-function scanHtml(
+/**
+ * Validate marked subtrees in a parsed final HTML document. Static builds and
+ * buffered response transforms intentionally share this one safety policy.
+ * The returned text spans are server-only planning data and must never be
+ * logged or serialized into a diagnostic.
+ */
+export function scanGlyphHtmlDocument(
   document: StaticHtmlNode,
   file: string,
-  configuredFonts: ReadonlySet<string>,
+  configuredFonts: ReadonlySet<string> | undefined,
   detectors: readonly StaticHydrationDetector[],
-): HtmlScan {
+  policy: GlyphHtmlBoundaryPolicy = {
+    source: GLYPH_STATIC_BOUNDARY_SOURCE,
+    name: "GlyphStaticBoundary",
+  },
+): GlyphHtmlScan {
   let protectedBlocks = 0;
   let protectedElements = 0;
   let protectedTextNodes = 0;
   const fonts = new Set<string>();
   const warnings: StaticPlanWarning[] = [];
-  const protectedText: ProtectedTextSpan[] = [];
+  const protectedText: GlyphProtectedTextSpan[] = [];
   const paths = indexElementPaths(document);
   const relevant = new WeakSet<StaticHtmlNode>();
   const markRelevant = (node: StaticHtmlNode): boolean => {
@@ -489,15 +509,21 @@ function scanHtml(
           path(),
           `${SOURCE_MARKER} requires ${MARKER}`,
         );
-      if (sourceMarker !== GLYPH_STATIC_BOUNDARY_SOURCE)
+      if (sourceMarker !== policy.source)
         throw new StaticBuildPlanError(
           file,
           path(),
-          `unsupported GlyphStaticBoundary source version "${sourceMarker || "(empty)"}"`,
+          `unsupported ${policy.name} source version "${sourceMarker || "(empty)"}"`,
         );
     }
 
     if (marker !== undefined) {
+      if (policy.requireSource && sourceMarker === undefined)
+        throw new StaticBuildPlanError(
+          file,
+          path(),
+          `${policy.name} requires ${SOURCE_MARKER}="${policy.source}"`,
+        );
       if (active) {
         if (marker !== active.font)
           throw new StaticBuildPlanError(
@@ -512,7 +538,7 @@ function scanHtml(
           message: `Nested marker reuses "${marker}" and is compiled as part of the ancestor block.`,
         });
       } else {
-        if (!configuredFonts.has(marker))
+        if (configuredFonts && !configuredFonts.has(marker))
           throw new StaticBuildPlanError(
             file,
             path(),
@@ -618,7 +644,7 @@ export function cloneStaticPlannedDocument(
 
 async function validateProtectedText(
   cwd: string,
-  spans: readonly ProtectedTextSpan[],
+  spans: readonly GlyphProtectedTextSpan[],
   concurrency: number,
 ): Promise<void> {
   const fontIds = [...new Set(spans.map((span) => span.font))].sort();
@@ -765,7 +791,7 @@ export class StaticBuildPlanner {
     const documents = new Map<string, StaticHtmlNode>();
     const allFonts = new Set<string>();
     const warnings: StaticPlanWarning[] = [];
-    const protectedText: ProtectedTextSpan[] = [];
+    const protectedText: GlyphProtectedTextSpan[] = [];
     let protectedBlocks = 0;
     let protectedElements = 0;
     let protectedTextNodes = 0;
@@ -779,7 +805,7 @@ export class StaticBuildPlanner {
       ): Promise<{
         file: StaticPlannedFile;
         document?: StaticHtmlNode;
-        scan?: HtmlScan;
+        scan?: GlyphHtmlScan;
       }> => {
         const isHtml = extname(entry.path).toLowerCase() === ".html";
         if (!isHtml) {
@@ -818,7 +844,7 @@ export class StaticBuildPlanner {
           source,
         );
         const document = parse(markedText) as unknown as StaticHtmlNode;
-        const scanned = scanHtml(
+        const scanned = scanGlyphHtmlDocument(
           document,
           entry.path,
           configuredFonts,
