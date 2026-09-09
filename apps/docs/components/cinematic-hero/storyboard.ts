@@ -35,13 +35,18 @@ export interface Beat {
   label: string;
   /** Claim-safe on-screen caption. Also the screen-reader narrative. */
   caption: string;
+  /** Short visitor-facing idea; the caption carries the technical detail. */
+  headline: string;
+  summary: string;
+  /** Settled local frame shown when selecting a chapter. */
+  previewAt?: number;
   /** Global scroll progress window, inclusive start / exclusive end. */
   range: readonly [number, number];
   camera: readonly CameraKey[];
 }
 
-export const SCROLLER_VH = 900;
-export const SCROLLER_VH_COMPACT = 700;
+export const SCROLLER_VH = 650;
+export const SCROLLER_VH_COMPACT = 560;
 
 const runtime = fixtureData.runtime.a;
 
@@ -74,8 +79,10 @@ export const SFNT_TABLES = [
 export const beats: readonly Beat[] = [
   {
     id: "title",
+    summary: "Follow a sentence from server response to readable glyphs.",
+    headline: "One sentence. Two ways to see it.",
     index: 0,
-    label: "Title",
+    label: "Overview",
     caption:
       "Independent research deserves deliberate access. One sentence, about to travel through the whole GlyphScramble pipeline.",
     range: [0, 0.08],
@@ -83,6 +90,9 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "prepare",
+    summary:
+      "The letter shapes stay intact. Only the character lookup changes.",
+    headline: "Keep the shapes. Change the lookup.",
     index: 1,
     label: "Prepare",
     caption:
@@ -96,6 +106,9 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "buckets",
+    summary:
+      "Letters move within compatible groups. Spaces, punctuation and marks stay in place.",
+    headline: "Shuffle letters with their peers.",
     index: 2,
     label: "Buckets",
     caption:
@@ -108,6 +121,9 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "permute",
+    summary:
+      "A random shuffle creates a fresh mapping. The encode map stays on the server.",
+    headline: "A fresh mapping. Every response.",
     index: 3,
     label: "Permute",
     caption:
@@ -120,6 +136,8 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "bake",
+    summary: "The matching WOFF2 font is prepared ahead of the request.",
+    headline: "The font carries the transformation.",
     index: 4,
     label: "Bake",
     caption:
@@ -140,6 +158,9 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "lease",
+    summary:
+      "Each response gets one variant: encoded text and its matching font.",
+    headline: "A matched pair, ready to travel.",
     index: 5,
     label: "Lease",
     caption:
@@ -152,6 +173,9 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "raw-agent",
+    summary:
+      "A raw parser reads remapped characters. There is no decoder in the document.",
+    headline: "A parser gets different characters.",
     index: 6,
     label: "Raw fetch",
     caption:
@@ -164,6 +188,10 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "human",
+    summary:
+      "The matching font turns those same characters into the intended words.",
+    previewAt: 0.96,
+    headline: "Your reader gets the original words.",
     index: 7,
     label: "Human render",
     caption:
@@ -176,6 +204,10 @@ export const beats: readonly Beat[] = [
   },
   {
     id: "recovery",
+    summary:
+      "Browsers, OCR and font analysis can still recover the text. This adds friction, not DRM.",
+    previewAt: 0.55,
+    headline: "Raise the effort. Know the limits.",
     index: 8,
     label: "Recovery boundary",
     caption:

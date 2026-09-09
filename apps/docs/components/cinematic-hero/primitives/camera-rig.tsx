@@ -140,7 +140,7 @@ export function CameraRig() {
     // Portrait viewports see less width, so back the camera off along its
     // own view axis to keep each beat framed.
     const boost =
-      aspect < 1.25 && state.beat.index > 0 ? Math.pow(1.25 / aspect, 0.5) : 1;
+      aspect < 1.25 && state.beat.index > 0 ? Math.pow(1.25 / aspect, 0.85) : 1;
     camera.position.set(
       have.target.x +
         (have.position.x - have.target.x) * boost +

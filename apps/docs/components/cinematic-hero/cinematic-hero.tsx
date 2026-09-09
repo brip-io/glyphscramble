@@ -15,6 +15,7 @@ import type { HeroMode, HeroTier } from "./capabilities";
 import { detectMode, detectTier } from "./capabilities";
 import {
   createProgressStore,
+  beatPreview,
   scrollerProgress,
   stepProgress,
 } from "./scroll-progress";
@@ -41,6 +42,11 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [inView, setInView] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const fallback = useCallback(() => {
+    setPlaying(false);
+    setMode("poster");
+  }, []);
+
   const sectionRef = useRef<HTMLElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const store = useMemo(() => createProgressStore(0), []);
@@ -52,10 +58,14 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
   const scrollToProgress = useCallback(
     (p: number, behavior: ScrollBehavior) => {
       const { top, height } = geometry.current;
-      const travel = Math.max(height - window.innerHeight, 0);
+      const stageHeight =
+        sectionRef.current?.querySelector(".cine-stage")?.clientHeight ??
+        window.innerHeight;
+      const travel = Math.max(height - stageHeight, 0);
+      store.set(p);
       window.scrollTo({ top: top + p * travel, behavior });
     },
-    [],
+    [store],
   );
 
   useEffect(() => {
@@ -92,7 +102,8 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
       const p = scrollerProgress(
         top,
         height,
-        window.innerHeight,
+        section.querySelector(".cine-stage")?.clientHeight ??
+          window.innerHeight,
         window.scrollY,
       );
       store.set(p);
@@ -154,7 +165,14 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
           /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
       )
         return;
-      if (!inViewRef.current) return;
+      const rect = scrollerRef.current?.getBoundingClientRect();
+      if (
+        !inViewRef.current ||
+        !rect ||
+        rect.top > 1 ||
+        rect.bottom < window.innerHeight - 1
+      )
+        return;
       const direction =
         event.key === "ArrowDown" || event.key === "PageDown"
           ? 1
@@ -165,6 +183,7 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
         if (event.key === "Escape") setPlaying(false);
         return;
       }
+      setPlaying(false);
       const next = stepProgress(store.get(), direction);
       if (next === null) return;
       event.preventDefault();
@@ -194,14 +213,24 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
     };
     frame = window.requestAnimationFrame(tick);
     const stop = () => setPlaying(false);
+    const onPointer = (event: PointerEvent) => {
+      if ((event.target as Element | null)?.closest("[data-playback-toggle]"))
+        return;
+      stop();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") stop();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("wheel", stop, { passive: true });
     window.addEventListener("touchmove", stop, { passive: true });
-    window.addEventListener("pointerdown", stop);
+    window.addEventListener("pointerdown", onPointer);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("wheel", stop);
       window.removeEventListener("touchmove", stop);
-      window.removeEventListener("pointerdown", stop);
+      window.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [playing, mode, store, scrollToProgress]);
 
@@ -214,8 +243,14 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
     setPlaying(true);
   };
   const step = (direction: 1 | -1) => {
+    setPlaying(false);
     const next = stepProgress(store.get(), direction);
     if (next !== null) scrollToProgress(next, "smooth");
+  };
+
+  const goToBeat = (index: number) => {
+    setPlaying(false);
+    scrollToProgress(beatPreview(index), "smooth");
   };
 
   const beat = beats[beatIndex] ?? beats[0]!;
@@ -236,31 +271,66 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
               <CinematicScene
                 store={store}
                 tier={tier}
-                inView={inView}
-                onFallback={() => setMode("poster")}
+                inView={inView && beatIndex !== 0}
+                onFallback={fallback}
               />
             </div>
           ) : null}
           <div className="cine-overlay shell">
+            {cinematic ? (
+              <div className="cine-topline">
+                <span>
+                  <i /> Inside GlyphScramble{" "}
+                  <span className="cine-topline-detail">
+                    / An interactive walkthrough
+                  </span>
+                </span>
+                <div className="cine-top-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fallback();
+                      requestAnimationFrame(() =>
+                        sectionRef.current?.scrollIntoView({
+                          behavior: "instant",
+                        }),
+                      );
+                    }}
+                  >
+                    Read instead
+                  </button>
+                  <a href="#how-it-works" onClick={() => setPlaying(false)}>
+                    Skip to overview{" "}
+                    <ArrowRightIcon size={14} aria-hidden="true" />
+                  </a>
+                </div>
+              </div>
+            ) : null}
             <div
               className="cine-hero-copy"
               data-active={!cinematic || beatIndex === 0}
             >
               {children}
               {cinematic ? (
-                <div className="cine-scroll-hint">
-                  <button
-                    type="button"
-                    className="cine-play-hint"
-                    onClick={togglePlay}
-                  >
-                    <PlayIcon aria-hidden="true" size={14} weight="fill" />
-                    Play the pipeline
-                  </button>
-                  <span aria-hidden="true">or scroll</span>
-                  <CaretDownIcon aria-hidden="true" size={16} />
-                </div>
-              ) : null}
+                <button
+                  className="button cine-start"
+                  type="button"
+                  data-playback-toggle
+                  onClick={() => {
+                    scrollToProgress(beats[1]!.range[0], "instant");
+                    setPlaying(true);
+                  }}
+                >
+                  <PlayIcon aria-hidden="true" weight="fill" size={18} /> See
+                  how it works
+                </button>
+              ) : (
+                <a className="button cine-start" href="/demo/">
+                  <ArrowRightIcon aria-hidden="true" size={18} /> Explore the
+                  demo
+                </a>
+              )}
+              <p className="cine-boundary">Friction, not DRM.</p>
             </div>
             {cinematic ? (
               <>
@@ -272,10 +342,11 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
                       data-active={item.index === beatIndex}
                     >
                       <span className="cine-beat-chip">
-                        {String(item.index).padStart(2, "0")} / 08 ·{" "}
+                        {String(item.index + 1).padStart(2, "0")} / 09 ·{" "}
                         {item.label}
                       </span>
-                      <p>{item.caption}</p>
+                      <h2>{item.headline}</h2>
+                      <p>{item.summary}</p>
                     </div>
                   ))}
                 </div>
@@ -305,6 +376,7 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
                 >
                   <button
                     type="button"
+                    data-playback-toggle
                     onClick={togglePlay}
                     aria-pressed={playing}
                     aria-label={
@@ -320,7 +392,7 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
                   <button
                     type="button"
                     onClick={() => step(-1)}
-                    disabled={beatIndex === 0 && store.get() <= 0}
+                    disabled={beatIndex === 0}
                     aria-label="Previous beat (Up arrow)"
                   >
                     <CaretUpIcon aria-hidden="true" size={16} />
@@ -334,9 +406,29 @@ export function CinematicHero({ children, narrative }: CinematicHeroProps) {
                     <CaretDownIcon aria-hidden="true" size={16} />
                   </button>
                   <span className="cine-controls-beat" aria-live="polite">
-                    {String(beatIndex).padStart(2, "0")} / 08
+                    {String(beatIndex + 1).padStart(2, "0")} / 09{" "}
+                    <span>{beat.label}</span>
                   </span>
                 </div>
+                <nav
+                  className="cine-chapters"
+                  aria-label="Walkthrough chapters"
+                >
+                  {beats.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-current={
+                        item.index === beatIndex ? "step" : undefined
+                      }
+                      aria-label={`Chapter ${item.index + 1}: ${item.label}`}
+                      onClick={() => goToBeat(item.index)}
+                    >
+                      <span>{String(item.index + 1).padStart(2, "0")}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
               </>
             ) : null}
           </div>

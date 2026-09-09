@@ -13,7 +13,7 @@ export function HeroNarrative() {
         {beats.map((beat) => (
           <li key={beat.id}>
             <span className="cine-narrative-index" aria-hidden="true">
-              {String(beat.index).padStart(2, "0")}
+              {String(beat.index + 1).padStart(2, "0")}
             </span>
             <strong>{beat.label}</strong>
             <p>{beat.caption}</p>

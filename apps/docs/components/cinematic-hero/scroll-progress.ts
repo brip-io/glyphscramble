@@ -37,21 +37,20 @@ export function beatStart(index: number): number {
   return beat.index === 0 ? 0 : Math.min(beat.range[0] + 0.002, 1);
 }
 
-/**
- * Where a keyboard step should land: the start of the next beat for +1, the
- * start of the previous beat for -1 (or of the current beat when the reader
- * is already well inside it). Returns null when stepping past either end.
- */
+/** A settled scene lets chapter navigation communicate the result immediately. */
+export function beatPreview(index: number): number {
+  const beat = beats[Math.min(Math.max(index, 0), beats.length - 1)]!;
+  return beat.index === 0
+    ? 0
+    : beat.range[0] +
+        (beat.range[1] - beat.range[0]) * (beat.previewAt ?? 0.72);
+}
+
+/** Step to an adjacent chapter; let native scrolling resume at either end. */
 export function stepProgress(p: number, direction: 1 | -1): number | null {
-  const beat = beatAt(p);
-  if (direction === 1) {
-    if (beat.index >= beats.length - 1) return null;
-    return beatStart(beat.index + 1);
-  }
-  const insideBy = p - beat.range[0];
-  if (insideBy > 0.02 && beat.index > 0) return beatStart(beat.index);
-  if (beat.index === 0) return p <= 0 ? null : 0;
-  return beatStart(beat.index - 1);
+  const index = beatAt(p).index + direction;
+  if (index < 0 || index >= beats.length) return null;
+  return beatPreview(index);
 }
 
 /** Scroll progress of a tall scroller whose sticky stage fills the viewport. */

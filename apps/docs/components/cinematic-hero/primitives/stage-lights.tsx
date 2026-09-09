@@ -41,7 +41,8 @@ export function StageLights() {
   return (
     <>
       <fog attach="fog" args={["#090a0a", 12, 40]} />
-      <ambientLight intensity={0.35} color="#b8bcb8" />
+      <hemisphereLight args={["#cdeee8", "#283d3c", 1.8]} />
+      <ambientLight intensity={1.15} color="#cee4df" />
       <directionalLight position={[5, 8, 6]} intensity={2.4} color="#79c5c8" />
       <directionalLight
         position={[-6, 4, -4]}

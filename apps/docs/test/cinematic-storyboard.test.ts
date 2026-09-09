@@ -7,6 +7,7 @@ import {
 } from "../components/cinematic-hero/storyboard";
 import {
   beatStart,
+  beatPreview,
   createProgressStore,
   scrollerProgress,
   stepProgress,
@@ -58,7 +59,9 @@ describe("cinematic storyboard", () => {
   it("never overclaims in captions", () => {
     for (const beat of beats) {
       for (const pattern of forbiddenClaims) {
-        expect(beat.caption).not.toMatch(pattern);
+        expect(
+          [beat.caption, beat.headline, beat.summary].join(" "),
+        ).not.toMatch(pattern);
       }
       if (/DRM/.test(beat.caption)) {
         expect(beat.caption).toMatch(/not DRM/);
@@ -102,17 +105,25 @@ describe("scroll progress store", () => {
 
   it("steps between beats with the arrow keys", () => {
     const prepare = beats[1]!;
-    expect(stepProgress(0, 1)).toBeCloseTo(beatStart(1));
+    expect(stepProgress(0, 1)).toBeCloseTo(beatPreview(1));
     expect(beatStart(1)).toBeGreaterThan(prepare.range[0]);
-    expect(stepProgress(beatStart(1), 1)).toBeCloseTo(beatStart(2));
+    expect(stepProgress(beatPreview(1), 1)).toBeCloseTo(beatPreview(2));
     // Up from just inside a beat returns to the previous beat.
-    expect(stepProgress(beatStart(2), -1)).toBeCloseTo(beatStart(1));
-    // Up from deep inside a beat returns to its own start first.
-    expect(stepProgress(0.28, -1)).toBeCloseTo(beatStart(2));
-    expect(stepProgress(0.04, -1)).toBe(0);
+    expect(stepProgress(beatPreview(2), -1)).toBeCloseTo(beatPreview(1));
+    // Previous always changes chapters, including from a settled preview.
+    expect(stepProgress(0.28, -1)).toBeCloseTo(beatPreview(1));
+    expect(stepProgress(0.04, -1)).toBeNull();
     expect(stepProgress(0, -1)).toBeNull();
     expect(stepProgress(1, 1)).toBeNull();
     expect(stepProgress(0.95, 1)).toBeNull();
+  });
+
+  it("chapter previews remain inside their chapter and show the completed human reveal", () => {
+    for (const beat of beats)
+      expect(beatAt(beatPreview(beat.index))).toBe(beat);
+    expect(segment(beatPreview(7), beats[7]!.range)).toBeGreaterThan(0.92);
+    expect(beatPreview(-1)).toBe(0);
+    expect(beatAt(beatPreview(99)).id).toBe("recovery");
   });
 
   it("derives progress from the scroller geometry", () => {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make the landing-page pipeline easier to enter and follow with a single play action, clearer 3D surfaces, concise captions, direct chapter selection, and static/skip exits; fix pause and keyboard interruption, repeated atlas construction, failed fixture-font fallback, and GPU resource cleanup so the demonstration remains readable and reliable.
+
 - Make first use guided and atomic across npm, pnpm, Yarn, and Bun; reduce the generated config to explicit font/licence/accessibility choices; add complete package metadata, clean tarball and browser-integrity evidence, and replace token publication with an immutable-action, OIDC-only beta release path.
 - Make static planning near-linear on wide documents, fail normalization and coverage errors before staging with file/DOM/font context, reuse validated parse trees while independently verifying output through a version 3 manifest, and publish deterministically through bounded I/O with localized failure contracts and documented beta scale ceilings.
 - Replace the Svelte/SvelteKit stubs with packaged Svelte 5 artifacts, a real typed SvelteKit 2 handle, safe existing-hook composition, selective and route-scoped streaming cache controls, and a production adapter-node consumer that verifies rotation, lifecycle cleanup, and plaintext-leakage boundaries.

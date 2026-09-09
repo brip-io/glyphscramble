@@ -2,7 +2,6 @@ import { GLYPH_INSTALLATION_PROFILES } from "@brip/glyphscramble";
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
-  BookOpenIcon,
   CodeIcon,
   EyeIcon,
   FilesIcon,
@@ -21,25 +20,15 @@ export default function HomePage() {
     <>
       <style>{`@font-face{font-family:"${comparisonFixture.family}";src:url("${comparisonFixture.fontFile}") format("woff2");font-weight:400;font-style:normal;font-display:block;}`}</style>
       <CinematicHero narrative={<HeroNarrative />}>
-        <p className="maker-line">
-          <span>Open source by</span>
-          <BripLockup />
-        </p>
-        <h1>Make bulk DOM scraping cost more.</h1>
+        <p className="cine-eyebrow">Open-source glyph scrambling</p>
+        <h1>
+          Easy to read.
+          <br />
+          <span>Harder to scrape.</span>
+        </h1>
         <p className="hero-summary">
-          Scramble response text, ship the matching font, and keep the limits
-          explicit.
+          Scrambled in the response. Readable in the browser.
         </p>
-        <div className="hero-actions">
-          <a className="button button-primary" href="/demo/">
-            Explore demo
-            <ArrowRightIcon aria-hidden="true" size={18} />
-          </a>
-          <a className="button button-secondary" href="/docs/">
-            <BookOpenIcon aria-hidden="true" size={18} />
-            Documentation
-          </a>
-        </div>
       </CinematicHero>
 
       <section className="section shell" id="how-it-works">

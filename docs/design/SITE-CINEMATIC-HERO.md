@@ -50,22 +50,43 @@ rules from R14 and `docs/SECURITY-MODEL.md`: no "blocks", "prevents", "stops",
 say "raw-fetch"; the recovery beat must say "recover". The recovery lane is part
 of the main sequence, labelled "recoverable · higher cost, not prevented".
 
+## Opening and navigation
+
+The opening is deliberately quiet: a two-line headline, one short explanation,
+and a play-icon **See how it works** button. There are no foreground widgets,
+specimen switches, floating glyphs, or chapter controls on this first frame.
+The button begins autoplay at the first technical chapter; scrolling still
+scrubs the sequence. The renderer is idle while the opening is displayed.
+
+Inside the walkthrough, concise headings and summaries sit separately from
+the 3D scene. Nine addressable chapter buttons, previous/next and play/pause
+controls remain available. Selecting a chapter lands on a settled scene; the
+human-render preview lands after the complete font-decoding sweep. **Read
+instead** switches to the static narrative, and **Skip to overview** exits the
+long scroller. Control and caption numbering both count from 01 to 09.
+
+The complete technical captions remain in the server-rendered narrative.
+Fixture font loading is strict: rejected, empty, or unloaded matches return to
+the poster instead of drawing an incorrect decoded example in a fallback font.
+Atlas callbacks are stable across playback updates, partial load successes are
+disposed on failure, and instance buffers and owned glow materials are released.
+
 ## Architecture
 
 `apps/docs/components/cinematic-hero/`
 
-| File                  | Role                                                                                             |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| `cinematic-hero.tsx`  | Client shell: sticky stage inside a 900svh scroller, DOM captions, mode/tier gating, lazy scene. |
-| `cinematic-scene.tsx` | `<Canvas>` and the actor tree. Loaded with `next/dynamic` (`ssr: false`).                        |
-| `hero-narrative.tsx`  | Server-rendered ordered narrative: poster content and the screen-reader story.                   |
-| `storyboard.ts`       | Beats, captions, scroll ranges, camera keyframes, fixture strings. No three.js imports.          |
-| `scroll-progress.ts`  | External progress store written by a passive scroll listener, read by the frame loop.            |
-| `capabilities.ts`     | Poster vs. cinematic mode and full vs. lite tier detection.                                      |
-| `glyph-atlas.ts`      | Canvas-2D glyph atlas builder (UI font and the scrambled fixture font).                          |
-| `glyph-batch.ts`      | Instanced glyph quads (custom shader) and instanced bodies. One draw call per batch.             |
-| `timeline.tsx`        | Damped scroll progress, beat/local time, and demand-mode render scheduling.                      |
-| `primitives/*`        | Camera rig, lights, fake-bloom sprites, dust, and the per-beat actors.                           |
+| File                  | Role                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `cinematic-hero.tsx`  | Client shell: sticky stage inside a 650svh (560svh on phones) scroller, DOM captions, mode/tier gating, lazy scene. |
+| `cinematic-scene.tsx` | `<Canvas>` and the actor tree. Loaded with `next/dynamic` (`ssr: false`).                                           |
+| `hero-narrative.tsx`  | Server-rendered ordered narrative: poster content and the screen-reader story.                                      |
+| `storyboard.ts`       | Beats, captions, scroll ranges, camera keyframes, fixture strings. No three.js imports.                             |
+| `scroll-progress.ts`  | External progress store written by a passive scroll listener, read by the frame loop.                               |
+| `capabilities.ts`     | Poster vs. cinematic mode and full vs. lite tier detection.                                                         |
+| `glyph-atlas.ts`      | Canvas-2D glyph atlas builder (UI font and the scrambled fixture font).                                             |
+| `glyph-batch.ts`      | Instanced glyph quads (custom shader) and instanced bodies. One draw call per batch.                                |
+| `timeline.tsx`        | Damped scroll progress, beat/local time, and demand-mode render scheduling.                                         |
+| `primitives/*`        | Camera rig, lights, fake-bloom sprites, dust, and the per-beat actors.                                              |
 
 Scroll progress maps to a beat and a local time; every actor is a pure function
 of that state, so scrubbing backwards is exact and screenshots are stable.
@@ -75,7 +96,7 @@ of that state, so scrubbing backwards is exact and screenshots are stable.
 
 - **Poster** (server render, `prefers-reduced-motion: reduce`, no WebGL2,
   `saveData`, WebGL context loss, atlas failure): hero copy plus the nine-beat
-  narrative grid. No canvas, no scroller.
+  narrative list. No canvas, no scroller. The main action links to the accessible demo.
 - **Cinematic**: same DOM with `data-mode="cinematic"`; the narrative becomes
   visually hidden but stays in the accessibility tree; animated captions are
   `aria-hidden`; the canvas is `pointer-events: none`; hero and outro links are
@@ -86,12 +107,12 @@ of that state, so scrubbing backwards is exact and screenshots are stable.
   document is visible.
 - **Playback controls**: a play/pause button autoplays the sequence by driving
   the scroll position over about 42 seconds; any wheel, touch, or pointer
-  input hands control back. Up/Down (and Page Up/Down) step between beat
-  starts while the stage is on screen; Escape pauses. `?autoplay` on the
+  input outside the play/pause toggle hands control back. Up/Down (and Page Up/Down) step between beat
+  previews while the stage is pinned; Escape pauses. Manual chapter navigation and hiding the tab pause playback. `?autoplay` on the
   landing URL starts playback on load. Playback never starts on its own
   otherwise.
 
-## Budget (measured on the static export, gzip)
+## Original PR budget (before the UX revision, gzip)
 
 | Asset                                        |     Size |
 | -------------------------------------------- | -------: |
