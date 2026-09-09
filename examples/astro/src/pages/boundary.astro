@@ -1,0 +1,18 @@
+---
+import GlyphResponseBoundary from "@brip/glyphscramble-astro/GlyphResponseBoundary.astro";
+import ResponseResearchCard from "../components/ResponseResearchCard.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Astro response boundary</title>
+  </head>
+  <body>
+    <h1>Indexable response-boundary heading</h1>
+    <GlyphResponseBoundary font="body" as="section">
+      <ResponseResearchCard />
+    </GlyphResponseBoundary>
+  </body>
+</html>

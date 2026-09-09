@@ -18,4 +18,11 @@ Static Astro pages can import
 non-hydrated component subtree. The component only emits a marker; publish the
 separate post-build compiler output, which rotates once per build.
 
+Astro SSR pages using the middleware's default bounded-buffer strategy can
+import `@brip/glyphscramble-astro/GlyphResponseBoundary.astro`. It wraps an
+existing inert component subtree and rotates that final HTML once per response.
+It rejects client islands, interactive content, mixed fonts, route-streaming
+mode, and static builds instead of falling back to plaintext. See the
+[per-response boundary guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#per-response-inert-html-boundary).
+
 GlyphScramble raises the cost of bulk DOM scraping; it is not DRM. Apache-2.0.

@@ -3,11 +3,13 @@ import {
   createGlyphEngine,
   protectedResponseHeaders,
   responseHeadersForContext,
+  transformGlyphHtmlResponse,
   type GlyphConfig,
   type GlyphEngine,
   type GlyphPayload,
   type GlyphResponseFace,
   type ResponseContext,
+  type TransformGlyphHtmlResponseOptions,
 } from "@brip/glyphscramble";
 
 export type { GlyphConfig, GlyphPayload, GlyphResponseFace, ResponseContext };
@@ -17,6 +19,8 @@ const MAX_BUFFERED_BYTES = 16 * 1024 * 1024;
 
 export interface GlyphAstroLocals {
   glyphscramble?: ResponseContext;
+  /** Internal capability checked by GlyphResponseBoundary.astro. */
+  glyphscrambleResponseBoundary?: true;
 }
 
 export type AstroStreamingPolicy =
@@ -36,6 +40,11 @@ export interface AstroGlyphOptions {
   /** Fixed prepared-face scope for protected routes handled here. */
   faces?: readonly GlyphResponseFace[];
   streaming?: AstroStreamingPolicy;
+  /** Bounded inert-HTML response transformation. Active in buffer mode. */
+  responseBoundary?: Omit<
+    TransformGlyphHtmlResponseOptions,
+    "maxBytes" | "signal"
+  >;
 }
 
 export interface AstroGlyphMiddleware extends MiddlewareHandler {
@@ -143,7 +152,16 @@ export async function createAstroGlyphMiddleware(
       ...(options.faces === undefined ? {} : { faces: options.faces }),
     });
     (context.locals as GlyphAstroLocals).glyphscramble = responseContext;
+    (context.locals as GlyphAstroLocals).glyphscrambleResponseBoundary = true;
     const response = await next();
+    if (
+      response.headers.get("content-type")?.toLowerCase().includes("text/html")
+    )
+      return transformGlyphHtmlResponse(response, responseContext, {
+        ...options.responseBoundary,
+        maxBytes: maxBytes!,
+        signal: context.request.signal,
+      });
     const body = await readResponseBody(response, maxBytes!);
     return responseWithHeaders(
       response,
