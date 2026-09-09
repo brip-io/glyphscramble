@@ -23,6 +23,7 @@ import { evaluateSmokeGate } from "../packages/core/dist/benchmark-policy.js";
 const GENERATION_VARIANTS = 5;
 const REQUEST_ITERATIONS = 50;
 const REQUEST_WARMUP_ITERATIONS = 10;
+const RESPONSE_HTML_WARMUP_ITERATIONS = 5;
 const REQUEST_VARIANTS = REQUEST_ITERATIONS + REQUEST_WARMUP_ITERATIONS;
 const COLD_ITERATIONS = 3;
 const LARGE_REPERTOIRE_CODEPOINTS = 20_000;
@@ -252,6 +253,19 @@ async function run(label, source, ceilings) {
         throw new Error(
           "Response-transform benchmark fixture must remain 100 KB.",
         );
+      for (let index = 0; index < RESPONSE_HTML_WARMUP_ITERATIONS; index++) {
+        const warmed = await transformGlyphHtmlResponse(
+          new globalThis.Response(responseMarkup, {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          }),
+          requestContexts[0],
+        );
+        if (!warmed.ok)
+          throw new Error(
+            `${label} response transform warmup returned ${warmed.status}`,
+          );
+        await warmed.arrayBuffer();
+      }
       for (const context of requestContexts) {
         const transformStarted = performance.now();
         const transformed = await transformGlyphHtmlResponse(

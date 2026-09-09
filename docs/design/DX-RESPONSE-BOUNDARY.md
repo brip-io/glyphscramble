@@ -58,4 +58,4 @@ Astro and generic Node can wrap the same inert existing component, emit a fresh 
 - Static and response modes share one final-HTML scanner. Response output rejects incomplete or malformed documents, client hydration, unsafe elements and attributes, inline typography overrides, mixed fonts, unchanged encoding, and recognizable response-owned plaintext copies.
 - Astro publishes `GlyphResponseBoundary.astro` only for default bounded-buffer SSR middleware; route streaming, static builds, and client islands refuse the component. The generic Fetch/Node example transforms only its eligible complete route while ordinary streaming bypasses it.
 - Qualification covers 275 unit/integration tests, 51 Chromium/Firefox/WebKit cases including visual equivalence, strict CSP, missing fonts, and disabled JavaScript, plus nine real Astro/Vite/Node consumer tests.
-- The runtime benchmark now gates a 103,770-byte response at 10 ms; the local implementation run measured 8.162 ms p95 excluding variant acquisition.
+- The runtime benchmark now gates a 103,770-byte response at 10 ms after explicit warmup; the local implementation run measured 8.545 ms p95 excluding variant acquisition.
