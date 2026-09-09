@@ -566,7 +566,7 @@ function staticCss(
         `.glyphscramble-font-${font.id},.glyphscramble-font-${font.id} *{font-family:"${font.family}"!important}.glyphscramble-font-${font.id}{font-weight:${font.descriptors.weight};font-style:${font.descriptors.style};font-stretch:${font.descriptors.stretch}}`,
     )
     .join("\n");
-  return `${faces}\n.glyphscramble-status{visibility:hidden}.glyphscramble-status[data-glyphscramble-status="pending"]{animation:glyphscramble-static-failure 1ms step-end ${timeoutMs}ms forwards}.glyphscramble-status[data-glyphscramble-status="error"]{visibility:visible}@keyframes glyphscramble-static-failure{to{visibility:visible}}\n`;
+  return `${faces}\n.glyphscramble-status{visibility:visible}.glyphscramble-status[data-glyphscramble-status="pending"]{animation:glyphscramble-static-pending ${timeoutMs}ms step-end}.glyphscramble-status[data-glyphscramble-status="error"]{visibility:visible}@keyframes glyphscramble-static-pending{from{visibility:hidden}to{visibility:hidden}}\n`;
 }
 
 function staticLoader(timeoutMs: number): string {
