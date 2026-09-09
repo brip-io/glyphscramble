@@ -74,6 +74,9 @@ export function PermuteRow({
     () => () => {
       parts.bodies.dispose();
       parts.labels.dispose();
+      parts.glow.material.dispose();
+      parts.swapGlowA.material.dispose();
+      parts.swapGlowB.material.dispose();
       parts.points.geometry.dispose();
       (parts.points.material as THREE.Material).dispose();
     },

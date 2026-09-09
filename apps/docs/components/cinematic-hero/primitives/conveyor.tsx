@@ -48,6 +48,7 @@ export function Conveyor({ ui, bricks }: { ui: GlyphAtlas; bricks: number }) {
     () => () => {
       parts.bodies.dispose();
       parts.labels.dispose();
+      parts.glow.material.dispose();
     },
     [parts],
   );

@@ -155,6 +155,12 @@ export function LanesAndFrames({ ui }: { ui: GlyphAtlas }) {
     () => () => {
       parts.bodies.dispose();
       parts.labels.dispose();
+      parts.ringGlow.material.dispose();
+      parts.boltGlow.material.dispose();
+      parts.packetA.material.dispose();
+      parts.packetB.material.dispose();
+      parts.sweepGlow.material.dispose();
+      parts.recoveryGlow.material.dispose();
       parts.ring.geometry.dispose();
       (parts.ring.material as THREE.Material).dispose();
     },

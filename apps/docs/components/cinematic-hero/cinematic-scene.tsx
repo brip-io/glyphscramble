@@ -66,7 +66,7 @@ export default function CinematicScene({
     let cancelled = false;
     (async () => {
       try {
-        const [ui, scrambled] = await Promise.all([
+        const [uiResult, scrambledResult] = await Promise.allSettled([
           buildGlyphAtlas({
             chars: `${LABEL_CHARS}${SENTENCE}${ENCODED}${fixture.staticFamily}`,
             family: "Instrument Sans Variable",
@@ -79,14 +79,21 @@ export default function CinematicScene({
             weight: 400,
             px: 96,
             sample: ENCODED,
+            requireFont: true,
           }),
         ]);
-        if (cancelled) {
-          ui.texture.dispose();
-          scrambled.texture.dispose();
+        if (
+          cancelled ||
+          uiResult.status === "rejected" ||
+          scrambledResult.status === "rejected"
+        ) {
+          if (uiResult.status === "fulfilled") uiResult.value.texture.dispose();
+          if (scrambledResult.status === "fulfilled")
+            scrambledResult.value.texture.dispose();
+          if (!cancelled) onFallback();
           return;
         }
-        setAtlases({ ui, scrambled });
+        setAtlases({ ui: uiResult.value, scrambled: scrambledResult.value });
       } catch {
         if (!cancelled) onFallback();
       }

@@ -24,6 +24,8 @@ interface AtlasOptions {
   px?: number;
   /** Optional sample text passed to document.fonts.load for subset fonts. */
   sample?: string;
+  /** Scrambled glyphs require their exact face; a system fallback cannot decode them. */
+  requireFont?: boolean;
 }
 
 /** Printable ASCII plus the few typographic extras the labels use. */
@@ -45,9 +47,16 @@ export async function buildGlyphAtlas(
   const px = options.px ?? 96;
   const font = `${options.weight} ${px}px "${options.family}"`;
   try {
-    await document.fonts.load(font, options.sample);
-  } catch {
-    // Fall through: the canvas will use the fallback stack.
+    const faces = await document.fonts.load(font, options.sample);
+    if (
+      options.requireFont &&
+      !faces.some((face) => face.status === "loaded")
+    ) {
+      throw new Error(`Required glyph font unavailable: ${options.family}`);
+    }
+  } catch (error) {
+    if (options.requireFont) throw error;
+    // UI labels may use a system fallback; encoded glyphs must never do so.
   }
 
   const unique = [...new Set([...options.chars])];

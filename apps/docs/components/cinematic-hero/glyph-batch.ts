@@ -25,6 +25,7 @@ void main() {
   float a = texture2D(map, vUv).a * vAlpha;
   if (a < 0.01) discard;
   gl_FragColor = vec4(vColor, a);
+  #include <colorspace_fragment>
 }
 `;
 
@@ -175,6 +176,7 @@ export class GlyphBatch {
   }
 
   dispose() {
+    this.mesh.dispose();
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
   }
@@ -252,6 +254,7 @@ export class BodyBatch {
   }
 
   dispose() {
+    this.mesh.dispose();
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
   }
