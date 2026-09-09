@@ -106,3 +106,11 @@ The parent initiative is split into independently reviewable milestones. Each mi
 10. Public release hardening
 
 Dependency order was font pipeline → Unicode engine → request engine → qualification/adapters → demo/docs → release. The scaffold established package boundaries across all ten surfaces; the R00 track now owns the corrections and evidence required before those surfaces may be called supported.
+
+## Website surfaces
+
+| ID                      | Design                                                         | Size | Priority |
+| ----------------------- | -------------------------------------------------------------- | ---: | -------: |
+| **SITE-CINEMATIC-HERO** | [Landing-page cinematic pipeline hero](SITE-CINEMATIC-HERO.md) |    M |       P2 |
+
+The cinematic hero is a landing-page marketing surface that deliberately deviates from R14's no-3D non-goal; R14's accessible explorer remains the canonical demo.
