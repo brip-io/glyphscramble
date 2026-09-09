@@ -1,7 +1,7 @@
 {
   "name": "@brip/glyphscramble-svelte",
   "version": "0.1.0-beta.0",
-  "description": "Svelte component and action for GlyphScramble payloads.",
+  "description": "Svelte payload rendering and static component boundaries for GlyphScramble.",
   "keywords": [
     "anti-scraping",
     "font",
@@ -37,6 +37,16 @@
       "types": "./dist/GlyphText.svelte.d.ts",
       "svelte": "./dist/GlyphText.svelte",
       "default": "./dist/GlyphText.svelte"
+    },
+    "./GlyphStaticBoundary.svelte": {
+      "types": "./dist/GlyphStaticBoundary.svelte.d.ts",
+      "svelte": "./dist/GlyphStaticBoundary.svelte",
+      "default": "./dist/GlyphStaticBoundary.svelte"
+    },
+    "./static": {
+      "types": "./dist/GlyphStaticBoundary.svelte.d.ts",
+      "svelte": "./dist/GlyphStaticBoundary.svelte",
+      "default": "./dist/GlyphStaticBoundary.svelte"
     }
   },
   "files": [

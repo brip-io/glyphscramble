@@ -90,7 +90,9 @@ export {
 } from "./font-pipeline.js";
 export {
   buildStaticSite,
+  STATIC_ACCESSIBILITY_WARNING,
   STATIC_BUILD_WARNING,
+  STATIC_SEO_WARNING,
   staticGlyphCspDirectives,
   verifyStaticOutput,
 } from "./static-output.js";
@@ -115,6 +117,16 @@ export type {
   StaticPlannedFile,
   StaticPlanWarning,
 } from "./static-plan.js";
+export {
+  GLYPH_STATIC_BOUNDARY_ELEMENTS,
+  GLYPH_STATIC_BOUNDARY_SOURCE,
+  glyphStaticBoundaryAttributes,
+  isGlyphStaticBoundaryElement,
+} from "./static-boundary.js";
+export type {
+  GlyphStaticBoundaryAttributes,
+  GlyphStaticBoundaryElement,
+} from "./static-boundary.js";
 export { buildCmap, parseCmap, parseVariationSequences } from "./cmap.js";
 export type { VariationSequenceMap } from "./cmap.js";
 export {

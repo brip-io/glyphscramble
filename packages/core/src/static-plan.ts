@@ -13,6 +13,7 @@ import {
 import { parse } from "parse5";
 import { mapBounded, staticIoConcurrency } from "./bounded-tasks.js";
 import { loadPreparedFont } from "./font-pipeline.js";
+import { GLYPH_STATIC_BOUNDARY_SOURCE } from "./static-boundary.js";
 import type { GlyphConfig } from "./types.js";
 import {
   assertTextSupported,
@@ -28,6 +29,7 @@ interface HtmlAttribute {
 export interface StaticHtmlNode {
   nodeName: string;
   value?: string;
+  data?: string;
   attrs?: HtmlAttribute[];
   childNodes?: StaticHtmlNode[];
   parentNode?: StaticHtmlNode;
@@ -59,6 +61,8 @@ export interface StaticPlannedFile {
   readonly sourceSha256?: string;
   readonly transformed: boolean;
   readonly protectedBlocks: number;
+  readonly protectedElements: number;
+  readonly protectedTextNodes: number;
   readonly fonts: readonly string[];
 }
 
@@ -70,6 +74,8 @@ export interface StaticBuildPlan {
   readonly files: readonly StaticPlannedFile[];
   readonly htmlFiles: number;
   readonly protectedBlocks: number;
+  readonly protectedElements: number;
+  readonly protectedTextNodes: number;
   readonly fonts: readonly string[];
   readonly warnings: readonly StaticPlanWarning[];
 }
@@ -95,7 +101,8 @@ export class StaticBuildPlanError extends Error {
 }
 
 const MARKER = "data-glyphscramble-font";
-const MARKER_PATTERN = /\bdata-glyphscramble-font\s*=/i;
+const SOURCE_MARKER = "data-glyphscramble-source";
+const MARKER_PATTERN = /\bdata-glyphscramble-(?:font|source)\s*=/i;
 const UNSAFE_ELEMENTS = new Map<string, string>([
   ["script", "executable or data scripts can retain or corrupt plaintext"],
   ["style", "raw CSS text cannot be protected"],
@@ -329,6 +336,24 @@ function interactiveReason(node: StaticHtmlNode): string | undefined {
   return undefined;
 }
 
+function inlineTypographyReason(node: StaticHtmlNode): string | undefined {
+  const style = attr(node, "style");
+  if (!style) return undefined;
+  const withoutComments = style.replace(/\/\*[\s\S]*?\*\//gu, "");
+  if (/\/\*|\*\//u.test(withoutComments))
+    return "inline style contains an unterminated CSS comment and cannot be validated safely";
+  for (const declaration of withoutComments.split(";")) {
+    const separator = declaration.indexOf(":");
+    if (separator < 0) continue;
+    const property = declaration.slice(0, separator).trim().toLowerCase();
+    if (property.includes("\\"))
+      return "inline style uses an escaped CSS property name and cannot be validated safely";
+    if (property === "font" || property === "font-family")
+      return `inline ${property} overrides the boundary's single prepared face; remove it or leave this subtree unprotected`;
+  }
+  return undefined;
+}
+
 function hydrationReason(
   node: StaticHtmlNode,
   detectors: readonly StaticHydrationDetector[],
@@ -346,6 +371,8 @@ function hydrationReason(
 
 interface HtmlScan {
   protectedBlocks: number;
+  protectedElements: number;
+  protectedTextNodes: number;
   fonts: readonly string[];
   warnings: readonly StaticPlanWarning[];
   protectedText: readonly ProtectedTextSpan[];
@@ -410,20 +437,31 @@ function scanHtml(
   detectors: readonly StaticHydrationDetector[],
 ): HtmlScan {
   let protectedBlocks = 0;
+  let protectedElements = 0;
+  let protectedTextNodes = 0;
   const fonts = new Set<string>();
   const warnings: StaticPlanWarning[] = [];
   const protectedText: ProtectedTextSpan[] = [];
   const paths = indexElementPaths(document);
   const relevant = new WeakSet<StaticHtmlNode>();
   const markRelevant = (node: StaticHtmlNode): boolean => {
-    let containsMarker = attr(node, MARKER) !== undefined;
+    let containsMarker =
+      attr(node, MARKER) !== undefined ||
+      attr(node, SOURCE_MARKER) !== undefined;
     for (const child of children(node))
       containsMarker = markRelevant(child) || containsMarker;
     if (containsMarker) relevant.add(node);
     return containsMarker;
   };
   if (!markRelevant(document))
-    return { protectedBlocks: 0, fonts: [], warnings: [], protectedText: [] };
+    return {
+      protectedBlocks: 0,
+      protectedElements: 0,
+      protectedTextNodes: 0,
+      fonts: [],
+      warnings: [],
+      protectedText: [],
+    };
   const documentHydration = documentHydrationReason(document, paths);
 
   const visit = (
@@ -441,7 +479,23 @@ function scanHtml(
       ? hydrationReason(node, detectors, paths)
       : undefined;
     const marker = attr(node, MARKER);
+    const sourceMarker = attr(node, SOURCE_MARKER);
     let nextActive = active;
+
+    if (sourceMarker !== undefined) {
+      if (marker === undefined)
+        throw new StaticBuildPlanError(
+          file,
+          path(),
+          `${SOURCE_MARKER} requires ${MARKER}`,
+        );
+      if (sourceMarker !== GLYPH_STATIC_BOUNDARY_SOURCE)
+        throw new StaticBuildPlanError(
+          file,
+          path(),
+          `unsupported GlyphStaticBoundary source version "${sourceMarker || "(empty)"}"`,
+        );
+    }
 
     if (marker !== undefined) {
       if (active) {
@@ -492,24 +546,36 @@ function scanHtml(
       throw new StaticBuildPlanError(file, path(), ownUnsafe);
     if (nextActive && ownHydration)
       throw new StaticBuildPlanError(file, path(), ownHydration);
-    if (nextActive && node.nodeName === "#comment")
+    const ownTypography = node.tagName
+      ? inlineTypographyReason(node)
+      : undefined;
+    if (nextActive && ownTypography)
+      throw new StaticBuildPlanError(file, path(), ownTypography);
+    if (
+      nextActive &&
+      node.nodeName === "#comment" &&
+      (node.data ?? node.value ?? "").trim().length > 0
+    )
       throw new StaticBuildPlanError(
         file,
         active?.path ?? path(),
-        "HTML comments inside a protected block would remain in plaintext",
+        "HTML comments containing text inside a protected block would remain in plaintext",
       );
+    if (nextActive && node.tagName) protectedElements++;
     if (
       nextActive &&
       node.nodeName === "#text" &&
       typeof node.value === "string" &&
       node.value.length > 0
-    )
+    ) {
+      protectedTextNodes++;
       protectedText.push({
         file,
         path: path(),
         font: nextActive.font,
         text: node.value,
       });
+    }
 
     const nextUnsafe =
       unsafeAncestor ??
@@ -524,6 +590,8 @@ function scanHtml(
   visit(document, undefined, undefined, undefined, undefined);
   return {
     protectedBlocks,
+    protectedElements,
+    protectedTextNodes,
     fonts: [...fonts].sort(),
     warnings,
     protectedText,
@@ -699,6 +767,8 @@ export class StaticBuildPlanner {
     const warnings: StaticPlanWarning[] = [];
     const protectedText: ProtectedTextSpan[] = [];
     let protectedBlocks = 0;
+    let protectedElements = 0;
+    let protectedTextNodes = 0;
     const fileEntries = tree.filter((entry) => !entry.directory);
     const configuredFonts = new Set(Object.keys(this.config.fonts));
     const planned = await mapBounded(
@@ -719,6 +789,8 @@ export class StaticBuildPlanner {
               kind: "asset",
               transformed: false,
               protectedBlocks: 0,
+              protectedElements: 0,
+              protectedTextNodes: 0,
               fonts: [],
             },
           };
@@ -736,6 +808,8 @@ export class StaticBuildPlanner {
               sourceSha256: hash,
               transformed: false,
               protectedBlocks: 0,
+              protectedElements: 0,
+              protectedTextNodes: 0,
               fonts: [],
             },
           };
@@ -757,6 +831,8 @@ export class StaticBuildPlanner {
             sourceSha256: hash,
             transformed: scanned.protectedBlocks > 0,
             protectedBlocks: scanned.protectedBlocks,
+            protectedElements: scanned.protectedElements,
+            protectedTextNodes: scanned.protectedTextNodes,
             fonts: scanned.fonts,
           },
           document,
@@ -770,6 +846,8 @@ export class StaticBuildPlanner {
       if (!scanned) continue;
       for (const font of scanned.fonts) allFonts.add(font);
       protectedBlocks += scanned.protectedBlocks;
+      protectedElements += scanned.protectedElements;
+      protectedTextNodes += scanned.protectedTextNodes;
       warnings.push(...scanned.warnings);
       protectedText.push(...scanned.protectedText);
       if (result.file.transformed && result.document)
@@ -801,6 +879,8 @@ export class StaticBuildPlanner {
       files,
       htmlFiles: files.filter((file) => file.kind === "html").length,
       protectedBlocks,
+      protectedElements,
+      protectedTextNodes,
       fonts: [...allFonts].sort(),
       warnings,
     };

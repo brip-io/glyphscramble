@@ -31,7 +31,7 @@ import type {
   GlyphConfig,
 } from "./types.js";
 
-const STATIC_ALGORITHM = "glyphscramble-static-v3" as const;
+const STATIC_ALGORITHM = "glyphscramble-static-v4" as const;
 const DEFAULT_FONT_LOAD_TIMEOUT_MS = 8_000;
 const MAX_FONT_LOAD_TIMEOUT_MS = 60_000;
 const DEFAULT_FAILURE_TEXT = "This protected content could not be displayed.";
@@ -83,6 +83,8 @@ export interface StaticManifestHtmlFile {
   sourceSha256: string;
   transformed: boolean;
   protectedBlocks: number;
+  protectedElements: number;
+  protectedTextNodes: number;
   fonts: readonly string[];
   /** Digest of protected encoded text-node structure for mutation detection. */
   readonly protectedTextSha256?: string;
@@ -103,7 +105,7 @@ export interface StaticGlyphCspDirectives {
 }
 
 export interface StaticBuildManifest {
-  version: 3;
+  version: 4;
   algorithm: typeof STATIC_ALGORITHM;
   buildId: string;
   seedIdentitySha256: string;
@@ -115,6 +117,9 @@ export interface StaticBuildManifest {
   fontIdentities: Readonly<Record<string, string>>;
   sourceHtml: readonly StaticManifestHtmlFile[];
   transformedFiles: readonly string[];
+  protectedBlocks: number;
+  protectedElements: number;
+  protectedTextNodes: number;
   fonts: readonly string[];
   warnings: readonly string[];
 }
@@ -122,6 +127,8 @@ export interface StaticBuildManifest {
 export interface StaticSiteResult {
   htmlFiles: number;
   protectedBlocks: number;
+  protectedElements: number;
+  protectedTextNodes: number;
   fonts: readonly string[];
   transformedFiles: readonly string[];
   outputDir: string;
@@ -132,6 +139,10 @@ export interface StaticSiteResult {
 
 export const STATIC_BUILD_WARNING =
   "Static mode supports explicitly marked, non-hydrated HTML only and rotates once per build. Every visitor receives the same recoverable mapping, so CDN caching improves while scraper resistance is lower than per-response mode.";
+export const STATIC_ACCESSIBILITY_WARNING =
+  "Protected static blocks are aria-hidden and are not WCAG-conformant. Use them only for optional, opted-in high-value content and keep an accessible acquisition route outside the block.";
+export const STATIC_SEO_WARNING =
+  "Search crawlers receive encoded protected text. Keep titles, headings, summaries, metadata, structured data, and link context outside protected blocks.";
 
 /** Minimal strict CSP for the same-origin, external-only static asset graph. */
 export function staticGlyphCspDirectives(): StaticGlyphCspDirectives {
@@ -552,14 +563,14 @@ function staticCss(
     .map(
       (font) =>
         `@font-face{font-family:"${font.family}";src:url("./${font.file}") format("woff2");font-weight:${font.descriptors.weight};font-style:${font.descriptors.style};font-stretch:${font.descriptors.stretch};unicode-range:${font.descriptors.unicodeRange.join(",")};font-display:block}\n` +
-        `.glyphscramble-font-${font.id}{font-family:"${font.family}";font-weight:${font.descriptors.weight};font-style:${font.descriptors.style};font-stretch:${font.descriptors.stretch}}`,
+        `.glyphscramble-font-${font.id},.glyphscramble-font-${font.id} *{font-family:"${font.family}"!important}.glyphscramble-font-${font.id}{font-weight:${font.descriptors.weight};font-style:${font.descriptors.style};font-stretch:${font.descriptors.stretch}}`,
     )
     .join("\n");
   return `${faces}\n.glyphscramble-status{visibility:hidden}.glyphscramble-status[data-glyphscramble-status="pending"]{animation:glyphscramble-static-failure 1ms step-end ${timeoutMs}ms forwards}.glyphscramble-status[data-glyphscramble-status="error"]{visibility:visible}@keyframes glyphscramble-static-failure{to{visibility:visible}}\n`;
 }
 
 function staticLoader(timeoutMs: number): string {
-  return `(()=>{const t=${timeoutMs};for(const e of document.querySelectorAll('[data-glyphscramble-font][data-glyphscramble-state="loading"]')){const s=e.nextElementSibling;const fail=()=>{e.hidden=true;e.dataset.glyphscrambleState='error';if(s instanceof HTMLElement&&s.hasAttribute('data-glyphscramble-status'))s.dataset.glyphscrambleStatus='error'};(async()=>{let timer;try{if(!(s instanceof HTMLElement)||!s.hasAttribute('data-glyphscramble-status'))throw 0;const family=e.dataset.glyphscrambleFamily;if(!family)throw 0;const style=getComputedStyle(e);const query=style.font;const text=e.textContent||' ';const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('font timeout')),t)});const loaded=await Promise.race([document.fonts.load(query,text),timeout]);if(!Array.isArray(loaded)||loaded.length===0||!document.fonts.check(query,text)||!getComputedStyle(e).fontFamily.includes(family))throw 0;clearTimeout(timer);s.hidden=true;s.dataset.glyphscrambleStatus='ready';e.dataset.glyphscrambleState='ready';e.hidden=false}catch{clearTimeout(timer);fail()}})()}})();\n`;
+  return `(()=>{const t=${timeoutMs};for(const e of document.querySelectorAll('[data-glyphscramble-font][data-glyphscramble-state="loading"]')){const s=e.nextElementSibling;const fail=()=>{e.hidden=true;e.dataset.glyphscrambleState='error';if(s instanceof HTMLElement&&s.hasAttribute('data-glyphscramble-status'))s.dataset.glyphscrambleStatus='error'};(async()=>{let timer;try{if(!(s instanceof HTMLElement)||!s.hasAttribute('data-glyphscramble-status'))throw 0;const family=e.dataset.glyphscrambleFamily;if(!family)throw 0;const requests=new Map;for(const n of [e,...e.querySelectorAll('*')]){const text=[...n.childNodes].filter(c=>c.nodeType===3).map(c=>c.textContent||'').join('');if(!text)continue;const style=getComputedStyle(n);if(!style.fontFamily.includes(family))throw 0;requests.set(style.font,(requests.get(style.font)||'')+text)}const entries=[...requests];const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('font timeout')),t)});const loaded=await Promise.race([Promise.all(entries.map(([query,text])=>document.fonts.load(query,text))),timeout]);if(loaded.some(faces=>!Array.isArray(faces)||faces.length===0)||entries.some(([query,text])=>!document.fonts.check(query,text)))throw 0;clearTimeout(timer);s.hidden=true;s.dataset.glyphscrambleStatus='ready';e.dataset.glyphscrambleState='ready';e.hidden=false}catch{clearTimeout(timer);fail()}})()}})();\n`;
 }
 
 function manifestHtml(
@@ -577,6 +588,8 @@ function manifestHtml(
         sourceSha256: file.sourceSha256,
         transformed: file.transformed,
         protectedBlocks: file.protectedBlocks,
+        protectedElements: file.protectedElements,
+        protectedTextNodes: file.protectedTextNodes,
         fonts: file.fonts,
       };
       if (!file.transformed) return common;
@@ -607,6 +620,9 @@ interface StaticBuildIdentity {
   publicBasePath: string;
   fontLoadTimeoutMs: number;
   failureText: string;
+  protectedBlocks: number;
+  protectedElements: number;
+  protectedTextNodes: number;
   sourceHtml: readonly StaticManifestHtmlFile[];
   fontIdentities: Readonly<Record<string, string>>;
   assets: readonly {
@@ -674,6 +690,9 @@ async function buildResources(
     publicBasePath,
     fontLoadTimeoutMs,
     failureText,
+    protectedBlocks: plan.protectedBlocks,
+    protectedElements: plan.protectedElements,
+    protectedTextNodes: plan.protectedTextNodes,
     sourceHtml,
     fontIdentities,
     assets: pending.map((asset) => ({
@@ -691,7 +710,7 @@ async function buildResources(
     kind: asset.kind,
   }));
   const manifest: StaticBuildManifest = {
-    version: 3,
+    version: 4,
     algorithm: STATIC_ALGORITHM,
     buildId,
     seedIdentitySha256,
@@ -705,9 +724,14 @@ async function buildResources(
     transformedFiles: sourceHtml
       .filter((file) => file.transformed)
       .map((file) => file.path),
+    protectedBlocks: plan.protectedBlocks,
+    protectedElements: plan.protectedElements,
+    protectedTextNodes: plan.protectedTextNodes,
     fonts: plan.fonts,
     warnings: [
       STATIC_BUILD_WARNING,
+      STATIC_ACCESSIBILITY_WARNING,
+      STATIC_SEO_WARNING,
       ...plan.warnings.map(
         (warning) =>
           `${warning.code}: ${warning.file} ${warning.path}: ${warning.message}`,
@@ -897,7 +921,7 @@ export async function verifyStaticOutput(
       manifestFile,
     );
   if (
-    manifest.version !== 3 ||
+    manifest.version !== 4 ||
     manifest.algorithm !== STATIC_ALGORITHM ||
     !/^[a-f0-9]{64}$/i.test(manifest.buildId) ||
     manifest.assetDirectory !== `${ASSET_ROOT}/${manifest.buildId}` ||
@@ -914,6 +938,12 @@ export async function verifyStaticOutput(
     typeof manifest.publicBasePath === "string" &&
     validStaticFailureText(manifest.failureText) &&
     Number.isSafeInteger(manifest.fontLoadTimeoutMs) &&
+    Number.isSafeInteger(manifest.protectedBlocks) &&
+    manifest.protectedBlocks >= 0 &&
+    Number.isSafeInteger(manifest.protectedElements) &&
+    manifest.protectedElements >= 0 &&
+    Number.isSafeInteger(manifest.protectedTextNodes) &&
+    manifest.protectedTextNodes >= 0 &&
     Array.isArray(manifest.sourceHtml) &&
     typeof manifest.fontIdentities === "object" &&
     manifest.fontIdentities !== null &&
@@ -933,6 +963,9 @@ export async function verifyStaticOutput(
       publicBasePath: manifest.publicBasePath,
       fontLoadTimeoutMs: manifest.fontLoadTimeoutMs,
       failureText: manifest.failureText,
+      protectedBlocks: manifest.protectedBlocks,
+      protectedElements: manifest.protectedElements,
+      protectedTextNodes: manifest.protectedTextNodes,
       sourceHtml: manifest.sourceHtml,
       fontIdentities: manifest.fontIdentities,
       assets: manifestAssets.map((asset) => ({
@@ -1049,6 +1082,10 @@ export async function verifyStaticOutput(
           typeof file.transformed === "boolean" &&
           Number.isSafeInteger(file.protectedBlocks) &&
           file.protectedBlocks >= 0 &&
+          Number.isSafeInteger(file.protectedElements) &&
+          file.protectedElements >= 0 &&
+          Number.isSafeInteger(file.protectedTextNodes) &&
+          file.protectedTextNodes >= 0 &&
           Array.isArray(file.fonts) &&
           file.fonts.every((font: unknown) => typeof font === "string") &&
           (!file.transformed ||
@@ -1070,6 +1107,25 @@ export async function verifyStaticOutput(
       findings,
       "STATIC-MANIFEST-CONTRACT",
       "Manifest sourceHtml paths must be unique.",
+      manifestFile,
+    );
+  const manifestTotals = sourceHtml.reduce(
+    (totals, file) => ({
+      blocks: totals.blocks + file.protectedBlocks,
+      elements: totals.elements + file.protectedElements,
+      textNodes: totals.textNodes + file.protectedTextNodes,
+    }),
+    { blocks: 0, elements: 0, textNodes: 0 },
+  );
+  if (
+    manifestTotals.blocks !== manifest.protectedBlocks ||
+    manifestTotals.elements !== manifest.protectedElements ||
+    manifestTotals.textNodes !== manifest.protectedTextNodes
+  )
+    addError(
+      findings,
+      "STATIC-MANIFEST-COUNTS",
+      "Manifest protected block, element, or text-node totals do not match sourceHtml entries.",
       manifestFile,
     );
   const declaredHtml = new Map(sourceHtml.map((file) => [file.path, file]));
@@ -1153,7 +1209,7 @@ export async function verifyStaticOutput(
     findings.push({
       severity: "info",
       code: "STATIC-OUTPUT-OK",
-      message: `Verified build ${manifest.buildId}: ${manifestAssets.length} asset(s), ${transformed.size} transformed document(s).`,
+      message: `Verified build ${manifest.buildId}: ${manifestAssets.length} asset(s), ${transformed.size} transformed document(s), ${manifest.protectedBlocks} protected block(s), ${manifest.protectedElements} element(s), and ${manifest.protectedTextNodes} text node(s).`,
     });
   return findings;
 }
@@ -1215,6 +1271,8 @@ export async function buildStaticSite(
   return {
     htmlFiles: plan.htmlFiles,
     protectedBlocks: plan.protectedBlocks,
+    protectedElements: plan.protectedElements,
+    protectedTextNodes: plan.protectedTextNodes,
     fonts: plan.fonts,
     transformedFiles: resources.manifest.transformedFiles,
     outputDir: plan.outputDir,

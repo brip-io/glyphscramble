@@ -14,6 +14,10 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { defineGlyphConfig } from "../src/config.js";
 import { prepareGlyphFonts } from "../src/font-pipeline.js";
+import {
+  GLYPH_STATIC_BOUNDARY_SOURCE,
+  glyphStaticBoundaryAttributes,
+} from "../src/static-boundary.js";
 import { StaticBuildPlanner } from "../src/static-plan.js";
 import {
   buildStaticSite,
@@ -30,12 +34,15 @@ afterEach(async () => {
   );
 });
 
-async function fixture() {
+async function fixture(additionalCodepoints: readonly number[] = []) {
   const cwd = await mkdtemp(join(tmpdir(), "glyphscramble-static-"));
   roots.push(cwd);
   await mkdir(join(cwd, "fonts"));
   await mkdir(join(cwd, "licenses"));
-  await writeFile(join(cwd, "fonts/body.ttf"), syntheticFont());
+  await writeFile(
+    join(cwd, "fonts/body.ttf"),
+    syntheticFont(additionalCodepoints),
+  );
   await writeFile(join(cwd, "licenses/OFL.txt"), "fixture license");
   const config = defineGlyphConfig({
     fonts: {
@@ -77,6 +84,156 @@ async function treeBytes(root: string): Promise<Record<string, string>> {
 }
 
 describe("static build planner and publisher", () => {
+  it("creates a versioned framework-neutral boundary marker", () => {
+    expect(glyphStaticBoundaryAttributes("body")).toEqual({
+      "data-glyphscramble-font": "body",
+      "data-glyphscramble-source": GLYPH_STATIC_BOUNDARY_SOURCE,
+    });
+    expect(() => glyphStaticBoundaryAttributes("")).toThrow(/font id/);
+    expect(() => glyphStaticBoundaryAttributes("body font")).toThrow(/font id/);
+  });
+
+  it("reports nested component coverage and publishes no protected text", async () => {
+    const { cwd, config } = await fixture();
+    await mkdir(join(cwd, "source"));
+    const boundary = Object.entries(glyphStaticBoundaryAttributes("body"))
+      .map(([name, value]) => `${name}="${value}"`)
+      .join(" ");
+    await writeFile(
+      join(cwd, "source/index.html"),
+      `<!doctype html><html><head></head><body><article ${boundary}><div><p>Secret <strong>value</strong></p><table><tbody><tr><th>Metric</th><td>Seven</td></tr></tbody></table></div></article><p>Indexable summary</p></body></html>`,
+    );
+
+    const plan = await new StaticBuildPlanner(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "published",
+    }).plan();
+    expect(plan).toMatchObject({
+      protectedBlocks: 1,
+      protectedElements: 9,
+      protectedTextNodes: 4,
+    });
+
+    const result = await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "published",
+      seed: "component-boundary-seed",
+    });
+    expect(result).toMatchObject({
+      protectedBlocks: 1,
+      protectedElements: 9,
+      protectedTextNodes: 4,
+    });
+    expect(result.manifest).toMatchObject({
+      protectedBlocks: 1,
+      protectedElements: 9,
+      protectedTextNodes: 4,
+      sourceHtml: [
+        expect.objectContaining({
+          protectedBlocks: 1,
+          protectedElements: 9,
+          protectedTextNodes: 4,
+        }),
+      ],
+    });
+    expect(result.manifest.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/not WCAG-conformant/),
+        expect.stringMatching(/Search crawlers/),
+      ]),
+    );
+    const output = await readFile(join(cwd, "published/index.html"), "utf8");
+    expect(output).not.toMatch(/Secret|value|Metric|Seven/);
+    expect(output).toContain("Indexable summary");
+    const css = result.manifest.assets.find((asset) => asset.kind === "style")!;
+    const styles = await readFile(join(cwd, "published", css.path), "utf8");
+    expect(styles).toContain(
+      ".glyphscramble-font-body,.glyphscramble-font-body *{font-family:",
+    );
+    expect(styles).toContain("!important");
+    expect(await verifyStaticOutput(join(cwd, "published"))).toEqual([
+      expect.objectContaining({
+        code: "STATIC-OUTPUT-OK",
+        message: expect.stringMatching(/9 element\(s\).*4 text node\(s\)/),
+      }),
+    ]);
+    await writeFile(
+      join(cwd, "published", result.manifestFile),
+      JSON.stringify({
+        ...result.manifest,
+        protectedElements: result.manifest.protectedElements + 1,
+      }),
+    );
+    expect(await verifyStaticOutput(join(cwd, "published"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "STATIC-MANIFEST-COUNTS" }),
+      ]),
+    );
+  });
+
+  it("rejects stale boundary metadata and inline face overrides", async () => {
+    const { cwd, config } = await fixture();
+    await mkdir(join(cwd, "source"));
+    const plan = () =>
+      new StaticBuildPlanner(config, {
+        cwd,
+        inputDir: "source",
+        outputDir: "published",
+      }).plan();
+
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><body><article data-glyphscramble-source="static-boundary-v0">Secret</article></body></html>',
+    );
+    await expect(plan()).rejects.toThrow(/requires data-glyphscramble-font/);
+
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><body><article data-glyphscramble-font="body" data-glyphscramble-source="static-boundary-v0">Secret</article></body></html>',
+    );
+    await expect(plan()).rejects.toThrow(/unsupported GlyphStaticBoundary/);
+
+    for (const style of [
+      "font-family: serif",
+      "font: 16px serif",
+      "f/**/ont-family: serif",
+      String.raw`f\6f nt-family: serif`,
+    ]) {
+      await writeFile(
+        join(cwd, "source/index.html"),
+        `<html><body><article data-glyphscramble-font="body"><span style="${style}">Secret</span></article></body></html>`,
+      );
+      await expect(plan()).rejects.toThrow(/inline .*font|escaped CSS/);
+    }
+
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><body><article data-glyphscramble-font="body"><span style="font-size: 1.1rem; color: red; font-weight: bold; font-style: italic">Secret</span></article></body></html>',
+    );
+    await expect(plan()).resolves.toMatchObject({ protectedBlocks: 1 });
+  });
+
+  it("transforms script-safe nested text while preserving structural controls", async () => {
+    const { cwd, config } = await fixture([0x0300, 0x0301, 0x0303]);
+    await mkdir(join(cwd, "source"));
+    const protectedValues = ["אבג", "بت", "कखग", "กขค", "q́", "😀‍😁"];
+    await writeFile(
+      join(cwd, "source/index.html"),
+      `<html><head></head><body><article data-glyphscramble-font="body">${protectedValues.map((value, index) => `<p${index < 2 ? ' dir="rtl"' : ""}>${value}</p>`).join("")}</article></body></html>`,
+    );
+    await buildStaticSite(config, {
+      cwd,
+      inputDir: "source",
+      outputDir: "published",
+      seed: "multiscript-boundary-seed",
+    });
+    const output = await readFile(join(cwd, "published/index.html"), "utf8");
+    for (const value of protectedValues) expect(output).not.toContain(value);
+    expect(output).toContain("‍");
+  });
+
   it("provides the external-only strict CSP contract", () => {
     expect(staticGlyphCspDirectives()).toEqual({
       "default-src": ["'none'"],
@@ -143,8 +300,8 @@ describe("static build planner and publisher", () => {
     expect(JSON.stringify(first.manifest)).not.toContain("Secret Value");
     expect(JSON.stringify(first.manifest)).not.toContain("stable-static-seed");
     expect(first.manifest).toMatchObject({
-      version: 3,
-      algorithm: "glyphscramble-static-v3",
+      version: 4,
+      algorithm: "glyphscramble-static-v4",
       publicBasePath: "/",
       fonts: ["body"],
       transformedFiles: ["index.html"],
@@ -444,6 +601,18 @@ describe("static build planner and publisher", () => {
         outputDir: "published",
       }).plan(),
     ).rejects.toThrow(/comments.*plaintext/i);
+
+    await writeFile(
+      join(cwd, "source/index.html"),
+      '<html><head></head><body><article data-glyphscramble-font="body">Visible<!----><span>Secret</span></article></body></html>',
+    );
+    await expect(
+      new StaticBuildPlanner(config, {
+        cwd,
+        inputDir: "source",
+        outputDir: "published",
+      }).plan(),
+    ).resolves.toMatchObject({ protectedBlocks: 1 });
   });
 
   it("supports custom hydration detectors", async () => {

@@ -45,7 +45,7 @@ The canonical direct-dependency profiles are:
 | `nuxt`         | Nuxt                         | `@brip/glyphscramble`, `@brip/glyphscramble-nuxt`      |
 | `sveltekit`    | SvelteKit                    | `@brip/glyphscramble`, `@brip/glyphscramble-sveltekit` |
 | `astro`        | Astro SSR                    | `@brip/glyphscramble`, `@brip/glyphscramble-astro`     |
-| `astro-static` | Astro static post-build      | `@brip/glyphscramble`                                  |
+| `astro-static` | Astro static post-build      | `@brip/glyphscramble`, `@brip/glyphscramble-astro`     |
 | `vite`         | Vite static/per-build plugin | `@brip/glyphscramble`, `@brip/glyphscramble-vite`      |
 
 The exported `GLYPH_INSTALLATION_PROFILES` value is the machine-readable source

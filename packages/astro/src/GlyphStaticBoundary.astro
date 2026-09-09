@@ -1,0 +1,40 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import {
+  glyphStaticBoundaryAttributes,
+  isGlyphStaticBoundaryElement,
+  type GlyphStaticBoundaryElement,
+} from "@brip/glyphscramble";
+
+type BoundaryAttribute =
+  | "children"
+  | "data-glyphscramble-font"
+  | "data-glyphscramble-source"
+  | "set:html"
+  | "set:text";
+
+export type Props = {
+  font: string;
+  as?: GlyphStaticBoundaryElement;
+} & Omit<HTMLAttributes<GlyphStaticBoundaryElement>, BoundaryAttribute>;
+
+if (!Astro.slots.has("default"))
+  throw new TypeError("GlyphStaticBoundary requires a default slot.");
+
+const { font, as: Element = "div", ...attributes } = Astro.props;
+if (!isGlyphStaticBoundaryElement(Element))
+  throw new TypeError(
+    "GlyphStaticBoundary `as` must be a supported non-interactive intrinsic element.",
+  );
+for (const name of [
+  "children",
+  "data-glyphscramble-font",
+  "data-glyphscramble-source",
+  "set:html",
+  "set:text",
+])
+  delete (attributes as Record<string, unknown>)[name];
+const marker = glyphStaticBoundaryAttributes(font);
+---
+
+<Element {...attributes} {...marker}><slot /></Element>

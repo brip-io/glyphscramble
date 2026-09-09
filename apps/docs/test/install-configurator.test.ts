@@ -72,10 +72,10 @@ describe("installation configurator", () => {
     );
   });
 
-  it("uses core only for the Astro static transform", () => {
+  it("includes the Astro boundary component for the static transform", () => {
     expect(
       packagesForSelection(GLYPH_INSTALLATION_PROFILES, "astro", "static"),
-    ).toEqual(["@brip/glyphscramble"]);
+    ).toEqual(["@brip/glyphscramble", "@brip/glyphscramble-astro"]);
   });
 
   it("ships local brand marks without a runtime icon dependency", async () => {

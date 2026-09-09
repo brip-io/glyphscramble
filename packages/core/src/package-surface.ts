@@ -153,7 +153,7 @@ export const GLYPH_INSTALLATION_PROFILES = Object.freeze({
   nuxt: packages(GLYPH_PACKAGE_NAMES.core, GLYPH_PACKAGE_NAMES.nuxt),
   sveltekit: packages(GLYPH_PACKAGE_NAMES.core, GLYPH_PACKAGE_NAMES.sveltekit),
   astro: packages(GLYPH_PACKAGE_NAMES.core, GLYPH_PACKAGE_NAMES.astro),
-  "astro-static": packages(GLYPH_PACKAGE_NAMES.core),
+  "astro-static": packages(GLYPH_PACKAGE_NAMES.core, GLYPH_PACKAGE_NAMES.astro),
   vite: packages(GLYPH_PACKAGE_NAMES.core, GLYPH_PACKAGE_NAMES.vite),
 } as const);
 

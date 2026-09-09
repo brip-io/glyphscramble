@@ -109,6 +109,26 @@ async function inspectSources(root: string): Promise<DoctorFinding[]> {
           file,
         ),
       );
+    if (
+      /GlyphStaticBoundary|data-glyphscramble-source\s*=\s*["']static-boundary-v1/iu.test(
+        source,
+      )
+    ) {
+      findings.push(
+        finding(
+          "warning",
+          "STATIC-BOUNDARY-A11Y",
+          `Static protected blocks are aria-hidden and are not WCAG-conformant. Restrict them to optional, opted-in high-value content with an accessible acquisition route outside the boundary. ${USAGE}#accessibility`,
+          file,
+        ),
+        finding(
+          "warning",
+          "STATIC-BOUNDARY-SEO",
+          `Search crawlers receive encoded text from static boundaries. Keep headings, summaries, metadata, structured data, and link context unprotected. ${USAGE}#static-compiler-boundary`,
+          file,
+        ),
+      );
+    }
   }
   return findings;
 }
@@ -333,6 +353,8 @@ export async function doctorProject(
         "ESSENTIAL-CONTENT",
         "A11Y-MIRROR",
         "STATIC-HYDRATION",
+        "STATIC-BOUNDARY-A11Y",
+        "STATIC-BOUNDARY-SEO",
       ].includes(item.code),
     )
   )

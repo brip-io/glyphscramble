@@ -8,7 +8,10 @@ npm install --save-exact @brip/glyphscramble@beta @brip/glyphscramble-svelte@bet
 
 Pass only a server-produced `GlyphPayload` to `GlyphText`; snippets and
 children are intentionally unavailable. `GlyphScramble` remains a deprecated
-beta alias. Read the [Svelte and SvelteKit
+beta alias. For non-hydrated static Svelte output only, import the default
+`GlyphStaticBoundary` component from `@brip/glyphscramble-svelte/static`; its
+snippet is transformed only by the post-build compiler and must never hydrate.
+Read the [Svelte and SvelteKit
 guide](https://github.com/brip-io/glyphscramble/blob/main/docs/FRAMEWORKS.md#svelte-5-and-sveltekit-2)
 and protect only optional, high-value content.
 

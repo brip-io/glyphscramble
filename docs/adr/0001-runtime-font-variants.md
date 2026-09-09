@@ -108,6 +108,11 @@ algorithm to `glyphscramble-static-v3`; a response token and font cannot mix
 algorithm versions because the process-local variant owns both artifacts and a
 missing post-deploy variant fails with `410`.
 
+DX-STATIC-BOUNDARY later advances the static algorithm and manifest to v4.
+That revision adds protected subtree counts and a descendant font-cascade
+contract, so older v3 output is intentionally recompiled instead of being
+accepted under a changed schema.
+
 ## Performance gates
 
 `glyphscramble benchmark` now measures preparation, pool startup, permutation,

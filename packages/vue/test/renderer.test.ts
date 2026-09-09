@@ -3,6 +3,7 @@ import { renderToString } from "vue/server-renderer";
 import { describe, expect, it } from "vitest";
 import type { GlyphPayload } from "@brip/glyphscramble";
 import { GlyphText, GlyphScramble } from "../src/index.js";
+import { GlyphStaticBoundary } from "../src/static.js";
 
 const payload = {
   version: 3,
@@ -52,6 +53,42 @@ describe("GlyphText", () => {
 
     await expect(renderToString(app)).rejects.toThrow(
       /GlyphText `as` must be a supported native text container/,
+    );
+  });
+});
+
+describe("GlyphStaticBoundary", () => {
+  it("marks a nested server-rendered slot and leaves it visible for compilation", async () => {
+    const ResearchCard = defineComponent({
+      render: () => h("div", [h("p", "Protected research detail")]),
+    });
+    const app = createSSRApp({
+      render: () =>
+        h(
+          GlyphStaticBoundary,
+          { font: "body", as: "article", class: "research" },
+          { default: () => h(ResearchCard) },
+        ),
+    });
+    const html = await renderToString(app);
+    expect(html).toContain('data-glyphscramble-font="body"');
+    expect(html).toContain('data-glyphscramble-source="static-boundary-v1"');
+    expect(html).toContain("<p>Protected research detail</p>");
+    expect(html).not.toContain("hidden");
+  });
+
+  it("rejects interactive wrapper elements", async () => {
+    const app = createSSRApp({
+      render: () =>
+        h(
+          GlyphStaticBoundary,
+          { font: "body", as: "button" as "div" },
+          { default: () => "Secret" },
+        ),
+    });
+    app.config.warnHandler = () => {};
+    await expect(renderToString(app)).rejects.toThrow(
+      /non-interactive native element/,
     );
   });
 });

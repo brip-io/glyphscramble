@@ -7,9 +7,9 @@ Every client adapter delegates to the same validated `mountGlyphPayload()` lifec
 `GlyphText` is the canonical payload-only leaf in every framework. It accepts
 no plaintext children, slots, snippets, or arbitrary custom component through
 `as`; use only a server-produced `GlyphPayload`. `GlyphScramble` remains a
-deprecated compatibility alias throughout beta. The forthcoming
-`GlyphStaticBoundary` is the separate compiler-backed API for safe,
-non-hydrated subtrees—`GlyphText` does not instrument descendants.
+deprecated compatibility alias throughout beta. `GlyphStaticBoundary` is the
+separate compiler-backed API for safe, non-hydrated static subtrees—`GlyphText`
+does not instrument descendants.
 
 Core `beginResponse()` and the Next, Nuxt, SvelteKit, and Astro server-helper
 options accept the same `faces: [{ font, face }]` predeclaration when a route or
@@ -221,6 +221,40 @@ traffic and `glyphHandle.close()` at process shutdown. Do not prerender routes
 that use per-response protection. Hydrated SvelteKit static output is outside
 the static compiler's safety boundary; only non-hydrated HTML may use the
 separate [static deployment](STATIC-DEPLOYMENT.md) workflow.
+
+## Existing components in static builds
+
+For genuinely non-hydrated output, wrap an existing presentational component
+with the framework's explicit static entrypoint. The component emits only a
+versioned marker; the post-build compiler validates and transforms final HTML.
+
+```tsx
+import { GlyphStaticBoundary } from "@brip/glyphscramble-react/static";
+
+<GlyphStaticBoundary font="body" as="article">
+  <ExistingResearchCard />
+</GlyphStaticBoundary>;
+```
+
+Vue uses the same named import from `@brip/glyphscramble-vue/static`. Svelte
+uses the default component from `@brip/glyphscramble-svelte/static`, and Astro
+uses `@brip/glyphscramble-astro/GlyphStaticBoundary.astro`. Framework-neutral
+renderers can spread `glyphStaticBoundaryAttributes("body")` from core onto a
+single safe wrapper.
+
+One prepared face owns the entire subtree in v0.1. Size, spacing, color,
+weight, and style may vary; inline `font` and `font-family` declarations fail
+planning. Generated CSS forces the mapped family on every descendant, and the
+font-load guard verifies each descendant's computed family before reveal.
+Hydration markers, interactive descendants, text-bearing attributes,
+comments containing text, and a nested different-font boundary fail before
+the publication directory is replaced.
+
+This is per-build rotation, not per-response protection. It is appropriate
+only for optional high-value blocks: the protected copy is absent from search
+semantics and assistive technology, while the content-addressed assets remain
+publicly cacheable. Keep headings, summaries, links, metadata, navigation,
+forms, and an accessible acquisition route outside the boundary.
 
 ## Astro 7
 

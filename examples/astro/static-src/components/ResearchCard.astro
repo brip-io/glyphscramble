@@ -1,0 +1,22 @@
+---
+const rows = [
+  ["Corpus", "31 million reviewed records"],
+  ["Refresh", "Weekly"],
+];
+---
+
+<div class="research-card__body">
+  <p>
+    The full research brief includes <strong>verified findings</strong> and
+    methodology notes.
+  </p>
+  <p dir="rtl">Right-to-left layout sample</p>
+  <table>
+    <tbody>
+      {rows.map(([label, value]) => (
+        <tr><th>{label}</th><td>{value}</td></tr>
+      ))}
+    </tbody>
+  </table>
+  <p><em>High-value detail for licensed readers.</em></p>
+</div>

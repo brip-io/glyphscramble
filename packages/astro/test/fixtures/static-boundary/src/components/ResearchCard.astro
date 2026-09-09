@@ -1,0 +1,17 @@
+---
+const entries = [
+  ["Corpus", "31 million records"],
+  ["Refresh", "Weekly"],
+];
+---
+
+<div class="card">
+  <p><strong>Research summary</strong> for licensed readers.</p>
+  <table>
+    <tbody>
+      {entries.map(([label, value]) => (
+        <tr><th>{label}</th><td>{value}</td></tr>
+      ))}
+    </tbody>
+  </table>
+</div>

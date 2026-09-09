@@ -28,11 +28,12 @@ describe("canonical package surface", () => {
       nuxt: ["@brip/glyphscramble", "@brip/glyphscramble-nuxt"],
       sveltekit: ["@brip/glyphscramble", "@brip/glyphscramble-sveltekit"],
       astro: ["@brip/glyphscramble", "@brip/glyphscramble-astro"],
-      "astro-static": ["@brip/glyphscramble"],
+      "astro-static": ["@brip/glyphscramble", "@brip/glyphscramble-astro"],
       vite: ["@brip/glyphscramble", "@brip/glyphscramble-vite"],
     });
     expect(glyphPackagesFor("astro", "static")).toEqual([
       "@brip/glyphscramble",
+      "@brip/glyphscramble-astro",
     ]);
     expect(glyphPackagesFor("astro", "response")).toEqual([
       "@brip/glyphscramble",
