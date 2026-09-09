@@ -9,6 +9,8 @@ import {
   ShuffleAngularIcon,
 } from "@phosphor-icons/react/ssr";
 import { BripLockup } from "../components/brip-lockup";
+import { CinematicHero } from "../components/cinematic-hero/cinematic-hero";
+import { HeroNarrative } from "../components/cinematic-hero/hero-narrative";
 import { InstallationConfigurator } from "../components/installation-configurator";
 import fixtureData from "../src/generated/demo-fixtures.json";
 
@@ -18,29 +20,27 @@ export default function HomePage() {
   return (
     <>
       <style>{`@font-face{font-family:"${comparisonFixture.family}";src:url("${comparisonFixture.fontFile}") format("woff2");font-weight:400;font-style:normal;font-display:block;}`}</style>
-      <section className="hero shell">
-        <div className="hero-copy">
-          <p className="maker-line">
-            <span>Open source by</span>
-            <BripLockup />
-          </p>
-          <h1>Make bulk DOM scraping cost more.</h1>
-          <p className="hero-summary">
-            Scramble response text, ship the matching font, and keep the limits
-            explicit.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-primary" href="/demo/">
-              Explore demo
-              <ArrowRightIcon aria-hidden="true" size={18} />
-            </a>
-            <a className="button button-secondary" href="/docs/">
-              <BookOpenIcon aria-hidden="true" size={18} />
-              Documentation
-            </a>
-          </div>
+      <CinematicHero narrative={<HeroNarrative />}>
+        <p className="maker-line">
+          <span>Open source by</span>
+          <BripLockup />
+        </p>
+        <h1>Make bulk DOM scraping cost more.</h1>
+        <p className="hero-summary">
+          Scramble response text, ship the matching font, and keep the limits
+          explicit.
+        </p>
+        <div className="hero-actions">
+          <a className="button button-primary" href="/demo/">
+            Explore demo
+            <ArrowRightIcon aria-hidden="true" size={18} />
+          </a>
+          <a className="button button-secondary" href="/docs/">
+            <BookOpenIcon aria-hidden="true" size={18} />
+            Documentation
+          </a>
         </div>
-      </section>
+      </CinematicHero>
 
       <section className="section shell" id="how-it-works">
         <div className="section-heading">

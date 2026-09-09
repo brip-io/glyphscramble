@@ -13,6 +13,8 @@ Glyph scrambling is hard to understand from prose because the same response is i
 
 The demo must therefore teach a pipeline and an attack boundary, not merely animate scrambled letters. It will use actual GlyphScramble output generated during the docs build so filenames, payload shapes, codepoints, family names, font bytes, and rendered result remain grounded in the library.
 
+The landing page ships a separate, deliberately cinematic WebGL hero documented in [`SITE-CINEMATIC-HERO`](SITE-CINEMATIC-HERO.md). It knowingly deviates from the "no 3D effects or heavy animation libraries" non-goal below for that one marketing surface, inherits this document's claim-boundary wording, and does not replace the inspectable explorer specified here.
+
 ## Goals
 
 - Make the trusted server boundary and emitted artifacts understandable in under one minute.
